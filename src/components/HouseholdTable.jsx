@@ -109,42 +109,40 @@ const HouseholdTable = ({ refreshTrigger }) => {
   ];
 
   return (
-    <div style={{ marginTop: '2rem', background: 'var(--color-background-soft, rgba(0,0,0,0.05))', padding: '1.5rem', borderRadius: '8px' }}>
+    <div style={{ marginTop: '2rem', background: 'var(--card-bg)', padding: '2rem', borderRadius: 'var(--radius)', boxShadow: 'var(--shadow)' }}>
       <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', gap: '1rem' }}>
-        <h2 style={{ margin: 0 }}>Household Directory</h2>
-        <input 
-          type="text" 
-          placeholder="Search by name, address, or ID..." 
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          style={{ 
-            padding: '0.6rem 1rem', 
-            width: '100%', 
-            maxWidth: '350px', 
-            borderRadius: '20px', 
-            border: '1px solid #ccc',
-            fontSize: '1rem'
-          }}
-        />
+        <h2 style={{ margin: 0, color: 'var(--primary-color)' }}>Household Directory</h2>
+        <div style={{ position: 'relative', width: '100%', maxWidth: '350px' }}>
+          <input 
+            type="text" 
+            placeholder="Search name, address, or ID..." 
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            style={{ 
+              paddingLeft: '1rem',
+              borderRadius: '24px',
+              backgroundColor: '#F3F4F6',
+              border: '1px solid transparent'
+            }}
+          />
+        </div>
       </div>
 
-      <div style={{ background: 'white', borderRadius: '8px', padding: search.trim() === '' ? '3rem' : '0', color: '#333', minHeight: '200px', display: 'flex', flexDirection: 'column' }}>
-        
-        {/* If user hasn't searched, show empty white box */}
+      <div style={{ background: 'white', borderRadius: 'var(--radius)', border: '1px solid #E5E7EB', overflow: 'hidden' }}>
         {search.trim() === '' ? (
-          <div style={{ textAlign: 'center', margin: 'auto', color: '#888' }}>
-            <h3 style={{ margin: '0 0 0.5rem 0' }}>Search Database</h3>
-            <p style={{ margin: 0 }}>Type a name, address, or ID in the search bar above to fetch records.</p>
+          <div style={{ textAlign: 'center', padding: '4rem 2rem', color: 'var(--text-secondary)' }}>
+            <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🔍</div>
+            <h3 style={{ margin: '0 0 0.5rem 0', color: 'var(--text-primary)' }}>Search Database</h3>
+            <p style={{ margin: 0 }}>Type a name, address, or ID to fetch records.</p>
           </div>
         ) : (
-          /* Table View when searching */
           <div style={{ overflowX: 'auto', width: '100%' }}>
             <table style={{ borderCollapse: 'collapse', textAlign: 'left', width: 'max-content' }}>
               <thead>
-                <tr style={{ borderBottom: '2px solid #eaeaea', backgroundColor: '#f9f9f9' }}>
-                  <th style={{ padding: '1rem', whiteSpace: 'nowrap', minWidth: '150px' }}>Actions</th>
+                <tr style={{ backgroundColor: '#F9FAFB', borderBottom: '1px solid #E5E7EB' }}>
+                  <th style={{ padding: '1rem', color: 'var(--text-secondary)', fontWeight: '600', minWidth: '150px' }}>Actions</th>
                   {columns.map(col => (
-                    <th key={col.key} style={{ padding: '1rem', whiteSpace: 'nowrap', minWidth: '120px' }}>
+                    <th key={col.key} style={{ padding: '1rem', whiteSpace: 'nowrap', minWidth: '120px', color: 'var(--text-secondary)', fontWeight: '600' }}>
                       {col.label}
                     </th>
                   ))}
@@ -152,18 +150,39 @@ const HouseholdTable = ({ refreshTrigger }) => {
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={columns.length + 1} style={{ padding: '2rem', textAlign: 'center' }}>Searching database...</td></tr>
+                  <tr><td colSpan={columns.length + 1} style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)' }}>Searching database...</td></tr>
                 ) : households.length === 0 ? (
-                  <tr><td colSpan={columns.length + 1} style={{ padding: '2rem', textAlign: 'center' }}>No matching records found.</td></tr>
+                  <tr><td colSpan={columns.length + 1} style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)' }}>No matching records found.</td></tr>
                 ) : (
                   households.map((h) => (
-                    <tr key={h.id} style={{ borderBottom: '1px solid #eaeaea' }}>
-                      <td style={{ padding: '1rem', whiteSpace: 'nowrap' }}>
-                        <button onClick={() => handleEdit(h)} style={{ marginRight: '10px', padding: '5px 10px', backgroundColor: '#42b883', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Edit</button>
-                        <button onClick={() => handleDelete(h.id)} style={{ padding: '5px 10px', backgroundColor: '#ff5f5f', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Delete</button>
+                    <tr key={h.id} style={{ borderBottom: '1px solid #F3F4F6', transition: 'background-color 0.2s' }}>
+                      <td style={{ padding: '0.75rem 1rem', whiteSpace: 'nowrap' }}>
+                        <button 
+                          onClick={() => handleEdit(h)} 
+                          style={{ 
+                            marginRight: '8px', 
+                            padding: '6px 12px', 
+                            backgroundColor: 'var(--primary-color)', 
+                            color: 'white', 
+                            fontSize: '0.875rem' 
+                          }}
+                        >
+                          Edit
+                        </button>
+                        <button 
+                          onClick={() => handleDelete(h.id)} 
+                          style={{ 
+                            padding: '6px 12px', 
+                            backgroundColor: '#EF4444', 
+                            color: 'white', 
+                            fontSize: '0.875rem' 
+                          }}
+                        >
+                          Delete
+                        </button>
                       </td>
                       {columns.map(col => (
-                        <td key={`${h.id}-${col.key}`} style={{ padding: '1rem', whiteSpace: 'nowrap' }}>
+                        <td key={`${h.id}-${col.key}`} style={{ padding: '1rem', whiteSpace: 'nowrap', color: 'var(--text-primary)' }}>
                           {h[col.key] || '-'}
                         </td>
                       ))}
@@ -176,24 +195,30 @@ const HouseholdTable = ({ refreshTrigger }) => {
         )}
       </div>
 
-      {/* Pagination Controls - Only show when searching and there are results */}
       {search.trim() !== '' && totalPages > 0 && (
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
-          <span style={{ fontSize: '0.9rem' }}>Showing {page * pageSize + 1} - {Math.min((page + 1) * pageSize, totalCount)} of {totalCount} records</span>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1.5rem', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+          <span>Showing {page * pageSize + 1} - {Math.min((page + 1) * pageSize, totalCount)} of {totalCount} records</span>
           
-          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
             <button 
               onClick={() => setPage(p => Math.max(0, p - 1))}
               disabled={page === 0}
-              style={{ padding: '0.5rem 1rem', borderRadius: '4px', border: '1px solid #ccc', background: page === 0 ? '#eee' : '#fff', color: '#333', cursor: page === 0 ? 'not-allowed' : 'pointer' }}
+              style={{ 
+                backgroundColor: page === 0 ? '#F3F4F6' : 'white', 
+                border: '1px solid #E5E7EB', 
+                color: page === 0 ? '#9CA3AF' : 'var(--text-primary)' 
+              }}
             >
               Prev
             </button>
-            <span style={{ margin: '0 0.5rem' }}>Page {page + 1} of {totalPages}</span>
             <button 
               onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
               disabled={page === totalPages - 1}
-              style={{ padding: '0.5rem 1rem', borderRadius: '4px', border: '1px solid #ccc', background: page === totalPages - 1 ? '#eee' : '#fff', color: '#333', cursor: page === totalPages - 1 ? 'not-allowed' : 'pointer' }}
+              style={{ 
+                backgroundColor: page === totalPages - 1 ? '#F3F4F6' : 'white', 
+                border: '1px solid #E5E7EB', 
+                color: page === totalPages - 1 ? '#9CA3AF' : 'var(--text-primary)' 
+              }}
             >
               Next
             </button>

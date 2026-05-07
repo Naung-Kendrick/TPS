@@ -45,20 +45,21 @@ const EditHouseholdModal = ({ household, isOpen, onClose, onUpdateSuccess }) => 
     width: '100%',
     padding: '10px',
     marginBottom: '15px',
-    borderRadius: '6px',
-    border: '1px solid #ddd',
-    color: '#1a1a1a',
-    backgroundColor: '#f9f9f9',
+    borderRadius: '8px',
+    border: '1px solid #E5E7EB',
+    color: 'var(--text-primary)',
+    backgroundColor: '#F9FAFB',
     fontSize: '14px',
     outline: 'none',
-    boxSizing: 'border-box'
+    boxSizing: 'border-box',
+    fontFamily: 'inherit'
   };
 
   const labelStyle = {
     display: 'block',
     marginBottom: '6px',
     fontWeight: '600',
-    color: '#444',
+    color: 'var(--text-secondary)',
     fontSize: '13px'
   };
 
@@ -66,7 +67,8 @@ const EditHouseholdModal = ({ household, isOpen, onClose, onUpdateSuccess }) => 
     <div style={{
       position: 'fixed',
       top: 0, left: 0, right: 0, bottom: 0,
-      backgroundColor: 'rgba(0,0,0,0.5)',
+      backgroundColor: 'rgba(0,0,0,0.6)',
+      backdropFilter: 'blur(4px)',
       display: 'flex',
       justifyContent: 'center',
       alignItems: 'center',
@@ -75,18 +77,18 @@ const EditHouseholdModal = ({ household, isOpen, onClose, onUpdateSuccess }) => 
     }}>
       <div style={{
         backgroundColor: 'white',
-        padding: '30px',
-        borderRadius: '8px',
+        padding: '2.5rem',
+        borderRadius: 'var(--radius)',
         width: '100%',
-        maxWidth: '600px',
+        maxWidth: '700px',
         maxHeight: '90vh',
         overflowY: 'auto',
-        boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
       }}>
-        <h2 style={{ color: '#333', marginTop: 0 }}>Edit Household Member</h2>
+        <h2 style={{ color: 'var(--primary-color)', marginTop: 0, marginBottom: '2rem', fontSize: '1.75rem' }}>Edit Member Details</h2>
         
         <form onSubmit={handleSubmit}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.5rem' }}>
             <div>
               <label style={labelStyle}>Name</label>
               <input style={inputStyle} name="name" value={formData.name || ''} onChange={handleChange} />
@@ -161,12 +163,37 @@ const EditHouseholdModal = ({ household, isOpen, onClose, onUpdateSuccess }) => 
             </div>
           </div>
 
-          {error && <p style={{ color: 'red' }}>{error}</p>}
+          {error && <p style={{ color: '#EF4444', fontWeight: '500' }}>{error}</p>}
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '20px' }}>
-            <button type="button" onClick={onClose} style={{ padding: '10px 20px', borderRadius: '4px', border: '1px solid #ccc', cursor: 'pointer' }}>Cancel</button>
-            <button type="submit" disabled={loading} style={{ padding: '10px 20px', borderRadius: '4px', border: 'none', backgroundColor: '#42b883', color: 'white', cursor: 'pointer' }}>
-              {loading ? 'Updating...' : 'Save Changes'}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '2.5rem' }}>
+            <button 
+              type="button" 
+              onClick={onClose} 
+              style={{ 
+                padding: '0.75rem 1.5rem', 
+                borderRadius: '8px', 
+                border: '1px solid #E5E7EB', 
+                backgroundColor: 'white',
+                color: 'var(--text-primary)',
+                fontWeight: '600'
+              }}
+            >
+              Cancel
+            </button>
+            <button 
+              type="submit" 
+              disabled={loading} 
+              style={{ 
+                padding: '0.75rem 2rem', 
+                borderRadius: '8px', 
+                border: 'none', 
+                backgroundColor: 'var(--primary-color)', 
+                color: 'white',
+                fontWeight: '600',
+                boxShadow: '0 4px 6px -1px rgba(30, 64, 175, 0.4)'
+              }}
+            >
+              {loading ? 'Saving...' : 'Update Record'}
             </button>
           </div>
         </form>

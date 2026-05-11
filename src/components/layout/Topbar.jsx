@@ -1,79 +1,106 @@
 import React from 'react';
-import { Search, Bell, HelpCircle, User } from 'lucide-react';
+import { Search, Bell, ChevronDown } from 'lucide-react';
+import flag from "../../assets/taang_flag.jpg";
 
 const Topbar = () => {
   return (
     <header style={{
-      height: '72px',
-      backgroundColor: 'white',
-      borderBottom: '1px solid #E2E8F0',
+      height: '50px',
+      backgroundColor: '#FFFFFF',
+      borderBottom: '1px solid #E5E7EB',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'space-between',
-      padding: '0 2rem',
+      padding: '0 24px',
       position: 'sticky',
       top: 0,
-      zIndex: 10
+      zIndex: 10,
+      flexShrink: 0,
     }}>
-      {/* Title */}
-      <h1 style={{ 
-        margin: 0, 
-        fontSize: '1.5rem', 
-        color: 'var(--primary-color)',
-        fontFamily: "'Public Sans', sans-serif"
-      }}>
-        PopRegistry Admin
-      </h1>
 
-      {/* Search Bar */}
-      <div style={{ flex: 1, maxWidth: '400px', margin: '0 2rem', position: 'relative' }}>
-        <div style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#9CA3AF' }}>
-          <Search size={18} />
-        </div>
-        <input 
-          type="text" 
-          placeholder="ရှာဖွေရန်..." 
-          style={{
-            width: '100%',
-            padding: '0.6rem 1rem 0.6rem 2.5rem',
-            borderRadius: '24px',
-            border: 'none',
-            backgroundColor: '#F1F5F9',
-            fontSize: '0.875rem'
-          }}
+      {/* ── Left: breadcrumb style title ── */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <img
+          src={flag}
+          alt="Ta'ang Flag"
+          style={{ height: '16px', border: '1px solid #E5E7EB', objectFit: 'cover' }}
         />
+        <span style={{ fontSize: '12px', fontWeight: '600', color: '#1A1A1A', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+          TLFUG Immigration
+        </span>
+        <span style={{ fontSize: '12px', color: '#737373' }}>|</span>
+        <span style={{ fontSize: '12px', color: '#737373' }}>
+          တအာင်းပြည်လွတ်မြောက်ရေးတပ်မတော်
+        </span>
       </div>
 
-      {/* Right Icons & Profile */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
-        <button style={{ background: 'none', border: 'none', padding: 0, color: 'var(--text-secondary)' }}>
-          <Bell size={20} />
-        </button>
-        <button style={{ background: 'none', border: 'none', padding: 0, color: 'var(--text-secondary)' }}>
-          <HelpCircle size={20} />
-        </button>
-        
-        <div style={{ width: '1px', height: '24px', backgroundColor: '#E2E8F0', margin: '0 0.5rem' }}></div>
-        
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }}>
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ fontWeight: '600', fontSize: '0.875rem', color: 'var(--text-primary)' }}>U Myo Min</div>
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>System Administrator</div>
-          </div>
-          <div style={{ 
-            width: '36px', 
-            height: '36px', 
-            borderRadius: '50%', 
-            backgroundColor: 'var(--secondary-color)', 
-            color: 'white',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            overflow: 'hidden'
+      {/* ── Right: search + bell + profile ── */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+
+        {/* Search pill */}
+        <div style={{ position: 'relative' }}>
+          <div style={{
+            position: 'absolute', left: '10px', top: '50%',
+            transform: 'translateY(-50%)', color: '#737373',
+            pointerEvents: 'none',
           }}>
-            <User size={20} />
+            <Search size={12} />
           </div>
+          <input
+            type="text"
+            placeholder="SEARCH..."
+            style={{
+              width: '200px',
+              padding: '6px 10px 6px 28px',
+              borderRadius: '0px',
+              border: '1px solid #E5E7EB',
+              backgroundColor: '#FAFAFA',
+              fontSize: '11px',
+              color: '#1A1A1A',
+              outline: 'none',
+              letterSpacing: '0.05em'
+            }}
+          />
         </div>
+
+        {/* Bell */}
+        <button style={{
+          background: 'none', border: 'none',
+          padding: '6px',
+          color: '#737373', cursor: 'pointer',
+          display: 'flex', alignItems: 'center',
+          transition: 'background 0.1s',
+        }}
+          onMouseOver={e => e.currentTarget.style.backgroundColor = '#F3F4F6'}
+          onMouseOut={e => e.currentTarget.style.backgroundColor = 'transparent'}
+        >
+          <Bell size={14} />
+        </button>
+
+        {/* Divider */}
+        <div style={{ width: '1px', height: '20px', backgroundColor: '#E5E7EB', margin: '0 4px' }} />
+
+        {/* Profile */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: '8px',
+          cursor: 'pointer', padding: '6px 8px',
+          transition: 'background 0.1s',
+        }}
+          onMouseOver={e => e.currentTarget.style.backgroundColor = '#F3F4F6'}
+          onMouseOut={e => e.currentTarget.style.backgroundColor = 'transparent'}
+        >
+          <div style={{
+            width: '24px', height: '24px',
+            backgroundColor: '#1A1A1A', color: '#FFFFFF',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: '10px', fontWeight: '600', flexShrink: 0,
+          }}>
+            UM
+          </div>
+          <span style={{ fontSize: '12px', fontWeight: '500', color: '#1A1A1A' }}>U MYO MIN</span>
+          <ChevronDown size={12} color="#737373" />
+        </div>
+
       </div>
     </header>
   );

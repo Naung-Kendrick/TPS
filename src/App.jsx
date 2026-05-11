@@ -4,6 +4,8 @@ import Layout from './components/layout/Layout'
 import CsvUploader from './components/CsvUploader'
 import Verification from './components/Verification'
 import Reports from './components/Reports'
+import PopulationStatistics from './components/PopulationStatistics'
+import HouseholdForm from './components/HouseholdForm'
 import './App.css'
 
 const VerificationPage = () => {
@@ -39,7 +41,8 @@ function App() {
         <Route index element={<Navigate to="/verification" replace />} />
         <Route path="verification" element={<VerificationPage />} />
         <Route path="reports" element={<Reports />} />
-        <Route path="statistics" element={<Placeholder title="Population Statistics" />} />
+        <Route path="statistics" element={<PopulationStatistics />} />
+        <Route path="registration" element={<HouseholdForm />} />
         <Route path="settings" element={<Placeholder title="Settings" />} />
       </Route>
     </Routes>

@@ -1,83 +1,134 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { Users, LineChart, FileText, Settings, Landmark } from 'lucide-react';
+import { Users, UserPlus, LineChart, FileText, Settings } from 'lucide-react';
+import logo from '../../assets/logo.jpg';
 
 const Sidebar = () => {
   const menuItems = [
-    { id: 'verification', path: '/verification', label: 'Verification', icon: Users },
-    { id: 'statistics', path: '/statistics', label: 'Population Statistics', icon: LineChart },
-    { id: 'reports', path: '/reports', label: 'Reports', icon: FileText },
-    { id: 'settings', path: '/settings', label: 'Settings', icon: Settings }
+    { id: 'verification',  path: '/verification',  label: 'Data Verification',       icon: Users      },
+    { id: 'statistics',    path: '/statistics',    label: 'Population Statistics',    icon: LineChart  },
+    { id: 'registration',  path: '/registration',  label: 'Household Registration',   icon: UserPlus   },
+    { id: 'reports',       path: '/reports',       label: 'Reports',                  icon: FileText   },
+    { id: 'settings',      path: '/settings',      label: 'Settings',                 icon: Settings   },
   ];
 
   return (
     <div style={{
-      width: '260px',
-      backgroundColor: '#F8FAFC',
-      borderRight: '1px solid #E2E8F0',
+      width: '240px',
+      flexShrink: 0,
+      backgroundColor: '#FFFFFF',
+      borderRight: '1px solid #E5E7EB',
       display: 'flex',
       flexDirection: 'column',
       height: '100vh',
       position: 'sticky',
-      top: 0
+      top: 0,
+      overflowY: 'auto',
     }}>
-      {/* Logo/Brand */}
+
+      {/* ── Workspace header ── */}
       <div style={{
-        padding: '1.5rem',
         display: 'flex',
         alignItems: 'center',
-        gap: '0.75rem',
-        borderBottom: '1px solid transparent'
-      }}>
+        gap: '12px',
+        padding: '16px 20px',
+        borderBottom: '1px solid #E5E7EB',
+        cursor: 'pointer',
+      }}
+        onMouseOver={e => e.currentTarget.style.backgroundColor = '#FAFAFA'}
+        onMouseOut={e => e.currentTarget.style.backgroundColor = '#FFFFFF'}
+      >
         <div style={{
-          backgroundColor: 'var(--primary-color)',
-          color: 'white',
-          padding: '0.5rem',
-          borderRadius: '8px',
+          width: '48px', height: '48px',
+          border: '1px solid #E5E7EB',
+          backgroundColor: '#FFFFFF',
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'center'
+          justifyContent: 'center',
+          overflow: 'hidden',
+          flexShrink: 0
         }}>
-          <Landmark size={24} />
+          <img src={logo} alt="TLFUG" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
         </div>
-        <div>
-          <h2 style={{ margin: 0, fontSize: '1.125rem', color: 'var(--text-primary)' }}>Population</h2>
-          <h2 style={{ margin: 0, fontSize: '1.125rem', color: 'var(--text-primary)' }}>Management</h2>
-          <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>REGISTRY V2.4</span>
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+          <div style={{
+            fontSize: '16px', fontWeight: '700', color: '#1A1A1A',
+            lineHeight: '1.2', whiteSpace: 'nowrap',
+            overflow: 'hidden', textOverflow: 'ellipsis',
+            letterSpacing: '0.05em',
+            textTransform: 'uppercase'
+          }}>TPS</div>
+          <div style={{ fontSize: '10px', color: '#737373', lineHeight: '1.2', letterSpacing: '0.02em', marginTop: '2px' }}>Ta'ang Population System</div>
         </div>
       </div>
 
-      {/* Navigation Links */}
-      <nav style={{ padding: '1rem', flex: 1 }}>
+      {/* ── Nav section ── */}
+      <div style={{ padding: '16px 8px', flex: 1 }}>
+
+        <div style={{
+          fontSize: '10px', fontWeight: '600', color: '#737373',
+          padding: '0 12px 8px',
+          textTransform: 'uppercase', letterSpacing: '0.1em',
+        }}>
+          Navigation
+        </div>
+
         {menuItems.map(item => (
           <NavLink
             key={item.id}
             to={item.path}
             style={({ isActive }) => ({
-              width: '100%',
               display: 'flex',
               alignItems: 'center',
-              gap: '1rem',
-              padding: '0.875rem 1rem',
-              marginBottom: '0.5rem',
-              borderRadius: '8px',
-              border: 'none',
-              backgroundColor: isActive ? 'var(--primary-color)' : 'transparent',
-              color: isActive ? 'white' : 'var(--text-secondary)',
-              fontWeight: isActive ? '600' : '500',
+              gap: '10px',
+              padding: '8px 12px',
+              marginBottom: '4px',
+              border: isActive ? '1px solid #1A1A1A' : '1px solid transparent',
+              backgroundColor: isActive ? '#FFFFFF' : 'transparent',
+              color: '#1A1A1A',
+              fontWeight: isActive ? '600' : '400',
               textDecoration: 'none',
-              transition: 'all 0.2s ease'
+              fontSize: '12px',
+              letterSpacing: '0.02em',
+              transition: 'all 0.1s',
             })}
+            onMouseOver={e => {
+              if (!e.currentTarget.style.borderColor || e.currentTarget.style.borderColor === 'transparent') {
+                e.currentTarget.style.backgroundColor = '#F3F4F6';
+              }
+            }}
+            onMouseOut={e => {
+              if (!e.currentTarget.style.borderColor || e.currentTarget.style.borderColor === 'transparent') {
+                e.currentTarget.style.backgroundColor = 'transparent';
+              }
+            }}
           >
             {({ isActive }) => (
               <>
-                <item.icon size={20} style={{ color: isActive ? 'white' : 'var(--text-secondary)' }} />
+                <item.icon
+                  size={14}
+                  strokeWidth={isActive ? 2 : 1.5}
+                  style={{ color: '#1A1A1A', flexShrink: 0 }}
+                />
                 {item.label}
               </>
             )}
           </NavLink>
         ))}
-      </nav>
+      </div>
+
+      {/* ── Footer ── */}
+      <div style={{
+        padding: '12px 20px',
+        borderTop: '1px solid #E5E7EB',
+        fontSize: '10px',
+        color: '#737373',
+        textAlign: 'center',
+        letterSpacing: '0.05em',
+        textTransform: 'uppercase'
+      }}>
+        v2.4
+      </div>
     </div>
   );
 };

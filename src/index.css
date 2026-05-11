@@ -1,35 +1,77 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap');
+
+@font-face {
+  font-family: 'MyanmarCustom';
+  src: url('./assets/fonts/my-font.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  --primary-color: #1E40AF;
-  --secondary-color: #475569;
-  --tertiary-color: #882D00;
-  --neutral-color: #76767F;
-  --bg-color: #F3F4F6;
-  --card-bg: #FFFFFF;
-  --text-primary: #1F2937;
-  --text-secondary: #4B5563;
-  --radius: 12px;
-  --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  /* ── Architect Core Palette ───────────────────────────── */
+  --n-bg:          #FFFFFF;
+  --n-sidebar:     #FAFAFA;
+  --n-text:        #1A1A1A;
+  --n-text-2:      #737373;
+  --n-border:      #E5E7EB; /* Light gray as requested */
+  --n-hover:       #F3F4F6;
+  --n-active:      #E5E7EB;
+  --n-accent:      #000000; /* Minimalist black accent */
+  --n-accent-bg:   #F3F4F6;
+
+  /* ── Aliases: keep backward-compat with all existing files ── */
+  --primary-color:    var(--n-accent);
+  --secondary-color:  var(--n-text-2);
+  --tertiary-color:   var(--n-text);
+  --neutral-color:    var(--n-text-2);
+  --bg-color:         var(--n-bg);
+  --card-bg:          var(--n-bg);
+  --text-primary:     var(--n-text);
+  --text-secondary:   var(--n-text-2);
+  --color-forest:     var(--n-text);
+  --color-sage:       var(--n-border);
+  --color-sage-light: var(--n-bg);
+  --color-brown-dark: var(--n-text);
+  --color-brown-med:  var(--n-text-2);
+  --color-warm-bg:    var(--n-bg);
+  --color-white:      var(--n-bg);
+  --color-border:     var(--n-border);
+
+  /* ── Typography ───────────────────────────────────────── */
+  --font-headline: 'Inter', 'MyanmarCustom', system-ui, sans-serif;
+  --font-body:     'Inter', 'MyanmarCustom', system-ui, sans-serif;
+  --font-label:    'Inter', 'MyanmarCustom', system-ui, sans-serif;
+  --font-mono:     'JetBrains Mono', monospace; /* For data values */
+
+  /* ── Geometry ─────────────────────────────────────────── */
+  --radius:    0px; /* Sharp corners for architect look */
+  --radius-sm: 0px;
+  --shadow:    none; /* No shadows as requested */
+  --shadow-sm: none;
+  --shadow-md: none;
+  --shadow-lg: none;
 
   font-family: 'Inter', system-ui, sans-serif;
+  font-size: 13px; /* Slightly smaller for technical look */
   line-height: 1.5;
   font-weight: 400;
-
-  color: var(--text-primary);
-  background-color: var(--bg-color);
-
+  color: var(--n-text);
+  background-color: var(--n-bg);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-h1, h2, h3, h4 {
-  font-family: 'Public Sans', sans-serif;
-  color: var(--primary-color);
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Inter', system-ui, sans-serif;
+  color: var(--n-text);
+  font-weight: 500; /* Less heavy for architect look */
+  line-height: 1.2;
 }
 
 body {
@@ -38,36 +80,68 @@ body {
   min-width: 320px;
   min-height: 100vh;
   width: 100%;
+  background-color: var(--n-bg);
 }
+
 #root {
   min-height: 100vh;
   width: 100%;
   display: flex;
 }
 
+/* ── Buttons ──────────────────────────────────────────── */
 button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
+  border-radius: 0px;
+  border: 1px solid var(--n-text);
+  padding: 0.5em 1em;
+  font-size: 0.85rem;
   font-weight: 500;
-  font-family: inherit;
+  font-family: 'Inter', sans-serif;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background 0.1s, color 0.1s;
 }
 
-input {
-  border-radius: 8px;
-  border: 1px solid #D1D5DB;
-  padding: 0.6em 1em;
-  font-size: 1em;
-  font-family: inherit;
+.btn-primary {
+  background-color: var(--n-text);
+  color: #FFFFFF;
+}
+.btn-primary:hover {
+  background-color: #FFFFFF;
+  color: var(--n-text);
+}
+
+.btn-secondary {
+  background-color: #FFFFFF;
+  color: var(--n-text);
+  border-color: var(--n-border);
+}
+.btn-secondary:hover { background-color: var(--n-hover); }
+
+/* ── Inputs ───────────────────────────────────────────── */
+input, select, textarea {
+  border-radius: 0px;
+  border: 1px solid var(--n-border);
+  padding: 0.5em 0.75em;
+  font-size: 0.85rem;
+  font-family: 'Inter', sans-serif;
   width: 100%;
   box-sizing: border-box;
+  color: var(--n-text);
+  background-color: var(--n-bg);
+  transition: border-color 0.1s;
 }
 
-input:focus {
+input:focus, select:focus, textarea:focus {
   outline: none;
-  border-color: var(--primary-color);
-  box-shadow: 0 0 0 3px rgba(30, 64, 175, 0.1);
+  border-color: var(--n-text);
 }
+
+input::placeholder, textarea::placeholder {
+  color: var(--n-text-2);
+}
+
+/* ── Scrollbar ────────────────────────────────────────── */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #E5E7EB; }
+::-webkit-scrollbar-thumb:hover { background: #D1D5DB; }

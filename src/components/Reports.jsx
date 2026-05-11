@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { ChevronRight, Search, Map as MapIcon, MapPin, Home, Users, User, ArrowLeft, Loader2, AlertCircle, Printer, FileSpreadsheet, Pencil, Trash2, Check, X, Download } from 'lucide-react';
 import { exportHouseholdExcel, printHouseholdPdf } from '../lib/householdPrint';
@@ -28,14 +28,49 @@ const Reports = () => {
   // Edit / delete state
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({});
+
   const [saving, setSaving] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const tableScrollRef = useRef(null);
+  const scroll = (dir) => {
+    if (tableScrollRef.current) tableScrollRef.current.scrollBy({ left: dir * 200, behavior: 'smooth' });
+  };
 
   // Trigger data fetching whenever level or path changes
   useEffect(() => {
     fetchData();
   }, [level, path.district, path.township, path.village, path.householdNo]);
+
+  // Real-time subscription for level 5 (family members)
+  useEffect(() => {
+    if (level !== 5 || !path.householdNo) return;
+
+    const relationshipOrder = { 'ဦးစီး': 1, 'ဇနီး': 2, 'ခင်ပွန်း': 2, 'သား': 3, 'သမီး': 3 };
+    const resort = (arr) => [...arr].sort((a, b) =>
+      (relationshipOrder[a.household_relationship] || 99) - (relationshipOrder[b.household_relationship] || 99)
+    );
+
+    const channel = supabase
+      .channel(`household-${path.householdNo}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'households',
+        filter: `household_no=eq.${path.householdNo}`,
+      }, (payload) => {
+        if (payload.eventType === 'INSERT') {
+          setFamilyMembers(prev => resort([...prev, payload.new]));
+        } else if (payload.eventType === 'UPDATE') {
+          setFamilyMembers(prev => resort(prev.map(m => m.id === payload.new.id ? payload.new : m)));
+        } else if (payload.eventType === 'DELETE') {
+          setFamilyMembers(prev => prev.filter(m => m.id !== payload.old.id));
+        }
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [level, path.householdNo]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -482,138 +517,83 @@ const Reports = () => {
                   </div>
                 )}
 
-                <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
-                  <h3 className="font-semibold text-gray-900 text-xs uppercase letter-spacing-0.05">Family Roster: {path.householdNo}</h3>
-                  <span className="text-[10px] text-gray-400 uppercase">Click <Pencil size={10} className="inline" /> to edit a row</span>
+                <div className="px-4 py-3 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
+                  <h3 className="font-semibold text-gray-900 text-xs uppercase">Family Roster: {path.householdNo}</h3>
+                  <span className="text-[10px] text-gray-400 uppercase">{familyMembers.length} member{familyMembers.length !== 1 ? 's' : ''}</span>
                 </div>
 
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse">
+                <style>{`
+                  .family-table-scroll::-webkit-scrollbar { height: 12px; background: #F3F4F6; }
+                  .family-table-scroll::-webkit-scrollbar-track { background: #F3F4F6; border-radius: 999px; margin: 0 4px; }
+                  .family-table-scroll::-webkit-scrollbar-thumb { background: #C4C4C4; border-radius: 999px; border: 2px solid #F3F4F6; }
+                  .family-table-scroll::-webkit-scrollbar-thumb:hover { background: #9CA3AF; }
+                  .family-table-scroll { scrollbar-width: auto; scrollbar-color: #C4C4C4 #F3F4F6; }
+                `}</style>
+                <div style={{ position: 'relative' }}>
+                  <div ref={tableScrollRef} className="family-table-scroll" style={{ overflowX: 'auto', scrollBehavior: 'smooth', paddingBottom: '4px' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px', tableLayout: 'auto' }}>
                     <thead>
-                      <tr>
-                        <th style={thStyle}>Name</th>
-                        <th style={thStyle}>Relationship</th>
-                        <th style={thStyle}>Gender</th>
-                        <th style={thStyle}>Date of Birth</th>
-                        <th style={thStyle}>Father's Name</th>
-                        <th style={thStyle}>Mother's Name</th>
-                        <th style={thStyle}>Occupation</th>
-                        <th style={thStyle}>Nationality</th>
-                        <th style={thStyle}>Religious</th>
-                        <th style={{ ...thStyle, textAlign: 'center', width: '90px' }}>Actions</th>
+                      <tr style={{ backgroundColor: '#FAFAFA' }}>
+                        {['No.','Name','Date of Birth','Gender',"Father's Name","Mother's Name",'Relationship','Occupation','Previous ID No.',"Ta'ang Land ID No.",'Nationality','Resident Status','Religious','Submission Date',''].map((h, i) => (
+                          <th key={i} style={{ padding: '8px 6px', fontSize: '9.5px', fontWeight: 600, color: '#737373', textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap', textAlign: i === 14 ? 'center' : 'left' }}>{h}</th>
+                        ))}
                       </tr>
                     </thead>
                     <tbody>
                       {familyMembers.length === 0 ? (
-                        <tr><td colSpan={10} className="p-12 text-center text-gray-500 text-xs uppercase">No family members found.</td></tr>
+                        <tr><td colSpan={15} style={{ padding: '48px', textAlign: 'center', color: '#9CA3AF', fontSize: '11px' }}>No family members found.</td></tr>
                       ) : (
-                        familyMembers.map((member) => {
+                        familyMembers.map((member, idx) => {
                           const isEditing = editingId === member.id;
-                          const cellCls = "border-none outline-none bg-yellow-50 border-b border-yellow-300 w-full text-xs px-1 py-0.5 font-inherit";
+                          const inStyle = { width: '100%', padding: '2px 4px', fontSize: '11px', border: '1px solid #93C5FD', outline: 'none', background: '#EFF6FF', minWidth: '70px' };
+                          const cell = (key, extraStyle = {}) => isEditing
+                            ? <input value={editForm[key] || ''} onChange={e => setEditForm(f => ({ ...f, [key]: e.target.value }))} style={{ ...inStyle, ...extraStyle }} />
+                            : (member[key] || '—');
                           return (
-                            <tr key={member.id} className={`transition-colors ${isEditing ? 'bg-yellow-50' : 'hover:bg-gray-50'}`}>
-                              {/* Name */}
-                              <td style={tdStyle} className="font-medium min-w-[120px]">
+                            <tr key={member.id} style={{ borderBottom: '1px solid #F3F4F6', background: isEditing ? '#F0F9FF' : undefined }}>
+                              <td style={{ padding: '7px 6px', color: '#9CA3AF', fontWeight: 600, whiteSpace: 'nowrap' }}>{idx + 1}</td>
+                              <td style={{ padding: '7px 6px', fontWeight: isEditing ? 400 : 600, whiteSpace: isEditing ? 'normal' : 'nowrap' }}>
                                 {isEditing
-                                  ? <input className={cellCls} value={editForm.name || ''} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} />
-                                  : member.name
-                                }
+                                  ? <input value={editForm.name || ''} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} style={{ ...inStyle, minWidth: '100px' }} />
+                                  : <>{member.name}{member.household_relationship === 'ဦးစီး' && <span style={{ marginLeft: '4px', border: '1px solid #1A1A1A', padding: '0 3px', fontSize: '8px', fontWeight: 700 }}>HEAD</span>}</>}
                               </td>
-                              {/* Relationship */}
-                              <td style={tdStyle} className="min-w-[100px]">
+                              <td style={{ padding: '7px 6px', whiteSpace: isEditing ? 'normal' : 'nowrap' }}>{cell('date_of_birth')}</td>
+                              <td style={{ padding: '7px 6px', whiteSpace: isEditing ? 'normal' : 'nowrap' }}>{cell('gender')}</td>
+                              <td style={{ padding: '7px 6px', whiteSpace: isEditing ? 'normal' : 'nowrap' }}>{cell('fathers_name')}</td>
+                              <td style={{ padding: '7px 6px', whiteSpace: isEditing ? 'normal' : 'nowrap' }}>{cell('mothers_name')}</td>
+                              <td style={{ padding: '7px 6px', whiteSpace: isEditing ? 'normal' : 'nowrap' }}>{cell('household_relationship')}</td>
+                              <td style={{ padding: '7px 6px', whiteSpace: isEditing ? 'normal' : 'nowrap' }}>{cell('occupation')}</td>
+                              <td style={{ padding: '7px 6px', whiteSpace: isEditing ? 'normal' : 'nowrap' }}>{cell('previous_id_no')}</td>
+                              <td style={{ padding: '7px 6px', whiteSpace: isEditing ? 'normal' : 'nowrap' }}>{cell('taang_land_id_no')}</td>
+                              <td style={{ padding: '7px 6px', whiteSpace: isEditing ? 'normal' : 'nowrap' }}>{cell('nationality')}</td>
+                              <td style={{ padding: '7px 6px', whiteSpace: isEditing ? 'normal' : 'nowrap' }}>{cell('resident_status')}</td>
+                              <td style={{ padding: '7px 6px', whiteSpace: isEditing ? 'normal' : 'nowrap' }}>{cell('religious')}</td>
+                              <td style={{ padding: '7px 6px', whiteSpace: isEditing ? 'normal' : 'nowrap' }}>
                                 {isEditing
-                                  ? <input className={cellCls} value={editForm.household_relationship || ''} onChange={e => setEditForm(f => ({ ...f, household_relationship: e.target.value }))} />
-                                  : member.household_relationship === 'ဦးစီး'
-                                    ? <span className="border border-gray-900 text-gray-900 px-1.5 py-0.5 text-[10px] font-bold uppercase">HEAD</span>
-                                    : <span className="text-gray-600">{member.household_relationship}</span>
-                                }
+                                  ? <input value={editForm.submission_date || ''} onChange={e => setEditForm(f => ({ ...f, submission_date: e.target.value }))} style={inStyle} />
+                                  : (member.submission_date || (member.created_at ? member.created_at.split('T')[0] : '—'))}
                               </td>
-                              {/* Gender */}
-                              <td style={tdStyle} className="min-w-[60px]">
-                                {isEditing
-                                  ? <input className={cellCls} value={editForm.gender || ''} onChange={e => setEditForm(f => ({ ...f, gender: e.target.value }))} />
-                                  : member.gender
-                                }
-                              </td>
-                              {/* DOB */}
-                              <td style={tdStyle} className="font-mono min-w-[100px]">
-                                {isEditing
-                                  ? <input className={cellCls} value={editForm.date_of_birth || ''} onChange={e => setEditForm(f => ({ ...f, date_of_birth: e.target.value }))} />
-                                  : member.date_of_birth
-                                }
-                              </td>
-                              {/* Father */}
-                              <td style={tdStyle} className="min-w-[100px]">
-                                {isEditing
-                                  ? <input className={cellCls} value={editForm.fathers_name || ''} onChange={e => setEditForm(f => ({ ...f, fathers_name: e.target.value }))} />
-                                  : member.fathers_name || <span className="text-gray-300">—</span>
-                                }
-                              </td>
-                              {/* Mother */}
-                              <td style={tdStyle} className="min-w-[100px]">
-                                {isEditing
-                                  ? <input className={cellCls} value={editForm.mothers_name || ''} onChange={e => setEditForm(f => ({ ...f, mothers_name: e.target.value }))} />
-                                  : member.mothers_name || <span className="text-gray-300">—</span>
-                                }
-                              </td>
-                              {/* Occupation */}
-                              <td style={tdStyle} className="min-w-[90px]">
-                                {isEditing
-                                  ? <input className={cellCls} value={editForm.occupation || ''} onChange={e => setEditForm(f => ({ ...f, occupation: e.target.value }))} />
-                                  : member.occupation || <span className="text-gray-300">—</span>
-                                }
-                              </td>
-                              {/* Nationality */}
-                              <td style={tdStyle} className="min-w-[80px]">
-                                {isEditing
-                                  ? <input className={cellCls} value={editForm.nationality || ''} onChange={e => setEditForm(f => ({ ...f, nationality: e.target.value }))} />
-                                  : member.nationality || <span className="text-gray-300">—</span>
-                                }
-                              </td>
-                              {/* Religious */}
-                              <td style={tdStyle} className="min-w-[80px]">
-                                {isEditing
-                                  ? <input className={cellCls} value={editForm.religious || ''} onChange={e => setEditForm(f => ({ ...f, religious: e.target.value }))} />
-                                  : member.religious || <span className="text-gray-300">—</span>
-                                }
-                              </td>
-                              {/* Actions */}
-                              <td style={{ ...tdStyle, textAlign: 'center', whiteSpace: 'nowrap' }}>
+                              <td style={{ padding: '7px 6px', whiteSpace: 'nowrap', textAlign: 'center' }}>
                                 {isEditing ? (
-                                  <div className="flex items-center justify-center gap-2">
-                                    <button
-                                      onClick={saveEdit}
-                                      disabled={saving}
-                                      title="Save"
-                                      className="flex items-center gap-1 bg-gray-900 text-white px-2 py-1 text-[10px] uppercase font-bold hover:bg-gray-700 transition-colors disabled:opacity-50"
-                                    >
-                                      {saving ? <Loader2 size={10} className="animate-spin" /> : <Check size={10} />}
-                                      Save
+                                  <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
+                                    <button onClick={saveEdit} disabled={saving} style={{ padding: '3px 8px', border: '1px solid #1A1A1A', background: '#1A1A1A', color: '#fff', cursor: 'pointer', fontSize: '10px', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                      {saving ? <Loader2 size={9} className="animate-spin" /> : <Check size={9} />} Save
                                     </button>
-                                    <button
-                                      onClick={cancelEdit}
-                                      disabled={saving}
-                                      title="Cancel"
-                                      className="flex items-center gap-1 border border-gray-300 text-gray-600 px-2 py-1 text-[10px] uppercase font-bold hover:bg-gray-100 transition-colors disabled:opacity-50"
-                                    >
-                                      <X size={10} /> Cancel
+                                    <button onClick={cancelEdit} style={{ padding: '3px 8px', border: '1px solid #D1D5DB', background: '#fff', cursor: 'pointer', fontSize: '10px', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                      <X size={9} /> Cancel
                                     </button>
                                   </div>
                                 ) : (
-                                  <div className="flex items-center justify-center gap-2">
-                                    <button
-                                      onClick={() => startEdit(member)}
-                                      title="Edit"
-                                      className="p-1.5 border border-gray-300 text-gray-600 hover:border-gray-900 hover:text-gray-900 transition-colors"
-                                    >
-                                      <Pencil size={12} />
+                                  <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
+                                    <button onClick={() => startEdit(member)} title="Edit" style={{ padding: '3px 6px', border: '1px solid #D1D5DB', background: '#fff', cursor: 'pointer', color: '#6B7280', fontSize: '10px' }}
+                                      onMouseEnter={e => { e.currentTarget.style.borderColor = '#1A1A1A'; e.currentTarget.style.color = '#1A1A1A'; }}
+                                      onMouseLeave={e => { e.currentTarget.style.borderColor = '#D1D5DB'; e.currentTarget.style.color = '#6B7280'; }}>
+                                      <Pencil size={10} />
                                     </button>
-                                    <button
-                                      onClick={() => confirmDelete(member.id)}
-                                      title="Delete"
-                                      className="p-1.5 border border-gray-300 text-gray-400 hover:border-red-500 hover:text-red-600 transition-colors"
-                                    >
-                                      <Trash2 size={12} />
+                                    <button onClick={() => confirmDelete(member.id)} title="Delete" style={{ padding: '3px 6px', border: '1px solid #D1D5DB', background: '#fff', cursor: 'pointer', color: '#9CA3AF', fontSize: '10px' }}
+                                      onMouseEnter={e => { e.currentTarget.style.borderColor = '#EF4444'; e.currentTarget.style.color = '#EF4444'; }}
+                                      onMouseLeave={e => { e.currentTarget.style.borderColor = '#D1D5DB'; e.currentTarget.style.color = '#9CA3AF'; }}>
+                                      <Trash2 size={10} />
                                     </button>
                                   </div>
                                 )}
@@ -624,7 +604,8 @@ const Reports = () => {
                       )}
                     </tbody>
                   </table>
-                </div>
+                  </div>{/* end ref scroll div */}
+                </div>{/* end relative wrapper */}
 
                 {familyMembers.length > 0 && (
                   <div className="px-6 py-3 bg-white border-t border-gray-200 flex flex-wrap items-center justify-end gap-3">

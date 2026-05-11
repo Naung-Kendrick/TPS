@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { Users, UserPlus, LineChart, FileText, Settings, Upload, Menu, X } from 'lucide-react';
-import logo from '../../assets/logo.jpg';
+import logo from '../../assets/fonts/IDTL_logo.png';
 
 const Sidebar = () => {
   const [open, setOpen] = useState(false);
@@ -18,12 +18,12 @@ const Sidebar = () => {
   }, []);
 
   const menuItems = [
-    { id: 'verification',     path: '/verification',     label: 'Data Verification',     icon: Users      },
-    { id: 'upload',           path: '/upload',           label: 'Data Upload',            icon: Upload     },
-    { id: 'statistics',       path: '/statistics',       label: 'Population Statistics',  icon: LineChart  },
-    { id: 'registration',     path: '/registration',     label: 'Household Registration', icon: UserPlus   },
-    { id: 'central-database', path: '/central-database', label: 'Central Database',       icon: FileText   },
-    { id: 'settings',         path: '/settings',         label: 'Settings',               icon: Settings   },
+    { id: 'verification',     path: '/verification',     label: 'Data Verification',      icon: Users          },
+    { id: 'upload',           path: '/upload',           label: 'Data Upload',          icon: Upload         },
+    { id: 'statistics',       path: '/statistics',       label: 'Population Statistics', icon: LineChart     },
+    { id: 'registration',     path: '/registration',     label: 'Household Registration', icon: UserPlus      },
+    { id: 'central-database', path: '/central-database', label: 'Central Database',      icon: FileText       },
+    { id: 'settings',         path: '/settings',         label: 'Settings',              icon: Settings       },
   ];
 
   const SidebarContent = () => (
@@ -85,10 +85,6 @@ const Sidebar = () => {
         ))}
       </div>
 
-      {/* Footer */}
-      <div style={{ padding: '12px 20px', borderTop: '1px solid #E5E7EB', fontSize: '10px', color: '#737373', textAlign: 'center', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
-        v2.4
-      </div>
     </div>
   );
 

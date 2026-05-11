@@ -1,5 +1,4 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
-import { useState } from 'react'
 import Layout from './components/layout/Layout'
 import CsvUploader from './components/CsvUploader'
 import Verification from './components/Verification'
@@ -8,24 +7,17 @@ import PopulationStatistics from './components/PopulationStatistics'
 import HouseholdForm from './components/HouseholdForm'
 import './App.css'
 
-const VerificationPage = () => {
-  const [refreshTrigger, setRefreshTrigger] = useState(0)
-  
-  return (
-    <div style={{ padding: '2rem' }} className="max-w-7xl mx-auto">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-        <div>
-          <h2 style={{ fontSize: '1.5rem', margin: '0 0 0.5rem 0', color: 'var(--text-primary)' }}>Data Verification</h2>
-          <p style={{ margin: 0, color: 'var(--text-secondary)' }}>Strictly verify household members.</p>
-        </div>
-      </div>
+const UploadPage = () => (
+  <div className="p-8 max-w-4xl mx-auto">
+    <h2 style={{ fontSize: '20px', margin: '0 0 8px 0', color: '#1A1A1A', fontWeight: '500', letterSpacing: '0.02em' }}>DATA UPLOAD</h2>
+    <p style={{ margin: '0 0 32px 0', color: '#737373', fontSize: '12px' }}>Bulk import household records from a CSV or JSON backup file.</p>
+    <CsvUploader />
+  </div>
+)
 
-      <CsvUploader onUploadSuccess={() => setRefreshTrigger(prev => prev + 1)} />
-
-      <Verification key={refreshTrigger} />
-    </div>
-  )
-}
+const VerificationPage = () => (
+  <Verification />
+)
 
 const Placeholder = ({ title }) => (
   <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
@@ -40,7 +32,8 @@ function App() {
       <Route path="/" element={<Layout />}>
         <Route index element={<Navigate to="/verification" replace />} />
         <Route path="verification" element={<VerificationPage />} />
-        <Route path="reports" element={<Reports />} />
+        <Route path="upload" element={<UploadPage />} />
+        <Route path="central-database" element={<Reports />} />
         <Route path="statistics" element={<PopulationStatistics />} />
         <Route path="registration" element={<HouseholdForm />} />
         <Route path="settings" element={<Placeholder title="Settings" />} />

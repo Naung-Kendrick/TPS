@@ -1,12 +1,13 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { Search, RotateCcw, AlertCircle, CheckCircle2, X, Loader2 } from 'lucide-react';
+import { exportHouseholdExcel, printHouseholdPdf } from '../lib/householdPrint';
+import { Search, RotateCcw, AlertCircle, CheckCircle2, X, Loader2, Printer, FileSpreadsheet } from 'lucide-react';
 
 // Convert Myanmar numerals to Arabic and calculate age from DOB string (format: day.month.year)
 const myanmarToArabic = (str) => {
   if (!str) return null;
   const map = { '၀': '0', '၁': '1', '၂': '2', '၃': '3', '၄': '4', '၅': '5', '၆': '6', '၇': '7', '၈': '8', '၉': '9' };
-  return str.replace(/[၀-၉]/g, ch => map[ch] || ch);
+  return str.replace(/[၀၁၂၃၄၅၆၇၈၉]/g, ch => map[ch] || ch);
 };
 
 const getAge = (dobStr) => {
@@ -100,6 +101,10 @@ const Verification = () => {
     }
   };
 
+  const handleExportExcel = exportHouseholdExcel;
+  const handlePrintPdf = printHouseholdPdf;
+
+
   const handleViewFamily = async (householdNo) => {
     if (expandedHouseholdNo === householdNo) {
       setExpandedHouseholdNo(null);
@@ -118,7 +123,7 @@ const Verification = () => {
 
       if (error) throw error;
 
-      const relationshipOrder = { 'ဦးစီး': 1, 'ဇနီး': 2, 'ခင်ပွန်း': 2, 'သား': 3, 'သမီး': 3 };
+      const relationshipOrder = { '\u1026\u1038\u1005\u102E\u1038': 1, '\u1007\u1014\u102E\u1038': 2, '\u1001\u1004\u103A\u1015\u103D\u1014\u103A\u1038': 2, '\u101E\u102C\u1038': 3, '\u101E\u1019\u102E\u1038': 3 };
       const sortedData = [...(data || [])].sort((a, b) => {
         const orderA = relationshipOrder[a.household_relationship] || 99;
         const orderB = relationshipOrder[b.household_relationship] || 99;
@@ -143,7 +148,7 @@ const Verification = () => {
           DATA VERIFICATION
         </h2>
         <p style={{ margin: 0, color: '#737373', fontSize: '12px' }}>
-          အချက်အလက်များကို စစ်ဆေးရန် အောက်ပါကွက်လပ်များတွင် ဖြည့်သွင်းပါ။
+          Strictly verify household members.
         </p>
       </div>
 
@@ -166,7 +171,7 @@ const Verification = () => {
                   value={formData.household_no} 
                   onChange={handleChange}
                   className="w-full px-3 py-2 bg-white border border-gray-200 rounded-none focus:outline-none focus:border-gray-900 transition-colors text-sm font-mono"
-                  placeholder="e.g. မန်မိုင်-၁"
+                  placeholder="e.g. HH-001"
                 />
               </div>
               <div>
@@ -336,7 +341,7 @@ const Verification = () => {
                                   <div className="bg-white border border-gray-200">
                                     <div className="px-6 py-3 border-b border-gray-200 flex items-center justify-between">
                                       <h3 className="font-semibold text-gray-900 flex items-center gap-2 text-xs uppercase letter-spacing-0.05">
-                                        Family Roster — Household: {expandedHouseholdNo}
+                                        Family Roster - Household: {expandedHouseholdNo}
                                       </h3>
                                       <button
                                         onClick={() => { setExpandedHouseholdNo(null); setFamilyMembers([]); }}
@@ -345,7 +350,7 @@ const Verification = () => {
                                         <X size={14} />
                                       </button>
                                     </div>
-                  
+
                                     {familyLoading ? (
                                       <div className="flex flex-col items-center justify-center py-12 text-gray-500 gap-3">
                                         <Loader2 className="animate-spin text-gray-900" size={24} />
@@ -385,14 +390,14 @@ const Verification = () => {
                                                 <tr 
                                                   key={member.id} 
                                                   className={`border-b border-gray-100 transition-colors hover:bg-gray-50 ${
-                                                    member.household_relationship === 'ဦးစီး' ? 'bg-gray-50' : ''
+                                                    member.household_relationship === '\u1026\u1038\u1005\u102E\u1038' ? 'bg-gray-50' : ''
                                                   }`}
                                                 >
                                                   <td className="px-4 py-2.5 text-gray-500 font-mono">{i + 1}</td>
                                                   <td className="px-4 py-2.5 font-semibold text-gray-900 font-mono">{member.household_no}</td>
                                                   <td className="px-4 py-2.5 font-medium text-gray-900">
                                                     {member.name}
-                                                    {member.household_relationship === 'ဦးစီး' && (
+                                                    {member.household_relationship === '\u1026\u1038\u1005\u102E\u1038' && (
                                                       <span className="ml-2 border border-gray-900 text-gray-900 px-1 py-0.5 text-[9px] font-bold uppercase">HEAD</span>
                                                     )}
                                                   </td>
@@ -418,16 +423,37 @@ const Verification = () => {
                                           </table>
                                         )}
                                         {familyMembers.length > 0 && (
-                                          <div className="px-6 py-2.5 bg-gray-50 border-t border-gray-200 text-xs text-gray-600 font-medium flex flex-wrap items-center gap-x-5 gap-y-1 font-mono">
-                                            <span>Total Members: {familyMembers.length}</span>
-                                            <span>|</span>
-                                            <span>Male: {familyMembers.filter(m => m.gender && (m.gender.includes('ကျား') || m.gender.trim() === 'က')).length}</span>
-                                            <span>Female: {familyMembers.filter(m => m.gender && !(m.gender.includes('ကျား') || m.gender.trim() === 'က')).length}</span>
-                                            <span>|</span>
-                                            <span>Under 16: {familyMembers.filter(m => { const age = getAge(m.date_of_birth); return age !== null && age < 16; }).length}</span>
-                                            <span>16 - 60: {familyMembers.filter(m => { const age = getAge(m.date_of_birth); return age !== null && age >= 16 && age <= 60; }).length}</span>
-                                            <span>Above 60: {familyMembers.filter(m => { const age = getAge(m.date_of_birth); return age !== null && age > 60; }).length}</span>
-                                          </div>
+                                          <>
+                                            <div className="px-6 py-2.5 bg-gray-50 border-t border-gray-200 text-xs text-gray-600 font-medium flex flex-wrap items-center gap-x-5 gap-y-1 font-mono">
+                                              <span>Total Members: {familyMembers.length}</span>
+                                              <span>|</span>
+                                              <span>Male: {familyMembers.filter(m => m.gender && (m.gender.includes('\u1000\u103B\u102C\u1038') || m.gender.trim() === '\u1000')).length}</span>
+                                              <span>Female: {familyMembers.filter(m => m.gender && !(m.gender.includes('\u1000\u103B\u102C\u1038') || m.gender.trim() === '\u1000')).length}</span>
+                                              <span>|</span>
+                                              <span>Under 16: {familyMembers.filter(m => { const age = getAge(m.date_of_birth); return age !== null && age < 16; }).length}</span>
+                                              <span>16 - 60: {familyMembers.filter(m => { const age = getAge(m.date_of_birth); return age !== null && age >= 16 && age <= 60; }).length}</span>
+                                              <span>Above 60: {familyMembers.filter(m => { const age = getAge(m.date_of_birth); return age !== null && age > 60; }).length}</span>
+                                            </div>
+                                            <div className="px-6 py-3 bg-white border-t border-gray-200 flex flex-wrap items-center justify-end gap-3">
+                                              <span className="text-[11px] text-gray-500 uppercase letter-spacing-0.05 mr-auto">Print / Export Household Registration</span>
+                                              <button
+                                                type="button"
+                                                onClick={() => handlePrintPdf(expandedHouseholdNo, familyMembers)}
+                                                className="flex items-center gap-2 bg-gray-900 hover:bg-white hover:text-gray-900 border border-gray-900 text-white px-4 py-2 rounded-none font-medium transition-colors text-xs uppercase letter-spacing-0.05"
+                                              >
+                                                <Printer size={14} />
+                                                Print PDF
+                                              </button>
+                                              <button
+                                                type="button"
+                                                onClick={() => handleExportExcel(expandedHouseholdNo, familyMembers)}
+                                                className="flex items-center gap-2 bg-white border border-gray-900 text-gray-900 hover:bg-gray-900 hover:text-white px-4 py-2 rounded-none font-medium transition-colors text-xs uppercase letter-spacing-0.05"
+                                              >
+                                                <FileSpreadsheet size={14} />
+                                                Export Excel
+                                              </button>
+                                            </div>
+                                          </>
                                         )}
                                       </div>
                                     )}

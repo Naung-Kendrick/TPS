@@ -1,14 +1,15 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { Users, UserPlus, LineChart, FileText, Settings } from 'lucide-react';
+import { Users, UserPlus, LineChart, FileText, Settings, Upload } from 'lucide-react';
 import logo from '../../assets/logo.jpg';
 
 const Sidebar = () => {
   const menuItems = [
     { id: 'verification',  path: '/verification',  label: 'Data Verification',       icon: Users      },
+    { id: 'upload',        path: '/upload',        label: 'Data Upload',              icon: Upload     },
     { id: 'statistics',    path: '/statistics',    label: 'Population Statistics',    icon: LineChart  },
     { id: 'registration',  path: '/registration',  label: 'Household Registration',   icon: UserPlus   },
-    { id: 'reports',       path: '/reports',       label: 'Reports',                  icon: FileText   },
+    { id: 'central-database', path: '/central-database', label: 'Central Database', icon: FileText   },
     { id: 'settings',      path: '/settings',      label: 'Settings',                 icon: Settings   },
   ];
 

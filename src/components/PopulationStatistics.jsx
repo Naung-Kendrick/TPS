@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { Users, User, Home, Search, BarChart2, MapPin, Globe } from 'lucide-react';
+import { deepEnsureUnicode } from './CsvUploader';
 
 const toMyanmarNum = (num) => {
   const myanmarNumbers = ['၀', '၁', '၂', '၃', '၄', '၅', '၆', '၇', '၈', '၉'];
@@ -119,9 +120,10 @@ const PopulationStatistics = () => {
           .select('household_no, district, township, ward_village_group, gender, date_of_birth, religious, nationality, resident_status');
 
         if (error) throw error;
-        setAllData(data || []);
+        const normalized = (data || []).map(row => deepEnsureUnicode(row));
+        setAllData(normalized);
 
-        const uniqueDistricts = [...new Set((data || []).map(d => d.district).filter(Boolean))].sort();
+        const uniqueDistricts = [...new Set(normalized.map(d => d.district).filter(Boolean))].sort();
         setDistricts(uniqueDistricts);
       } catch (err) {
         setError(err.message);

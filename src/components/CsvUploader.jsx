@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import Papa from 'papaparse';
 import { supabase } from '../lib/supabase';
 import { zg2uni } from 'rabbit-node';
-import { AlertCircle, X, CheckCircle2, Upload, FileSpreadsheet, Loader2 } from 'lucide-react';
+import { AlertCircle, X, CheckCircle2, Upload, FileSpreadsheet, Loader2, FileJson } from 'lucide-react';
 
 // Basic Zawgyi detector regex
 const isZawgyi = (text) => {
@@ -18,6 +18,20 @@ const ensureUnicode = (text) => {
     return zg2uni(str);
   }
   return str;
+};
+
+// Recursively walk any object/array and convert every Myanmar string to Unicode
+export const deepEnsureUnicode = (value) => {
+  if (typeof value === 'string') return ensureUnicode(value);
+  if (Array.isArray(value)) return value.map(deepEnsureUnicode);
+  if (value !== null && typeof value === 'object') {
+    const result = {};
+    for (const key of Object.keys(value)) {
+      result[key] = deepEnsureUnicode(value[key]);
+    }
+    return result;
+  }
+  return value;
 };
 
 // Myanmar text quality validator — detects garbled/misspelled Myanmar text
@@ -66,6 +80,89 @@ const validateMyanmarText = (text) => {
   return issues.length > 0 ? issues.join('; ') : null;
 };
 
+// Shared: run validation + Supabase upsert for a flat array of parsed rows
+const processAndUpload = async (formattedData, setValidationErrors, setShowModal, setLoading, setSuccessMsg, onUploadSuccess, fileInputRef) => {
+  const errorsFound = [];
+
+  formattedData.forEach((parsedRow, index) => {
+    const missingFields = [];
+    if (!parsedRow.ward_village_group) missingFields.push('Ward/Village/Group');
+    if (!parsedRow.township) missingFields.push('Township');
+    if (!parsedRow.district) missingFields.push('District');
+    if (!parsedRow.gender) missingFields.push('Gender');
+    if (!parsedRow.household_relationship) missingFields.push('Household Relationship');
+
+    const myanmarFieldsToCheck = [
+      { key: 'name', label: 'Name' },
+      { key: 'fathers_name', label: "Father's Name" },
+      { key: 'mothers_name', label: "Mother's Name" },
+      { key: 'household_relationship', label: 'Household Relationship' },
+      { key: 'occupation', label: 'Occupation' },
+      { key: 'nationality', label: 'Nationality' },
+      { key: 'religious', label: 'Religious' },
+      { key: 'ward_village_group', label: 'Ward/Village/Group' },
+      { key: 'township', label: 'Township' },
+      { key: 'district', label: 'District' },
+      { key: 'resident_status', label: 'Resident Status' },
+    ];
+    const spellingIssues = [];
+    for (const field of myanmarFieldsToCheck) {
+      const issue = validateMyanmarText(parsedRow[field.key]);
+      if (issue) spellingIssues.push(`${field.label}: "${parsedRow[field.key]}" (${issue})`);
+    }
+
+    if (missingFields.length > 0 || spellingIssues.length > 0) {
+      errorsFound.push({
+        rowNumber: index + 2,
+        name: parsedRow.name || 'No Name Provided',
+        missingFields: missingFields.length > 0 ? missingFields.join(', ') : null,
+        spellingIssues: spellingIssues.length > 0 ? spellingIssues : null,
+      });
+    }
+  });
+
+  if (errorsFound.length > 0) {
+    setValidationErrors(errorsFound);
+    setShowModal(true);
+    setLoading(false);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+    return;
+  }
+
+  let successCount = 0;
+  let duplicateCount = 0;
+  let dbErrors = [];
+
+  for (let i = 0; i < formattedData.length; i++) {
+    const rowData = formattedData[i];
+    const { data: existing } = await supabase
+      .from('households')
+      .select('id')
+      .eq('name', rowData.name || '')
+      .eq('household_no', rowData.household_no || '')
+      .eq('date_of_birth', rowData.date_of_birth || '')
+      .eq('gender', rowData.gender || '')
+      .eq('fathers_name', rowData.fathers_name || '')
+      .eq('previous_id_no', rowData.previous_id_no || '')
+      .limit(1);
+
+    if (existing && existing.length > 0) { duplicateCount++; continue; }
+
+    const { error: supabaseError } = await supabase.from('households').insert(rowData);
+    if (supabaseError) dbErrors.push(`Row ${i + 2}: ${supabaseError.message}`);
+    else successCount++;
+  }
+
+  const parts = [];
+  if (successCount > 0) parts.push(`Inserted ${successCount} new records`);
+  if (duplicateCount > 0) parts.push(`Skipped ${duplicateCount} duplicates`);
+  if (dbErrors.length > 0) parts.push(`${dbErrors.length} DB errors`);
+  setSuccessMsg(parts.join(' | ') || 'No changes made.');
+  if (onUploadSuccess && successCount > 0) onUploadSuccess();
+  setLoading(false);
+  if (fileInputRef.current) fileInputRef.current.value = '';
+};
+
 const CsvUploader = ({ onUploadSuccess }) => {
   const [loading, setLoading] = useState(false);
   const [successMsg, setSuccessMsg] = useState(null);
@@ -73,9 +170,73 @@ const CsvUploader = ({ onUploadSuccess }) => {
   const [showModal, setShowModal] = useState(false);
   const fileInputRef = useRef(null);
 
+  const handleJsonUpload = (file) => {
+    setLoading(true);
+    setSuccessMsg(null);
+    setValidationErrors([]);
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const rawParsed = JSON.parse(e.target.result);
+        // Recursively convert every Myanmar string to Unicode before processing
+        const parsed = deepEnsureUnicode(rawParsed);
+        const households = Array.isArray(parsed) ? parsed : [parsed];
+
+        const formattedData = [];
+        for (const hh of households) {
+          const hhId = hh.household_id || hh.household_no || 'UNKNOWN';
+          const loc = hh.location || {};
+          const members = Array.isArray(hh.members) ? hh.members : [];
+          for (const m of members) {
+            formattedData.push({
+              household_no: ensureUnicode(String(hhId).trim()),
+              name: ensureUnicode(m.name || ''),
+              date_of_birth: m.dob || m.date_of_birth || '',
+              gender: ensureUnicode(m.gender || ''),
+              fathers_name: ensureUnicode(m.fathers_name || ''),
+              mothers_name: ensureUnicode(m.mothers_name || ''),
+              household_relationship: ensureUnicode(m.relationship || m.household_relationship || ''),
+              occupation: ensureUnicode(m.occupation || ''),
+              previous_id_no: ensureUnicode(m.previous_id_no || ''),
+              taang_land_id_no: ensureUnicode(m.taang_land_id_no || ''),
+              nationality: ensureUnicode(m.nationality || ''),
+              resident_status: ensureUnicode(m.resident_status || ''),
+              religious: ensureUnicode(m.religious || ''),
+              house_no: ensureUnicode(loc.house_no || m.house_no || ''),
+              ward_village_group: ensureUnicode(loc.ward_village || loc.ward_village_group || m.ward_village_group || ''),
+              township: ensureUnicode(loc.township || m.township || ''),
+              district: ensureUnicode(loc.district || m.district || ''),
+              submission_date: m.submission_date || '',
+              address: ensureUnicode(`${loc.house_no || ''}, ${loc.ward_village || ''}, ${loc.township || ''}, ${loc.district || ''}`),
+            });
+          }
+        }
+
+        if (formattedData.length === 0) throw new Error('JSON file has no member records.');
+
+        await processAndUpload(
+          formattedData,
+          setValidationErrors, setShowModal, setLoading, setSuccessMsg, onUploadSuccess, fileInputRef
+        );
+      } catch (err) {
+        console.error('JSON upload error:', err);
+        alert(err.message || 'Failed to parse JSON file.');
+        setLoading(false);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+      }
+    };
+    reader.readAsText(file, 'UTF-8');
+  };
+
   const handleFileUpload = (event) => {
     const file = event.target.files[0];
     if (!file) return;
+
+    if (file.name.endsWith('.json')) {
+      handleJsonUpload(file);
+      return;
+    }
 
     setLoading(true);
     setSuccessMsg(null);
@@ -116,26 +277,27 @@ const CsvUploader = ({ onUploadSuccess }) => {
             if (rawTownship && rawTownship.trim() !== '') currentTownship = rawTownship.trim();
             if (rawDistrict && rawDistrict.trim() !== '') currentDistrict = rawDistrict.trim();
 
+            const cell = (key) => (row[key] || '').trim();
             const parsedRow = {
               household_no: ensureUnicode(currentHouseholdNo),
-              name: ensureUnicode(row['Name']),
-              date_of_birth: row['Date of birth'],
-              gender: ensureUnicode(row['Gender']),
-              fathers_name: ensureUnicode(row["Father's Name"]),
-              mothers_name: ensureUnicode(row["Mother's Name"]),
-              household_relationship: ensureUnicode(row['Household Relationship']),
-              occupation: ensureUnicode(row['Occupation']),
-              previous_id_no: ensureUnicode(row['Previous ID No.']),
-              taang_land_id_no: ensureUnicode(row["Ta'ang Land ID No."]),
-              nationality: ensureUnicode(row['Nationality']),
-              resident_status: ensureUnicode(row['Resident Status']),
-              religious: ensureUnicode(row['Religious']),
-              house_no: ensureUnicode(row['House NO.']),
+              name: ensureUnicode(cell('Name')),
+              date_of_birth: cell('Date of birth'),
+              gender: ensureUnicode(cell('Gender')),
+              fathers_name: ensureUnicode(cell("Father's Name")),
+              mothers_name: ensureUnicode(cell("Mother's Name")),
+              household_relationship: ensureUnicode(cell('Household Relationship')),
+              occupation: ensureUnicode(cell('Occupation')),
+              previous_id_no: ensureUnicode(cell('Previous ID No.')),
+              taang_land_id_no: ensureUnicode(cell("Ta'ang Land ID No.")),
+              nationality: ensureUnicode(cell('Nationality')),
+              resident_status: ensureUnicode(cell('Resident Status')),
+              religious: ensureUnicode(cell('Religious')),
+              house_no: ensureUnicode(cell('House NO.')),
               ward_village_group: ensureUnicode(currentWard),
               township: ensureUnicode(currentTownship),
               district: ensureUnicode(currentDistrict),
-              submission_date: row['Submission Date'],
-              address: ensureUnicode(`${row['House NO.'] || ''}, ${currentWard || ''}, ${currentTownship || ''}, ${currentDistrict || ''}`)
+              submission_date: cell('Submission Date'),
+              address: ensureUnicode(`${cell('House NO.')}, ${currentWard}, ${currentTownship}, ${currentDistrict}`)
             };
 
             // 2. Strict Validation Check (After Forward-Fill)
@@ -185,66 +347,15 @@ const CsvUploader = ({ onUploadSuccess }) => {
             throw new Error('The CSV file is empty or formatted incorrectly.');
           }
 
-          // 4. Block Upload if Errors Exist -> Trigger UI Modal
-          if (errorsFound.length > 0) {
-            setValidationErrors(errorsFound);
-            setShowModal(true);
-            setLoading(false);
-            if (fileInputRef.current) fileInputRef.current.value = ""; // Reset file input
-            return; // STOP EXECUTION! Do not send to Supabase!
-          }
-
-          // 5. Success State -> Proceed with insertion
-          let successCount = 0;
-          let duplicateCount = 0;
-          let dbErrors = [];
-
-          for (let i = 0; i < formattedData.length; i++) {
-            const rowData = formattedData[i];
-
-            // Stricter duplicate check: match on 6 key identity fields
-            const { data: existing } = await supabase
-              .from('households')
-              .select('id')
-              .eq('name', rowData.name || '')
-              .eq('household_no', rowData.household_no || '')
-              .eq('date_of_birth', rowData.date_of_birth || '')
-              .eq('gender', rowData.gender || '')
-              .eq('fathers_name', rowData.fathers_name || '')
-              .eq('previous_id_no', rowData.previous_id_no || '')
-              .limit(1);
-
-            if (existing && existing.length > 0) {
-              duplicateCount++;
-              continue;
-            }
-
-            const { error: supabaseError } = await supabase
-              .from('households')
-              .insert(rowData);
-
-            if (supabaseError) {
-              dbErrors.push(`Row ${i + 2}: ${supabaseError.message}`);
-            } else {
-              successCount++;
-            }
-          }
-
-          // Build result message
-          const parts = [];
-          if (successCount > 0) parts.push(`Inserted ${successCount} new records`);
-          if (duplicateCount > 0) parts.push(`Skipped ${duplicateCount} duplicates`);
-          if (dbErrors.length > 0) parts.push(`${dbErrors.length} DB errors`);
-          setSuccessMsg(parts.join(' | ') || 'No changes made.');
-
-          if (onUploadSuccess && successCount > 0) {
-            onUploadSuccess();
-          }
+          // 4. Delegate to shared upload processor
+          await processAndUpload(
+            formattedData,
+            setValidationErrors, setShowModal, setLoading, setSuccessMsg, onUploadSuccess, fileInputRef
+          );
 
         } catch (err) {
           console.error("Upload error:", err);
           alert(err.message || 'An error occurred during upload.');
-        } finally {
           setLoading(false);
           if (fileInputRef.current) fileInputRef.current.value = "";
         }
@@ -269,8 +380,8 @@ const CsvUploader = ({ onUploadSuccess }) => {
           <Upload size={24} />
         </div>
         <div>
-          <h2 className="text-xl font-bold text-gray-900">Bulk Upload Households (CSV)</h2>
-          <p className="text-sm text-slate-500">Upload your exported Excel data safely.</p>
+          <h2 className="text-xl font-bold text-gray-900">Bulk Upload Households (CSV / JSON)</h2>
+          <p className="text-sm text-slate-500">Upload a CSV file or a previously exported JSON backup.</p>
         </div>
       </div>
 
@@ -278,13 +389,16 @@ const CsvUploader = ({ onUploadSuccess }) => {
 
         <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-slate-300 border-dashed rounded-xl cursor-pointer bg-slate-50 hover:bg-slate-100 transition-colors">
           <div className="flex flex-col items-center justify-center pt-5 pb-6">
-            <FileSpreadsheet size={32} className="text-slate-400 mb-2" />
+            <div className="flex gap-2 mb-2">
+              <FileSpreadsheet size={28} className="text-slate-400" />
+              <FileJson size={28} className="text-slate-400" />
+            </div>
             <p className="text-sm text-slate-500 font-medium">Click to upload or drag and drop</p>
-            <p className="text-xs text-slate-400">.CSV files only</p>
+            <p className="text-xs text-slate-400">.CSV or .JSON files</p>
           </div>
           <input
             type="file"
-            accept=".csv"
+            accept=".csv,.json"
             className="hidden"
             onChange={handleFileUpload}
             disabled={loading}

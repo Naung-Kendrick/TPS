@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import Papa from 'papaparse';
 import { supabase } from '../lib/supabase';
 import { zg2uni } from 'rabbit-node';
+import { pushNotification, NOTIF_TYPES } from '../lib/notifications';
 import { AlertCircle, X, CheckCircle2, Upload, FileSpreadsheet, Loader2, FileJson } from 'lucide-react';
 
 // Basic Zawgyi detector regex
@@ -157,7 +158,15 @@ const processAndUpload = async (formattedData, setValidationErrors, setShowModal
   if (successCount > 0) parts.push(`Inserted ${successCount} new records`);
   if (duplicateCount > 0) parts.push(`Skipped ${duplicateCount} duplicates`);
   if (dbErrors.length > 0) parts.push(`${dbErrors.length} DB errors`);
-  setSuccessMsg(parts.join(' | ') || 'No changes made.');
+  const msg = parts.join(' | ') || 'No changes made.';
+  setSuccessMsg(msg);
+  if (successCount > 0) {
+    pushNotification({
+      type: NOTIF_TYPES.UPLOAD,
+      title: 'Upload Complete',
+      message: msg,
+    });
+  }
   if (onUploadSuccess && successCount > 0) onUploadSuccess();
   setLoading(false);
   if (fileInputRef.current) fileInputRef.current.value = '';

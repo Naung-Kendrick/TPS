@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import jsQR from 'jsqr';
 import { supabase } from '../lib/supabase';
+import { pushNotification, NOTIF_TYPES } from '../lib/notifications';
 import {
   ScanLine, Search, X, CheckCircle2, AlertCircle, Loader2,
   User, Home, MapPin, CreditCard, Hash, Camera, Keyboard,
@@ -110,6 +111,11 @@ const IDCardScanner = () => {
     setVerificationRef(ref);
     setVerifiedAt(new Date());
     setResult(data);
+    pushNotification({
+      type: NOTIF_TYPES.VERIFICATION,
+      title: 'Verification Complete',
+      message: `${data.name || 'Unknown'} · ${ref}`,
+    });
   };
 
   const handleManualSearch = (e) => {

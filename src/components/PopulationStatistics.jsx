@@ -3,6 +3,7 @@ import { SkeletonStatGrid, SkeletonBar } from './Skeleton';
 import { supabase } from '../lib/supabase';
 import { Users, User, Home, Search, BarChart2, MapPin, Globe } from 'lucide-react';
 import { deepEnsureUnicode } from './CsvUploader';
+import EmptyState from './EmptyState';
 
 const toMyanmarNum = (num) => {
   const myanmarNumbers = ['၀', '၁', '၂', '၃', '၄', '၅', '၆', '၇', '၈', '၉'];
@@ -229,8 +230,13 @@ const PopulationStatistics = () => {
   if (error) {
     return (
       <div style={{ padding: '32px' }} className="max-w-7xl mx-auto">
-        <div style={{ padding: '16px', border: '1px solid #E5E7EB', color: '#1A1A1A', fontSize: '12px' }}>
-          ERROR: {error}
+        <div style={{ border: '1px solid #E5E7EB' }}>
+          <EmptyState
+            type={!navigator.onLine ? 'offline' : 'error'}
+            message={!navigator.onLine ? 'Device is offline. Reconnect to load population statistics.' : 'Could not load population statistics from the database.'}
+            detail={error}
+            action={{ label: 'Retry', onClick: () => window.location.reload() }}
+          />
         </div>
       </div>
     );

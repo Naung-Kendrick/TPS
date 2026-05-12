@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { cacheGet, cacheSet } from '../lib/offlineCache';
 import { SkeletonTable, SkeletonBar } from './Skeleton';
 import { ChevronRight, Search, Map as MapIcon, MapPin, Home, Users, User, ArrowLeft, Loader2, AlertCircle, Printer, FileSpreadsheet, Pencil, Trash2, Check, X, Download } from 'lucide-react';
+import EmptyState from './EmptyState';
 import { exportHouseholdExcel, printHouseholdPdf } from '../lib/householdPrint';
 import { deepEnsureUnicode } from './CsvUploader';
 import { buildExportFilename } from '../lib/exportFilename';
@@ -408,9 +409,13 @@ const Reports = () => {
       </div>
 
       {error && (
-        <div className="p-4 border border-gray-200 text-gray-900 text-xs mb-8 flex items-center gap-3">
-          <AlertCircle size={16} />
-          <span>{error}</span>
+        <div className="mb-8">
+          <EmptyState
+            type={!navigator.onLine ? 'offline' : 'error'}
+            message={!navigator.onLine ? 'The device is offline. Cached data may be shown.' : 'Could not load records from the database.'}
+            detail={error}
+            action={{ label: 'Retry', onClick: fetchData }}
+          />
         </div>
       )}
 
@@ -450,7 +455,9 @@ const Reports = () => {
             {level <= 3 && (
               <div className="p-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 bg-white min-h-[400px]">
                 {filteredData.length === 0 ? (
-                  <div className="col-span-full flex justify-center items-center h-40 text-gray-500 text-xs uppercase">No records found.</div>
+                  <div className="col-span-full">
+                    <EmptyState type="no-results" message={search ? `No results for "${search}".` : 'No records available at this level.'} compact />
+                  </div>
                 ) : (
                   filteredData.map((item, idx) => (
                     <div 
@@ -492,7 +499,7 @@ const Reports = () => {
                   </thead>
                   <tbody>
                     {filteredData.length === 0 ? (
-                      <tr><td colSpan={5} className="p-12 text-center text-gray-500 text-xs uppercase">No household heads found.</td></tr>
+                      <tr><td colSpan={5}><EmptyState type="no-results" message={search ? `No household heads match "${search}".` : 'No household heads found in this village.'} compact /></td></tr>
                     ) : (
                       filteredData.map(head => (
                         <tr key={head.id} className="hover:bg-gray-50 transition-colors">
@@ -562,7 +569,7 @@ const Reports = () => {
                     </thead>
                     <tbody>
                       {familyMembers.length === 0 ? (
-                        <tr><td colSpan={15} style={{ padding: '48px', textAlign: 'center', color: '#9CA3AF', fontSize: '11px' }}>No family members found.</td></tr>
+                        <tr><td colSpan={15}><EmptyState type="no-results" title="No Members Found" message="No family members are registered under this household number." compact /></td></tr>
                       ) : (
                         familyMembers.map((member, idx) => {
                           const isEditing = editingId === member.id;

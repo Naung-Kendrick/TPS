@@ -2,6 +2,7 @@
 import { supabase } from '../lib/supabase';
 import { exportHouseholdExcel, printHouseholdPdf } from '../lib/householdPrint';
 import { Search, RotateCcw, AlertCircle, CheckCircle2, X, Loader2, Printer, FileSpreadsheet } from 'lucide-react';
+import EmptyState from './EmptyState';
 
 // Convert Myanmar numerals to Arabic and calculate age from DOB string (format: day.month.year)
 const myanmarToArabic = (str) => {
@@ -40,6 +41,7 @@ const Verification = () => {
   const [results, setResults] = useState(null);
   const [loading, setLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+  const [verifyError, setVerifyError] = useState(null);
 
   const [expandedHouseholdNo, setExpandedHouseholdNo] = useState(null);
   const [familyMembers, setFamilyMembers] = useState([]);
@@ -62,6 +64,7 @@ const Verification = () => {
     setHasSearched(false);
     setExpandedHouseholdNo(null);
     setFamilyMembers([]);
+    setVerifyError(null);
   };
 
   const handleVerify = async (e) => {
@@ -77,6 +80,7 @@ const Verification = () => {
     }
 
     setLoading(true);
+    setVerifyError(null);
 
     try {
       let query = supabase.from('households').select('*');
@@ -95,7 +99,9 @@ const Verification = () => {
 
     } catch (err) {
       console.error(err);
-      alert('Error fetching verification data: ' + err.message);
+      const msg = err?.message || '';
+      const isOffline = !navigator.onLine;
+      setVerifyError({ message: msg, offline: isOffline });
     } finally {
       setLoading(false);
     }
@@ -253,14 +259,31 @@ const Verification = () => {
         </div>
       </div>
 
+      {/* Error state */}
+      {verifyError && !loading && (
+        <div className="border border-gray-200">
+          <EmptyState
+            type={verifyError.offline ? 'offline' : 'error'}
+            message={verifyError.offline
+              ? 'The device is offline. Reconnect and try again.'
+              : 'Could not fetch records from the database.'}
+            detail={verifyError.message}
+            action={{ label: 'Retry', onClick: () => { setVerifyError(null); } }}
+          />
+        </div>
+      )}
+
       {/* VERIFICATION RESULTS */}
-      {hasSearched && !loading && results && (
+      {hasSearched && !loading && results && !verifyError && (
         <div>
           {results.length === 0 ? (
-            <div className="border border-gray-200 p-8 flex flex-col items-center justify-center text-center">
-              <AlertCircle size={24} className="text-gray-900 mb-3" />
-              <h3 className="text-xs font-bold text-gray-900 mb-1 uppercase">Data not found.</h3>
-              <p className="text-gray-600 text-xs">Please check the inputs and try again. Ensure spelling is correct.</p>
+            <div className="border border-gray-200">
+              <EmptyState
+                type="no-results"
+                title="No Records Found"
+                message="No household members match the search criteria. Check the spelling or try fewer filters."
+                action={{ label: 'Clear Filters', onClick: handleClear }}
+              />
             </div>
           ) : (
             <div className="space-y-4">

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import EditHouseholdModal from './EditHouseholdModal';
+import EmptyState from './EmptyState';
 
 const HouseholdTable = ({ refreshTrigger }) => {
   const [households, setHouseholds] = useState([]);
@@ -130,11 +131,11 @@ const HouseholdTable = ({ refreshTrigger }) => {
 
       <div style={{ background: 'white', borderRadius: 'var(--radius)', border: '1px solid #E5E7EB', overflow: 'hidden' }}>
         {search.trim() === '' ? (
-          <div style={{ textAlign: 'center', padding: '4rem 2rem', color: 'var(--text-secondary)' }}>
-            <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🔍</div>
-            <h3 style={{ margin: '0 0 0.5rem 0', color: 'var(--text-primary)' }}>Search Database</h3>
-            <p style={{ margin: 0 }}>Type a name, address, or ID to fetch records.</p>
-          </div>
+          <EmptyState
+            type="no-search"
+            title="Search Household Database"
+            message="Type a name, address, household number, or ID to fetch records."
+          />
         ) : (
           <div style={{ overflowX: 'auto', width: '100%' }}>
             <table style={{ borderCollapse: 'collapse', textAlign: 'left', width: 'max-content' }}>
@@ -150,9 +151,13 @@ const HouseholdTable = ({ refreshTrigger }) => {
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={columns.length + 1} style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)' }}>Searching database...</td></tr>
+                  <tr><td colSpan={columns.length + 1}>
+                    <EmptyState type="no-search" title="Searching Database" message="Fetching matching records..." compact />
+                  </td></tr>
                 ) : households.length === 0 ? (
-                  <tr><td colSpan={columns.length + 1} style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)' }}>No matching records found.</td></tr>
+                  <tr><td colSpan={columns.length + 1}>
+                    <EmptyState type="no-results" message={`No records match "${search}". Try a different name, ID, or address.`} compact />
+                  </td></tr>
                 ) : (
                   households.map((h) => (
                     <tr key={h.id} style={{ borderBottom: '1px solid #F3F4F6', transition: 'background-color 0.2s' }}>

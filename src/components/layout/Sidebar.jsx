@@ -90,8 +90,13 @@ const Sidebar = () => {
         backgroundColor: '#FAFAFA',
       }}>
         {/* Issuing body */}
-        <div style={{ fontSize: '8.5px', fontWeight: '700', color: '#737373', letterSpacing: '0.14em', textTransform: 'uppercase', marginBottom: '10px' }}>
-          Ta'ang Land Immigration Dept.
+        <div style={{ marginBottom: '10px' }}>
+          <div style={{ fontSize: '10px', fontWeight: '600', color: '#1A1A1A', letterSpacing: '0.02em', lineHeight: 1.4, marginBottom: '2px' }}>
+            တီုင်စေတ်မေန်းတိုအီး အဆိုးယကပီုန်တအာင်း
+          </div>
+          <div style={{ fontSize: '8px', fontWeight: '700', color: '#737373', letterSpacing: '0.12em', textTransform: 'uppercase' }}>
+            Ta'ang Land Immigration Dept.
+          </div>
         </div>
 
         {/* Seal + title row */}
@@ -183,6 +188,7 @@ const Sidebar = () => {
         <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', minWidth: 0 }}>
           <span style={{ fontSize: '7.5px', fontWeight: '600', color: '#737373', letterSpacing: '0.1em', textTransform: 'uppercase', lineHeight: 1, whiteSpace: 'nowrap' }}>IDTL · Ta'ang Land Immigration</span>
           <span style={{ fontSize: '13px', fontWeight: '800', color: '#1A1A1A', letterSpacing: '0.07em', textTransform: 'uppercase', lineHeight: 1.2 }}>TPS</span>
+          <span style={{ fontSize: '8px', fontWeight: '500', color: '#737373', letterSpacing: '0.01em', lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>တီုင်စေတ်မေန်းတိုအီး အဆိုးယကပီုန်တအာင်း</span>
         </div>
 
         {/* Official badge — pushed to right */}

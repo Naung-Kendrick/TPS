@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { Users, UserPlus, LineChart, FileText, Settings, Upload, Menu, X } from 'lucide-react';
+import { Users, UserPlus, LineChart, FileText, Settings, Upload, ScanLine, Menu, X } from 'lucide-react';
 import logo from '../../assets/fonts/IDTL_logo.png';
 
 const Sidebar = () => {
@@ -20,6 +20,7 @@ const Sidebar = () => {
   const menuItems = [
     { id: 'verification',     path: '/verification',     label: 'Data Verification',      icon: Users          },
     { id: 'upload',           path: '/upload',           label: 'Data Upload',          icon: Upload         },
+    { id: 'scanner',          path: '/scanner',          label: 'ID Card Scanner',       icon: ScanLine       },
     { id: 'statistics',       path: '/statistics',       label: 'Population Statistics', icon: LineChart     },
     { id: 'registration',     path: '/registration',     label: 'Household Registration', icon: UserPlus      },
     { id: 'central-database', path: '/central-database', label: 'Central Database',      icon: FileText       },

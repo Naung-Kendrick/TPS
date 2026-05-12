@@ -6,6 +6,7 @@ import Verification from './components/Verification'
 import Reports from './components/Reports'
 import PopulationStatistics from './components/PopulationStatistics'
 import HouseholdForm from './components/HouseholdForm'
+import IDCardScanner from './components/IDCardScanner'
 import './App.css'
 
 const UploadPage = () => (
@@ -37,6 +38,7 @@ function App() {
         <Route index element={<Navigate to="/verification" replace />} />
         <Route path="verification" element={<VerificationPage />} />
         <Route path="upload" element={<UploadPage />} />
+        <Route path="scanner" element={<IDCardScanner />} />
         <Route path="central-database" element={<Reports />} />
         <Route path="statistics" element={<PopulationStatistics />} />
         <Route path="registration" element={<HouseholdForm />} />

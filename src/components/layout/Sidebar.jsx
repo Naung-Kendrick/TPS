@@ -9,6 +9,8 @@ const Sidebar = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const moreSheetRef = useRef(null);
+  const touchStartX = useRef(null);
+  const touchStartY = useRef(null);
 
   // Close drawer/more on route change (mobile)
   useEffect(() => { setOpen(false); setMoreOpen(false); }, [location.pathname]);
@@ -19,6 +21,35 @@ const Sidebar = () => {
     window.addEventListener('resize', handler);
     return () => window.removeEventListener('resize', handler);
   }, []);
+
+  // Swipe gestures: swipe left to close drawer; swipe right from left edge to open
+  useEffect(() => {
+    const onTouchStart = (e) => {
+      touchStartX.current = e.touches[0].clientX;
+      touchStartY.current = e.touches[0].clientY;
+    };
+    const onTouchEnd = (e) => {
+      if (touchStartX.current === null) return;
+      const dx = e.changedTouches[0].clientX - touchStartX.current;
+      const dy = Math.abs(e.changedTouches[0].clientY - touchStartY.current);
+      // Only treat as horizontal swipe if horizontal movement dominates
+      if (dy > Math.abs(dx) * 0.8) { touchStartX.current = null; return; }
+      if (open && dx < -50) {
+        // Swipe left anywhere → close drawer
+        setOpen(false);
+      } else if (!open && dx > 50 && touchStartX.current < 30) {
+        // Swipe right from left edge (within 30px) → open drawer
+        setOpen(true);
+      }
+      touchStartX.current = null;
+    };
+    document.addEventListener('touchstart', onTouchStart, { passive: true });
+    document.addEventListener('touchend', onTouchEnd, { passive: true });
+    return () => {
+      document.removeEventListener('touchstart', onTouchStart);
+      document.removeEventListener('touchend', onTouchEnd);
+    };
+  }, [open]);
 
   // Close "More" sheet when tapping outside
   useEffect(() => {

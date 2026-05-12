@@ -20,6 +20,21 @@ const IDCardScanner = () => {
   const [familyModal, setFamilyModal] = useState(false);
   const [familyMembers, setFamilyMembers] = useState([]);
   const [familyLoading, setFamilyLoading] = useState(false);
+  const [verificationRef, setVerificationRef] = useState(null);
+  const [verifiedAt, setVerifiedAt] = useState(null);
+
+  const generateVerifRef = (householdNo, idNo) => {
+    const seed = (householdNo || '') + (idNo || '') + Date.now();
+    let hash = 0;
+    for (let i = 0; i < seed.length; i++) {
+      hash = ((hash << 5) - hash) + seed.charCodeAt(i);
+      hash |= 0;
+    }
+    const hex = Math.abs(hash).toString(16).toUpperCase().padStart(6, '0').slice(0, 6);
+    const now = new Date();
+    const datePart = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}`;
+    return `TPS-VRF-${datePart}-${hex}`;
+  };
 
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
@@ -91,6 +106,9 @@ const IDCardScanner = () => {
       return;
     }
 
+    const ref = generateVerifRef(data.household_no, data.taang_land_id_no);
+    setVerificationRef(ref);
+    setVerifiedAt(new Date());
     setResult(data);
   };
 
@@ -203,6 +221,8 @@ const IDCardScanner = () => {
     setInputValue('');
     setFamilyModal(false);
     setFamilyMembers([]);
+    setVerificationRef(null);
+    setVerifiedAt(null);
     if (inputRef.current) inputRef.current.focus();
   };
 
@@ -240,7 +260,7 @@ const IDCardScanner = () => {
   };
 
   return (
-    <div className="p-8 max-w-3xl mx-auto">
+    <div style={{ padding: '24px 16px', maxWidth: '768px', margin: '0 auto', boxSizing: 'border-box' }} className="scanner-page">
       {/* Page Header */}
       <div className="mb-8">
         <h2 style={{ fontSize: '20px', margin: '0 0 8px 0', color: '#1A1A1A', fontWeight: '500', letterSpacing: '0.02em' }}>
@@ -524,23 +544,46 @@ const IDCardScanner = () => {
 
       {/* Result Card */}
       {result && !loading && (
-        <div className="bg-white border border-[#E5E7EB]" style={{ borderRadius: '0px' }}>
-          {/* Result Header */}
-          <div className="flex items-center justify-between p-4 border-b border-[#E5E7EB] bg-[#FAFAFA]">
-            <div className="flex items-center gap-3">
-              <CheckCircle2 size={18} className="text-[#1A1A1A]" />
-              <div>
-                <p className="text-sm font-bold text-[#1A1A1A]">Record Verified</p>
-                <p className="text-xs text-[#737373]">Match found in household database</p>
+        <div className="bg-white border border-[#E5E7EB]" style={{ borderRadius: '0px', borderLeft: '3px solid #1A1A1A' }}>
+
+          {/* ── Verification Stamp Header ── */}
+          <div style={{ backgroundColor: '#1A1A1A', padding: '12px 16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                {/* Stamp seal */}
+                <div style={{
+                  width: '36px', height: '36px', border: '2px solid rgba(255,255,255,0.6)',
+                  borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  flexShrink: 0,
+                }}>
+                  <CheckCircle2 size={18} color="#FFFFFF" />
+                </div>
+                <div>
+                  <div style={{ fontSize: '11px', fontWeight: '800', color: '#FFFFFF', letterSpacing: '0.12em', textTransform: 'uppercase' }}>VERIFIED</div>
+                  <div style={{ fontSize: '9px', color: 'rgba(255,255,255,0.65)', marginTop: '2px', letterSpacing: '0.04em' }}>Ta'ang Land Immigration Dept. · TPS</div>
+                </div>
               </div>
+              <button
+                onClick={reset}
+                style={{ background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '50%', width: 28, height: 28, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+              >
+                <X size={14} color="#fff" />
+              </button>
             </div>
-            <button
-              onClick={reset}
-              className="text-[#737373] hover:text-[#1A1A1A] transition-colors"
-              style={{ background: 'none', border: 'none', padding: '4px', cursor: 'pointer' }}
-            >
-              <X size={18} />
-            </button>
+          </div>
+
+          {/* ── Reference strip ── */}
+          <div style={{
+            backgroundColor: '#F3F4F6', borderBottom: '1px solid #E5E7EB',
+            padding: '7px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '4px',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ fontSize: '8.5px', fontWeight: '700', color: '#737373', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Ref No.</span>
+              <span style={{ fontSize: '10px', fontWeight: '700', color: '#1A1A1A', fontFamily: 'monospace', letterSpacing: '0.06em' }}>{verificationRef}</span>
+            </div>
+            <span style={{ fontSize: '8.5px', color: '#737373', letterSpacing: '0.04em' }}>
+              {verifiedAt && verifiedAt.toLocaleString('en-GB', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' })}
+            </span>
           </div>
 
           {/* Identity Section */}

@@ -1,21 +1,28 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Html5Qrcode } from 'html5-qrcode';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import jsQR from 'jsqr';
 import { supabase } from '../lib/supabase';
 import {
   ScanLine, Search, X, CheckCircle2, AlertCircle, Loader2,
-  User, Home, MapPin, CreditCard, Hash, Camera, Keyboard
+  User, Home, MapPin, CreditCard, Hash, Camera, Keyboard,
+  ZoomIn, ZoomOut
 } from 'lucide-react';
 
 const IDCardScanner = () => {
-  const [mode, setMode] = useState('manual'); // 'manual' | 'camera'
+  const [mode, setMode] = useState('manual');
   const [inputValue, setInputValue] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
   const [scanning, setScanning] = useState(false);
+  const [zoom, setZoom] = useState(1);
+  const [zoomRange, setZoomRange] = useState({ min: 1, max: 1 });
+  const [scanFlash, setScanFlash] = useState(false);
 
-  const scannerRef = useRef(null);
-  const html5QrRef = useRef(null);
+  const videoRef = useRef(null);
+  const canvasRef = useRef(null);
+  const streamRef = useRef(null);
+  const rafRef = useRef(null);
+  const trackRef = useRef(null);
   const inputRef = useRef(null);
 
   // Extract the core numeric part from any format:
@@ -90,42 +97,84 @@ const IDCardScanner = () => {
     lookupID(inputValue.trim());
   };
 
+  const stopCamera = useCallback(() => {
+    if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(t => t.stop());
+      streamRef.current = null;
+    }
+    trackRef.current = null;
+    setScanning(false);
+    setZoom(1);
+    setZoomRange({ min: 1, max: 1 });
+  }, []);
+
   const startCamera = async () => {
-    setScanning(true);
     setError(null);
     setResult(null);
-
+    setScanning(true);
     try {
-      const html5Qr = new Html5Qrcode('qr-reader');
-      html5QrRef.current = html5Qr;
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }
+      });
+      streamRef.current = stream;
+      const track = stream.getVideoTracks()[0];
+      trackRef.current = track;
 
-      await html5Qr.start(
-        { facingMode: 'environment' },
-        { fps: 10, qrbox: { width: 260, height: 260 } },
-        (decodedText) => {
+      // Read zoom capability
+      const caps = track.getCapabilities?.() || {};
+      if (caps.zoom) {
+        setZoomRange({ min: caps.zoom.min, max: caps.zoom.max });
+        setZoom(caps.zoom.min);
+      }
+
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+      }
+
+      // Start QR decode loop
+      const canvas = canvasRef.current;
+      const ctx = canvas.getContext('2d');
+      const tick = () => {
+        const video = videoRef.current;
+        if (!video || video.readyState !== video.HAVE_ENOUGH_DATA) {
+          rafRef.current = requestAnimationFrame(tick);
+          return;
+        }
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: 'dontInvert' });
+        if (code?.data) {
+          setScanFlash(true);
+          setTimeout(() => setScanFlash(false), 400);
           stopCamera();
-          setInputValue(decodedText);
-          lookupID(decodedText);
-        },
-        () => {}
-      );
+          setInputValue(code.data);
+          lookupID(code.data);
+          return;
+        }
+        rafRef.current = requestAnimationFrame(tick);
+      };
+      rafRef.current = requestAnimationFrame(tick);
     } catch (err) {
       setScanning(false);
       setError('Camera error: ' + (err?.message || 'Could not access camera.'));
     }
   };
 
-  const stopCamera = async () => {
-    if (html5QrRef.current) {
-      try { await html5QrRef.current.stop(); } catch (_) {}
-      html5QrRef.current = null;
+  const handleZoomChange = async (val) => {
+    const z = parseFloat(val);
+    setZoom(z);
+    if (trackRef.current) {
+      try { await trackRef.current.applyConstraints({ advanced: [{ zoom: z }] }); } catch (_) {}
     }
-    setScanning(false);
   };
 
   useEffect(() => {
     return () => { stopCamera(); };
-  }, []);
+  }, [stopCamera]);
 
   const handleModeSwitch = (m) => {
     stopCamera();
@@ -239,27 +288,18 @@ const IDCardScanner = () => {
 
       {/* Camera QR Scanner */}
       {mode === 'camera' && (
-        <div className="bg-white border border-[#E5E7EB] p-6 mb-6" style={{ borderRadius: '0px' }}>
-          <div className="flex items-center gap-3 mb-5">
-            <div className="bg-[#F3F4F6] p-2" style={{ borderRadius: '0px' }}>
-              <ScanLine size={20} className="text-[#1A1A1A]" />
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-[#1A1A1A]">QR Code Camera Scanner</p>
-              <p className="text-xs text-[#737373]">Point camera at the QR code on the ID card</p>
-            </div>
-          </div>
-
-          {/* QR Reader container */}
-          <div
-            id="qr-reader"
-            ref={scannerRef}
-            className="w-full bg-[#FAFAFA] border border-[#E5E7EB] overflow-hidden"
-            style={{ borderRadius: '0px', minHeight: scanning ? '320px' : '0px' }}
-          />
-
-          <div className="flex gap-2 mt-4">
-            {!scanning ? (
+        <div className="mb-6">
+          {!scanning ? (
+            <div className="bg-white border border-[#E5E7EB] p-6" style={{ borderRadius: '0px' }}>
+              <div className="flex items-center gap-3 mb-5">
+                <div className="bg-[#F3F4F6] p-2" style={{ borderRadius: '0px' }}>
+                  <ScanLine size={20} className="text-[#1A1A1A]" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-[#1A1A1A]">QR Code Camera Scanner</p>
+                  <p className="text-xs text-[#737373]">Point camera at the QR code on the ID card</p>
+                </div>
+              </div>
               <button
                 onClick={startCamera}
                 className="flex items-center gap-2 px-5 py-2 bg-[#1A1A1A] text-white text-sm font-medium hover:bg-[#737373] transition-colors"
@@ -268,23 +308,151 @@ const IDCardScanner = () => {
                 <Camera size={16} />
                 Start Camera
               </button>
-            ) : (
-              <button
-                onClick={stopCamera}
-                className="flex items-center gap-2 px-5 py-2 bg-[#F3F4F6] text-[#1A1A1A] border border-[#E5E7EB] text-sm font-medium hover:bg-[#E5E7EB] transition-colors"
-                style={{ borderRadius: '0px' }}
-              >
-                <X size={16} />
-                Stop Camera
-              </button>
-            )}
-          </div>
+            </div>
+          ) : (
+            /* ── Fullscreen Camera Overlay ── */
+            <div style={{
+              position: 'fixed', inset: 0, zIndex: 9999,
+              backgroundColor: '#000',
+              display: 'flex', flexDirection: 'column',
+            }}>
+              {/* Video */}
+              <video
+                ref={videoRef}
+                playsInline
+                muted
+                style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+              />
+              <canvas ref={canvasRef} style={{ display: 'none' }} />
 
-          {scanning && (
-            <p className="mt-3 text-xs text-[#737373] flex items-center gap-1">
-              <Loader2 size={12} className="animate-spin" />
-              Scanning... align QR code within the frame
-            </p>
+              {/* Dark vignette overlay with card cutout */}
+              <div style={{
+                position: 'absolute', inset: 0,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                {/* Semi-dark mask around the card frame */}
+                <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }} xmlns="http://www.w3.org/2000/svg">
+                  <defs>
+                    <mask id="cutout">
+                      <rect width="100%" height="100%" fill="white" />
+                      <rect x="50%" y="50%" width="78vw" height="49vw"
+                        transform="translate(-39vw,-24.5vw)"
+                        rx="4" ry="4" fill="black" />
+                    </mask>
+                  </defs>
+                  <rect width="100%" height="100%" fill="rgba(0,0,0,0.55)" mask="url(#cutout)" />
+                </svg>
+
+                {/* Card frame with corner brackets */}
+                <div style={{
+                  position: 'relative',
+                  width: '78vw', height: '49vw',
+                  maxWidth: '560px', maxHeight: '352px',
+                }}
+                >
+                  {/* Scan flash */}
+                  {scanFlash && (
+                    <div style={{
+                      position: 'absolute', inset: 0,
+                      backgroundColor: 'rgba(255,255,255,0.35)',
+                      pointerEvents: 'none', zIndex: 2,
+                    }} />
+                  )}
+
+                  {/* Corner brackets — top-left */}
+                  <div style={{ position:'absolute', top:0, left:0, width:28, height:28,
+                    borderTop:'3px solid #4FC3F7', borderLeft:'3px solid #4FC3F7' }} />
+                  {/* top-right */}
+                  <div style={{ position:'absolute', top:0, right:0, width:28, height:28,
+                    borderTop:'3px solid #4FC3F7', borderRight:'3px solid #4FC3F7' }} />
+                  {/* bottom-left */}
+                  <div style={{ position:'absolute', bottom:0, left:0, width:28, height:28,
+                    borderBottom:'3px solid #4FC3F7', borderLeft:'3px solid #4FC3F7' }} />
+                  {/* bottom-right */}
+                  <div style={{ position:'absolute', bottom:0, right:0, width:28, height:28,
+                    borderBottom:'3px solid #4FC3F7', borderRight:'3px solid #4FC3F7' }} />
+
+                  {/* Animated scan line */}
+                  <div style={{
+                    position: 'absolute', left: 8, right: 8, height: '2px',
+                    background: 'linear-gradient(90deg, transparent, #4FC3F7, transparent)',
+                    animation: 'scanline 2s linear infinite',
+                    zIndex: 1,
+                  }} />
+                </div>
+              </div>
+
+              {/* Top bar */}
+              <div style={{
+                position: 'absolute', top: 0, left: 0, right: 0,
+                padding: '16px 20px',
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                background: 'linear-gradient(to bottom, rgba(0,0,0,0.6), transparent)',
+              }}>
+                <div className="flex items-center gap-2">
+                  <ScanLine size={18} color="#4FC3F7" />
+                  <span style={{ color: '#fff', fontSize: '13px', fontWeight: '600', letterSpacing: '0.05em' }}>ID CARD SCANNER</span>
+                </div>
+                <button
+                  onClick={stopCamera}
+                  style={{ background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '50%', width: 36, height: 36, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                >
+                  <X size={18} color="#fff" />
+                </button>
+              </div>
+
+              {/* Hint text */}
+              <div style={{
+                position: 'absolute',
+                top: '50%', left: '50%',
+                transform: 'translate(-50%, calc(-50% + 30vw))',
+                maxWidth: '78vw',
+                textAlign: 'center',
+                marginTop: '8px',
+              }}>
+                <p style={{ color: 'rgba(255,255,255,0.8)', fontSize: '12px', margin: 0 }}>
+                  Align the ID card within the frame to scan QR code
+                </p>
+              </div>
+
+              {/* Bottom bar — zoom */}
+              <div style={{
+                position: 'absolute', bottom: 0, left: 0, right: 0,
+                padding: '20px 28px 32px',
+                background: 'linear-gradient(to top, rgba(0,0,0,0.7), transparent)',
+                display: 'flex', alignItems: 'center', gap: '14px',
+              }}>
+                <button
+                  onClick={() => handleZoomChange(Math.max(zoomRange.min, zoom - 0.5))}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}
+                >
+                  <ZoomOut size={22} color="rgba(255,255,255,0.85)" />
+                </button>
+                <input
+                  type="range"
+                  min={zoomRange.min}
+                  max={zoomRange.max}
+                  step={0.1}
+                  value={zoom}
+                  onChange={(e) => handleZoomChange(e.target.value)}
+                  style={{ flex: 1, accentColor: '#4FC3F7', cursor: 'pointer', height: '4px' }}
+                />
+                <button
+                  onClick={() => handleZoomChange(Math.min(zoomRange.max, zoom + 0.5))}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}
+                >
+                  <ZoomIn size={22} color="rgba(255,255,255,0.85)" />
+                </button>
+              </div>
+
+              <style>{`
+                @keyframes scanline {
+                  0%   { top: 8px; }
+                  50%  { top: calc(100% - 10px); }
+                  100% { top: 8px; }
+                }
+              `}</style>
+            </div>
           )}
         </div>
       )}

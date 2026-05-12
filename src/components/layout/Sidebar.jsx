@@ -50,30 +50,52 @@ const Sidebar = () => {
       width: '240px', flexShrink: 0, backgroundColor: '#FFFFFF',
       borderRight: '1px solid #E5E7EB', display: 'flex', flexDirection: 'column',
       height: '100%', overflowY: 'auto',
+      borderLeft: '3px solid #1A1A1A',
     }}>
-      {/* Header */}
+      {/* Authority Header */}
       <div style={{
-        display: 'flex', alignItems: 'center', gap: '12px',
-        padding: '16px 20px', borderBottom: '1px solid #E5E7EB',
+        padding: '14px 16px 12px',
+        borderBottom: '1px solid #E5E7EB',
+        backgroundColor: '#FAFAFA',
       }}>
-        <div style={{
-          width: '40px', height: '40px', border: '1px solid #E5E7EB',
-          backgroundColor: '#FFFFFF', display: 'flex', alignItems: 'center',
-          justifyContent: 'center', overflow: 'hidden', flexShrink: 0
-        }}>
-          <img src={logo} alt="TPS" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+        {/* Issuing body */}
+        <div style={{ fontSize: '8.5px', fontWeight: '700', color: '#737373', letterSpacing: '0.14em', textTransform: 'uppercase', marginBottom: '10px' }}>
+          Ta'ang Land Immigration Dept.
         </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: '15px', fontWeight: '700', color: '#1A1A1A', letterSpacing: '0.05em', textTransform: 'uppercase' }}>TPS</div>
-          <div style={{ fontSize: '10px', color: '#737373', marginTop: '1px' }}>Ta'ang Population System</div>
+
+        {/* Seal + title row */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+          <div style={{
+            width: '44px', height: '44px', flexShrink: 0,
+            border: '2px solid #1A1A1A',
+            backgroundColor: '#FFFFFF',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            overflow: 'hidden',
+          }}>
+            <img src={logo} alt="IDTL Seal" style={{ width: '90%', height: '90%', objectFit: 'contain' }} />
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: '14px', fontWeight: '800', color: '#1A1A1A', letterSpacing: '0.08em', textTransform: 'uppercase', lineHeight: 1 }}>TPS</div>
+            <div style={{ fontSize: '9.5px', color: '#1A1A1A', fontWeight: '500', marginTop: '3px', lineHeight: 1.3 }}>Ta'ang Population{' '}System</div>
+          </div>
+          {/* Close button — mobile only */}
+          <button onClick={() => setOpen(false)} style={{
+            display: 'none', background: 'none', border: 'none', cursor: 'pointer', padding: '4px',
+            color: '#737373', flexShrink: 0,
+          }} className="sidebar-close-btn">
+            <X size={18} />
+          </button>
         </div>
-        {/* Close button — mobile only */}
-        <button onClick={() => setOpen(false)} style={{
-          display: 'none', background: 'none', border: 'none', cursor: 'pointer', padding: '4px',
-          color: '#737373', flexShrink: 0,
-        }} className="sidebar-close-btn">
-          <X size={18} />
-        </button>
+
+        {/* Divider + system badge */}
+        <div style={{ borderTop: '1px solid #E5E7EB', paddingTop: '8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span style={{ fontSize: '8px', color: '#737373', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Official System</span>
+          <span style={{
+            fontSize: '8px', fontWeight: '700', color: '#FFFFFF',
+            backgroundColor: '#1A1A1A',
+            padding: '2px 6px', letterSpacing: '0.06em', textTransform: 'uppercase',
+          }}>IDTL · 2025</span>
+        </div>
       </div>
 
       {/* Nav */}
@@ -109,17 +131,27 @@ const Sidebar = () => {
 
   return (
     <>
-      {/* ── Mobile branding header (logo + TPS only, no nav) ── */}
+      {/* ── Mobile branding header ── */}
       <div className="mobile-topbar" style={{
         display: 'none', position: 'fixed', top: 0, left: 0, right: 0, zIndex: 900,
-        backgroundColor: '#FFFFFF', borderBottom: '1px solid #E5E7EB',
+        backgroundColor: '#FAFAFA', borderBottom: '1px solid #E5E7EB',
+        borderLeft: '3px solid #1A1A1A',
         alignItems: 'center', justifyContent: 'flex-start', gap: '10px',
-        padding: '10px 16px', height: '48px',
+        padding: '8px 14px', height: '48px',
       }}>
-        <img src={logo} alt="TPS" style={{ width: '26px', height: '26px', objectFit: 'contain', border: '1px solid #E5E7EB' }} />
-        <div>
-          <div style={{ fontSize: '13px', fontWeight: '700', color: '#1A1A1A', letterSpacing: '0.06em', textTransform: 'uppercase', lineHeight: 1 }}>TPS</div>
-          <div style={{ fontSize: '9px', color: '#737373', letterSpacing: '0.02em', marginTop: '2px' }}>Ta'ang Population System</div>
+        <div style={{
+          width: '28px', height: '28px', flexShrink: 0,
+          border: '2px solid #1A1A1A', backgroundColor: '#FFFFFF',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
+        }}>
+          <img src={logo} alt="IDTL Seal" style={{ width: '90%', height: '90%', objectFit: 'contain' }} />
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: '8px', fontWeight: '700', color: '#737373', letterSpacing: '0.12em', textTransform: 'uppercase', lineHeight: 1, marginBottom: '2px' }}>Ta'ang Land Immigration Dept.</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ fontSize: '13px', fontWeight: '800', color: '#1A1A1A', letterSpacing: '0.06em', textTransform: 'uppercase', lineHeight: 1 }}>TPS</span>
+            <span style={{ fontSize: '7.5px', fontWeight: '700', color: '#FFFFFF', backgroundColor: '#1A1A1A', padding: '1px 5px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>IDTL · 2025</span>
+          </div>
         </div>
       </div>
 

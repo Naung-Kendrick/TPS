@@ -109,7 +109,7 @@ const IDCardScanner = () => {
     trackRef.current = null;
     setScanning(false);
     setZoom(1);
-    setZoomRange({ min: 1, max: 1 });
+    setZoomRange({ min: 1, max: 4 });
   }, []);
 
   const startCamera = async () => {
@@ -124,12 +124,9 @@ const IDCardScanner = () => {
       const track = stream.getVideoTracks()[0];
       trackRef.current = track;
 
-      // Read zoom capability
-      const caps = track.getCapabilities?.() || {};
-      if (caps.zoom) {
-        setZoomRange({ min: caps.zoom.min, max: caps.zoom.max });
-        setZoom(caps.zoom.min);
-      }
+      // Always allow CSS zoom 1–4x; also enable hardware zoom if supported
+      setZoomRange({ min: 1, max: 4 });
+      setZoom(1);
 
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
@@ -170,8 +167,20 @@ const IDCardScanner = () => {
   const handleZoomChange = async (val) => {
     const z = parseFloat(val);
     setZoom(z);
+    // Apply CSS scale zoom on video element (always works)
+    if (videoRef.current) {
+      videoRef.current.style.transform = `scale(${z})`;
+      videoRef.current.style.transformOrigin = 'center center';
+    }
+    // Also try hardware zoom if the device supports it
     if (trackRef.current) {
-      try { await trackRef.current.applyConstraints({ advanced: [{ zoom: z }] }); } catch (_) {}
+      try {
+        const caps = trackRef.current.getCapabilities?.() || {};
+        if (caps.zoom) {
+          const hwZoom = caps.zoom.min + (z - 1) * (caps.zoom.max - caps.zoom.min) / 3;
+          await trackRef.current.applyConstraints({ advanced: [{ zoom: hwZoom }] });
+        }
+      } catch (_) {}
     }
   };
 
@@ -338,13 +347,14 @@ const IDCardScanner = () => {
               position: 'fixed', inset: 0, zIndex: 9999,
               backgroundColor: '#000',
               display: 'flex', flexDirection: 'column',
+              overflow: 'hidden',
             }}>
               {/* Video */}
               <video
                 ref={videoRef}
                 playsInline
                 muted
-                style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+                style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', transition: 'transform 0.15s ease', transformOrigin: 'center center' }}
               />
               <canvas ref={canvasRef} style={{ display: 'none' }} />
 

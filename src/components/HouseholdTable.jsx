@@ -161,7 +161,8 @@ const HouseholdTable = ({ refreshTrigger }) => {
                           onClick={() => handleEdit(h)} 
                           style={{ 
                             marginRight: '8px', 
-                            padding: '6px 12px', 
+                            minHeight: '44px',
+                            padding: '0 12px', 
                             backgroundColor: 'var(--primary-color)', 
                             color: 'white', 
                             fontSize: '0.875rem' 
@@ -172,7 +173,8 @@ const HouseholdTable = ({ refreshTrigger }) => {
                         <button 
                           onClick={() => handleDelete(h.id)} 
                           style={{ 
-                            padding: '6px 12px', 
+                            minHeight: '44px',
+                            padding: '0 12px', 
                             backgroundColor: '#EF4444', 
                             color: 'white', 
                             fontSize: '0.875rem' 
@@ -204,6 +206,7 @@ const HouseholdTable = ({ refreshTrigger }) => {
               onClick={() => setPage(p => Math.max(0, p - 1))}
               disabled={page === 0}
               style={{ 
+                minHeight: '44px', padding: '0 16px',
                 backgroundColor: page === 0 ? '#F3F4F6' : 'white', 
                 border: '1px solid #E5E7EB', 
                 color: page === 0 ? '#9CA3AF' : 'var(--text-primary)' 
@@ -215,6 +218,7 @@ const HouseholdTable = ({ refreshTrigger }) => {
               onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
               disabled={page === totalPages - 1}
               style={{ 
+                minHeight: '44px', padding: '0 16px',
                 backgroundColor: page === totalPages - 1 ? '#F3F4F6' : 'white', 
                 border: '1px solid #E5E7EB', 
                 color: page === totalPages - 1 ? '#9CA3AF' : 'var(--text-primary)' 

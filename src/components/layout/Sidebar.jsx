@@ -11,6 +11,7 @@ const Sidebar = () => {
   const moreSheetRef = useRef(null);
   const touchStartX = useRef(null);
   const touchStartY = useRef(null);
+  const touchStartEdge = useRef(null);
 
   // Close drawer/more on route change (mobile)
   useEffect(() => { setOpen(false); setMoreOpen(false); }, [location.pathname]);
@@ -25,20 +26,26 @@ const Sidebar = () => {
   // Swipe gestures: swipe left to close drawer; swipe right from left edge to open
   useEffect(() => {
     const onTouchStart = (e) => {
-      touchStartX.current = e.touches[0].clientX;
-      touchStartY.current = e.touches[0].clientY;
+      const t = e.touches[0];
+      touchStartX.current = t.clientX;
+      touchStartY.current = t.clientY;
+      touchStartEdge.current = t.clientX; // capture edge position at start
     };
     const onTouchEnd = (e) => {
       if (touchStartX.current === null) return;
-      const dx = e.changedTouches[0].clientX - touchStartX.current;
-      const dy = Math.abs(e.changedTouches[0].clientY - touchStartY.current);
-      // Only treat as horizontal swipe if horizontal movement dominates
-      if (dy > Math.abs(dx) * 0.8) { touchStartX.current = null; return; }
-      if (open && dx < -50) {
-        // Swipe left anywhere → close drawer
+      const endX = e.changedTouches[0].clientX;
+      const endY = e.changedTouches[0].clientY;
+      const dx = endX - touchStartX.current;
+      const dy = Math.abs(endY - touchStartY.current);
+      const absDx = Math.abs(dx);
+      // Ignore if mostly vertical (scroll), require horizontal dominance
+      if (dy > absDx || absDx < 40) {
+        touchStartX.current = null;
+        return;
+      }
+      if (open && dx < -40) {
         setOpen(false);
-      } else if (!open && dx > 50 && touchStartX.current < 30) {
-        // Swipe right from left edge (within 30px) → open drawer
+      } else if (!open && dx > 40 && touchStartEdge.current <= 40) {
         setOpen(true);
       }
       touchStartX.current = null;

@@ -440,7 +440,7 @@ const HouseholdForm = () => {
   const closeForm = () => setFormOpen(false);
 
   const FormFields = () => (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px 14px' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '10px 14px' }}>
 
       <div style={groupStyle}>
         <label style={labelStyle}>အိမ်ထောင်စုစာရင်းအမှတ် (Household No.)</label>
@@ -634,12 +634,14 @@ const HouseholdForm = () => {
         <div style={{
           position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.4)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          zIndex: 1000, padding: '16px'
+          zIndex: 1000, padding: window.innerWidth < 768 ? '0' : '16px'
         }}>
           <div style={{
             backgroundColor: '#FFFFFF', border: '1px solid #E5E7EB',
             width: '100%', maxWidth: '1080px',
-            maxHeight: '96vh', display: 'flex', flexDirection: 'column',
+            height: window.innerWidth < 768 ? '100%' : 'auto',
+            maxHeight: window.innerWidth < 768 ? '100dvh' : '96vh',
+            display: 'flex', flexDirection: 'column',
             borderRadius: '0px'
           }}>
             {/* Modal header */}
@@ -682,7 +684,7 @@ const HouseholdForm = () => {
             )}
 
             {/* Scrollable form body */}
-            <div style={{ overflowY: 'auto', flex: 1, padding: '14px 20px' }}>
+            <div style={{ overflowY: 'auto', flex: 1, padding: '14px 20px', paddingBottom: window.innerWidth < 768 ? '80px' : '14px' }}>
               <form id="registration-form" onSubmit={(e) => { e.preventDefault(); submitForm('SAME_HOUSEHOLD'); }}>
                 <FormFields />
               </form>

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
-import logo from '../../assets/fonts/IDTL_logo.png';
+import logo from '/icons/icon-192.png';
 
 const Layout = () => {
   return (

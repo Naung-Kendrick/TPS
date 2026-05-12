@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { SkeletonStatGrid, SkeletonBar } from './Skeleton';
 import { supabase } from '../lib/supabase';
 import { Users, User, Home, Search, BarChart2, MapPin, Globe } from 'lucide-react';
 import { deepEnsureUnicode } from './CsvUploader';
@@ -217,9 +218,10 @@ const PopulationStatistics = () => {
   if (loading) {
     return (
       <div style={{ padding: '32px' }} className="max-w-7xl mx-auto">
-        <div style={{ textAlign: 'center', padding: '64px', color: '#737373', fontSize: '12px' }}>
-          <p>LOADING STATISTICS...</p>
-        </div>
+        <SkeletonBar width="200px" height="22px" style={{ marginBottom: '8px' }} />
+        <SkeletonBar width="320px" height="12px" style={{ marginBottom: '32px' }} />
+        <SkeletonStatGrid />
+        <SkeletonStatGrid />
       </div>
     );
   }

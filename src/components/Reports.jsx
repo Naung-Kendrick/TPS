@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
+import { cacheGet, cacheSet } from '../lib/offlineCache';
+import { SkeletonTable, SkeletonBar } from './Skeleton';
 import { ChevronRight, Search, Map as MapIcon, MapPin, Home, Users, User, ArrowLeft, Loader2, AlertCircle, Printer, FileSpreadsheet, Pencil, Trash2, Check, X, Download } from 'lucide-react';
 import { exportHouseholdExcel, printHouseholdPdf } from '../lib/householdPrint';
 import { deepEnsureUnicode } from './CsvUploader';
@@ -73,28 +75,46 @@ const Reports = () => {
   }, [level, path.householdNo]);
 
   const fetchData = async () => {
-    setLoading(true);
     setError(null);
     setSearch('');
-    
+
+    // Cache key for this navigation state
+    const cacheKey = `reports_l${level}_${path.district||''}_${path.township||''}_${path.village||''}_${path.householdNo||''}`;
+
+    // Serve cached data immediately (stale-while-revalidate)
+    const cached = await cacheGet(cacheKey);
+    if (cached) {
+      if (level === 5) setFamilyMembers(cached);
+      else setDataList(cached);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
+
     try {
       if (level === 1) {
         const { data, error } = await supabase.from('households').select('district');
         if (error) throw error;
         const unique = [...new Set(data.filter(d => d.district).map(d => d.district))].sort();
-        setDataList(unique.map(name => ({ id: name, name })));
+        const list = unique.map(name => ({ id: name, name }));
+        setDataList(list);
+        cacheSet(cacheKey, list);
       } 
       else if (level === 2) {
         const { data, error } = await supabase.from('households').select('township').eq('district', path.district);
         if (error) throw error;
         const unique = [...new Set(data.filter(d => d.township).map(d => d.township))].sort();
-        setDataList(unique.map(name => ({ id: name, name })));
+        const list = unique.map(name => ({ id: name, name }));
+        setDataList(list);
+        cacheSet(cacheKey, list);
       }
       else if (level === 3) {
         const { data, error } = await supabase.from('households').select('ward_village_group').eq('township', path.township);
         if (error) throw error;
         const unique = [...new Set(data.filter(d => d.ward_village_group).map(d => d.ward_village_group))].sort();
-        setDataList(unique.map(name => ({ id: name, name })));
+        const list = unique.map(name => ({ id: name, name }));
+        setDataList(list);
+        cacheSet(cacheKey, list);
       }
       else if (level === 4) {
         const { data, error } = await supabase
@@ -104,6 +124,7 @@ const Reports = () => {
           .ilike('household_relationship', '%ဦးစီး%');
         if (error) throw error;
         setDataList(data || []);
+        cacheSet(cacheKey, data || []);
       }
       else if (level === 5) {
         const { data, error } = await supabase
@@ -119,10 +140,11 @@ const Reports = () => {
           return orderA - orderB;
         });
         setFamilyMembers(sortedData);
+        cacheSet(cacheKey, sortedData);
       }
     } catch (err) {
       console.error(err);
-      setError(err.message);
+      if (!cached) setError(err.message);
     } finally {
       setLoading(false);
     }
@@ -419,9 +441,8 @@ const Reports = () => {
       {/* MAIN CONTENT AREA */}
       <div className="border border-gray-200 bg-white min-h-[400px]">
         {loading ? (
-          <div className="flex flex-col items-center justify-center h-[400px] text-gray-500 gap-3">
-            <Loader2 className="animate-spin text-gray-900" size={32} />
-            <span className="font-medium text-xs uppercase">Fetching Records...</span>
+          <div style={{ padding: '24px' }}>
+            <SkeletonTable rows={level === 4 || level === 5 ? 8 : 6} cols={level === 4 || level === 5 ? 5 : 2} />
           </div>
         ) : (
           <>

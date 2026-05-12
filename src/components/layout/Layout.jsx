@@ -32,8 +32,8 @@ const Layout = () => {
       <style>{`
         @media (max-width: 767px) {
           .main-content {
-            padding-top: 52px;
-            padding-bottom: 68px;
+            padding-top: 48px;
+            padding-bottom: 60px;
           }
         }
       `}</style>

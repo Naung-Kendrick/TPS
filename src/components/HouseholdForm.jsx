@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { enqueue } from '../lib/retryQueue';
 
 const MyanmarCalendar = ({ value, onChange }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -168,9 +169,13 @@ const HouseholdForm = () => {
 
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [savedOffline, setSavedOffline] = useState(false);
   const [error, setError] = useState(null);
   const [submittedMembers, setSubmittedMembers] = useState([]);
   const [autoFillMessage, setAutoFillMessage] = useState('');
+  const [draftRestored, setDraftRestored] = useState(false);
+
+  const DRAFT_KEY = 'tps_household_form_draft';
   const [isCustomRelationship, setIsCustomRelationship] = useState(false);
   const [isCustomReligion, setIsCustomReligion] = useState(false);
   
@@ -180,6 +185,29 @@ const HouseholdForm = () => {
   const [viewFamilyLoading, setViewFamilyLoading] = useState(false);
 
   const [dob, setDob] = useState({ day: '', month: '', year: '' });
+
+  // Restore draft on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(DRAFT_KEY);
+      if (saved) {
+        const { formData: savedForm, dob: savedDob } = JSON.parse(saved);
+        if (savedForm && savedForm.household_no) {
+          setFormData(savedForm);
+          if (savedDob) setDob(savedDob);
+          setDraftRestored(true);
+          setTimeout(() => setDraftRestored(false), 4000);
+        }
+      }
+    } catch (_) {}
+  }, []);
+
+  // Auto-save draft on every change
+  useEffect(() => {
+    try {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({ formData, dob }));
+    } catch (_) {}
+  }, [formData, dob]);
 
   useEffect(() => {
     const dobString = [dob.day, dob.month, dob.year].filter(Boolean).join('.');
@@ -293,20 +321,36 @@ const HouseholdForm = () => {
     setSuccess(false);
 
     try {
-      const { error: supabaseError } = await supabase
-        .from('households')
-        .insert([formData]);
+      let savedLocally = false;
 
-      if (supabaseError) {
-        throw supabaseError;
+      if (!navigator.onLine) {
+        // Device is offline — queue the write
+        enqueue({ table: 'households', type: 'insert', payload: { ...formData } });
+        savedLocally = true;
+      } else {
+        const { error: supabaseError } = await supabase
+          .from('households')
+          .insert([formData]);
+
+        if (supabaseError) {
+          // Network error mid-request — queue it
+          enqueue({ table: 'households', type: 'insert', payload: { ...formData } });
+          savedLocally = true;
+        }
       }
 
-      setSuccess(true);
+      if (savedLocally) {
+        setSavedOffline(true);
+        setTimeout(() => setSavedOffline(false), 6000);
+      } else {
+        setSuccess(true);
+      }
       setIsCustomRelationship(false);
       setIsCustomReligion(false);
       setDob({ day: '', month: '', year: '' });
       setSubmittedMembers(prev => [...prev, formData]);
       fetchFamilyCount(formData.household_no);
+      localStorage.removeItem(DRAFT_KEY);
       
       if (mode === 'SAME_HOUSEHOLD') {
         setFormData(prev => ({
@@ -615,6 +659,17 @@ const HouseholdForm = () => {
             </div>
 
             {/* Alerts inside modal */}
+            {draftRestored && (
+              <div style={{ margin: '12px 24px 0', padding: '8px 12px', border: '1px solid #E5E7EB', backgroundColor: '#F3F4F6', color: '#1A1A1A', fontSize: '11px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span>📋 Draft restored — your previous unsaved data has been reloaded.</span>
+                <button type="button" onClick={() => { localStorage.removeItem(DRAFT_KEY); setDraftRestored(false); }} style={{ background: 'none', border: '1px solid #E5E7EB', fontSize: '10px', cursor: 'pointer', padding: '2px 8px', color: '#737373', textTransform: 'uppercase' }}>Clear</button>
+              </div>
+            )}
+            {savedOffline && (
+              <div style={{ margin: '12px 24px 0', padding: '8px 12px', border: '1px solid #E5E7EB', backgroundColor: '#F3F4F6', color: '#1A1A1A', fontSize: '11px', flexShrink: 0 }}>
+                📶 Saved locally — will sync automatically when internet is restored.
+              </div>
+            )}
             {success && (
               <div style={{ margin: '12px 24px 0', padding: '10px 12px', border: '1px solid #E5E7EB', color: '#1A1A1A', fontSize: '12px', flexShrink: 0 }}>
                 အချက်အလက်များ အောင်မြင်စွာ သိမ်းဆည်းပြီးပါပြီ။
@@ -636,37 +691,26 @@ const HouseholdForm = () => {
             {/* Sticky footer buttons */}
             <div style={{
               padding: '10px 20px', borderTop: '1px solid #E5E7EB',
-              display: 'flex', justifyContent: 'flex-end', gap: '10px', flexShrink: 0,
-              backgroundColor: '#FAFAFA', flexWrap: 'wrap',
-            }}
-              className="form-action-bar"
-            >
-              <style>{`
-                @media (max-width: 767px) {
-                  .form-action-bar { flex-direction: column !important; }
-                  .form-action-bar button { width: 100% !important; min-height: 44px !important; font-size: 13px !important; justify-content: center; }
-                }
-              `}</style>
+              display: 'flex', justifyContent: 'flex-end', gap: '12px', flexShrink: 0,
+              backgroundColor: '#FAFAFA'
+            }}>
               <button type="button" onClick={closeForm} style={{
                 padding: '8px 16px', border: '1px solid #E5E7EB', backgroundColor: '#FFFFFF',
-                color: '#1A1A1A', fontWeight: '500', fontSize: '12px', cursor: 'pointer', textTransform: 'uppercase',
-                minHeight: '40px', display: 'flex', alignItems: 'center',
+                color: '#1A1A1A', fontWeight: '500', fontSize: '12px', cursor: 'pointer', textTransform: 'uppercase'
               }}>
                 CANCEL
               </button>
               <button type="button" onClick={() => submitForm('SAME_HOUSEHOLD')} disabled={loading} style={{
                 padding: '8px 16px', border: '1px solid #1A1A1A', backgroundColor: '#FFFFFF',
                 color: '#1A1A1A', fontWeight: '500', fontSize: '12px',
-                cursor: loading ? 'not-allowed' : 'pointer', textTransform: 'uppercase',
-                minHeight: '40px', display: 'flex', alignItems: 'center',
+                cursor: loading ? 'not-allowed' : 'pointer', textTransform: 'uppercase'
               }}>
                 {loading ? 'SAVING...' : 'ADD MEMBER'}
               </button>
               <button type="button" onClick={() => submitForm('NEW_HOUSEHOLD')} disabled={loading} style={{
                 padding: '8px 16px', border: '1px solid #1A1A1A', backgroundColor: '#1A1A1A',
                 color: '#FFFFFF', fontWeight: '500', fontSize: '12px',
-                cursor: loading ? 'not-allowed' : 'pointer', textTransform: 'uppercase',
-                minHeight: '40px', display: 'flex', alignItems: 'center',
+                cursor: loading ? 'not-allowed' : 'pointer', textTransform: 'uppercase'
               }}>
                 {loading ? 'SAVING...' : 'NEW HOUSEHOLD'}
               </button>

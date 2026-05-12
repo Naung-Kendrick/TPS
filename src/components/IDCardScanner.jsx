@@ -607,40 +607,6 @@ const IDCardScanner = () => {
             </div>
 
             {/* Modal Body — scrollable table */}
-            <style>{`
-              .scanner-family-table thead { }
-              .scanner-family-table td { padding: 7px 8px; white-space: nowrap; color: #737373; }
-              @media (max-width: 767px) {
-                .scanner-family-table thead { display: none; }
-                .scanner-family-table tbody tr {
-                  display: block;
-                  border: 1px solid #E5E7EB;
-                  margin: 8px;
-                  padding: 10px;
-                  background: #fff;
-                }
-                .scanner-family-table tbody tr td {
-                  display: flex !important;
-                  justify-content: space-between;
-                  align-items: flex-start;
-                  padding: 5px 0 !important;
-                  border-bottom: 1px solid #F3F4F6;
-                  font-size: 12px !important;
-                  white-space: normal !important;
-                }
-                .scanner-family-table tbody tr td:last-child { border-bottom: none; }
-                .scanner-family-table tbody tr td::before {
-                  content: attr(data-label);
-                  font-size: 10px;
-                  font-weight: 600;
-                  color: #737373;
-                  text-transform: uppercase;
-                  letter-spacing: 0.04em;
-                  min-width: 110px;
-                  flex-shrink: 0;
-                }
-              }
-            `}</style>
             <div style={{ overflowY: 'auto', overflowX: 'auto', flex: 1 }}>
               {familyLoading ? (
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', padding: '40px' }}>
@@ -650,7 +616,7 @@ const IDCardScanner = () => {
               ) : familyMembers.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '40px', color: '#737373', fontSize: '12px' }}>No family members found.</div>
               ) : (
-                <table className="scanner-family-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px', tableLayout: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px', tableLayout: 'auto' }}>
                   <thead>
                     <tr style={{ backgroundColor: '#FAFAFA', borderBottom: '1px solid #E5E7EB' }}>
                       {['No.', 'Name', 'Date of Birth', 'Gender', "Father's Name", "Mother's Name", 'Relationship', 'Occupation', 'Previous ID No.', "Ta'ang Land ID No.", 'Nationality', 'Resident Status', 'Religious', 'Submission Date'].map((h, i) => (
@@ -662,27 +628,27 @@ const IDCardScanner = () => {
                     {familyMembers.map((m, i) => {
                       const isMe = m.taang_land_id_no === result.taang_land_id_no;
                       const rowBg = isMe ? '#F3F4F6' : '#FFFFFF';
-                      const td = (label, val) => <td data-label={label} style={{ padding: '7px 8px', whiteSpace: 'nowrap', color: '#737373' }}>{val || '—'}</td>;
+                      const td = (val) => <td style={{ padding: '7px 8px', whiteSpace: 'nowrap', color: '#737373' }}>{val || '—'}</td>;
                       return (
                         <tr key={m.id || i} style={{ borderBottom: '1px solid #F3F4F6', backgroundColor: rowBg }}>
-                          <td data-label="No." style={{ padding: '7px 8px', color: '#9CA3AF', fontWeight: 600, whiteSpace: 'nowrap' }}>{i + 1}</td>
-                          <td data-label="Name" style={{ padding: '7px 8px', fontWeight: isMe ? 700 : 600, whiteSpace: 'nowrap', color: '#1A1A1A' }}>
+                          <td style={{ padding: '7px 8px', color: '#9CA3AF', fontWeight: 600, whiteSpace: 'nowrap' }}>{i + 1}</td>
+                          <td style={{ padding: '7px 8px', fontWeight: isMe ? 700 : 600, whiteSpace: 'nowrap', color: '#1A1A1A' }}>
                             {m.name}
                             {m.household_relationship === 'ဦးစီး' && <span style={{ marginLeft: '4px', border: '1px solid #1A1A1A', padding: '0 3px', fontSize: '8px', fontWeight: 700 }}>HEAD</span>}
                             {isMe && <span style={{ marginLeft: '4px', backgroundColor: '#1A1A1A', color: '#fff', padding: '0 4px', fontSize: '8px', fontWeight: 700, letterSpacing: '0.05em' }}>YOU</span>}
                           </td>
-                          {td('Date of Birth', m.date_of_birth)}
-                          {td('Gender', m.gender)}
-                          {td("Father's Name", m.fathers_name)}
-                          {td("Mother's Name", m.mothers_name)}
-                          {td('Relationship', m.household_relationship)}
-                          {td('Occupation', m.occupation)}
-                          {td('Previous ID', m.previous_id_no)}
-                          {td("Ta'ang Land ID", m.taang_land_id_no)}
-                          {td('Nationality', m.nationality)}
-                          {td('Resident Status', m.resident_status)}
-                          {td('Religious', m.religious)}
-                          {td('Submission Date', m.submission_date || (m.created_at ? m.created_at.split('T')[0] : null))}
+                          {td(m.date_of_birth)}
+                          {td(m.gender)}
+                          {td(m.fathers_name)}
+                          {td(m.mothers_name)}
+                          {td(m.household_relationship)}
+                          {td(m.occupation)}
+                          {td(m.previous_id_no)}
+                          {td(m.taang_land_id_no)}
+                          {td(m.nationality)}
+                          {td(m.resident_status)}
+                          {td(m.religious)}
+                          {td(m.submission_date || (m.created_at ? m.created_at.split('T')[0] : null))}
                         </tr>
                       );
                     })}

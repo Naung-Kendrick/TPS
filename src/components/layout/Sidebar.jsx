@@ -207,25 +207,43 @@ const Sidebar = () => {
         <SidebarContent />
       </div>
 
-      {/* ── Mobile drawer overlay ── */}
-      {open && (
-        <div
-          onClick={() => setOpen(false)}
-          style={{
-            display: 'none', position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.4)', zIndex: 1000,
-          }}
-          className="mobile-overlay"
-        />
-      )}
+      {/* ── Mobile overlay (tap-to-close) — only on mobile ── */}
+      <div
+        onClick={() => setOpen(false)}
+        className="mobile-overlay"
+        style={{
+          display: 'none', // shown via CSS on mobile
+          position: 'fixed', inset: 0,
+          backgroundColor: open ? 'rgba(0,0,0,0.4)' : 'transparent',
+          zIndex: 1000,
+          pointerEvents: open ? 'auto' : 'none',
+          transition: 'background-color 0.25s ease',
+        }}
+      />
 
       {/* ── Mobile drawer ── */}
-      <div className="mobile-drawer" style={{
-        display: 'none', position: 'fixed', top: 0, left: 0, bottom: 0, zIndex: 1001,
-        transform: open ? 'translateX(0)' : 'translateX(-100%)',
-        transition: 'transform 0.25s ease',
-      }}>
+      <div
+        className="mobile-drawer"
+        style={{
+          display: 'none', // shown via CSS on mobile
+          position: 'fixed', top: 0, left: 0, bottom: 0, zIndex: 1001,
+          transform: open ? 'translateX(0)' : 'translateX(-100%)',
+          transition: 'transform 0.25s ease',
+        }}
+      >
         <SidebarContent />
       </div>
+
+      {/* ── Left-edge swipe-to-open strip (mobile only, always rendered) ── */}
+      <div
+        className="mobile-swipe-edge"
+        style={{
+          display: 'none', // shown via CSS on mobile
+          position: 'fixed', top: 0, left: 0, bottom: 0,
+          width: '20px', zIndex: 999,
+          pointerEvents: open ? 'none' : 'auto',
+        }}
+      />
 
       {/* ── Bottom Navigation Bar (mobile only) ── */}
       <div className="bottom-nav" style={{
@@ -322,14 +340,16 @@ const Sidebar = () => {
           .desktop-sidebar { display: block !important; }
           .mobile-drawer { display: none !important; }
           .mobile-overlay { display: none !important; }
+          .mobile-swipe-edge { display: none !important; }
           .bottom-nav { display: none !important; }
           .bottom-nav-overlay { display: none !important; }
         }
         @media (max-width: 767px) {
           .mobile-topbar { display: flex !important; }
           .desktop-sidebar { display: none !important; }
-          .mobile-drawer { display: none !important; }
-          .mobile-overlay { display: none !important; }
+          .mobile-drawer { display: block !important; }
+          .mobile-overlay { display: block !important; }
+          .mobile-swipe-edge { display: block !important; }
           .sidebar-close-btn { display: flex !important; }
           .bottom-nav { display: flex !important; }
         }

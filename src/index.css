@@ -145,3 +145,51 @@ input::placeholder, textarea::placeholder {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #E5E7EB; }
 ::-webkit-scrollbar-thumb:hover { background: #D1D5DB; }
+
+/* ── Purposeful Animations ─────────────────────────────── */
+
+/* 1. Page transition — subtle fade + slide up */
+@keyframes tps-page-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.tps-page-enter {
+  animation: tps-page-in 180ms ease-out both;
+}
+
+/* 2. Button press feedback */
+button:active {
+  transform: scale(0.97);
+  transition: transform 60ms ease-out;
+}
+
+/* 3. Error shake — for error/offline states */
+@keyframes tps-shake {
+  0%, 100% { transform: translateX(0); }
+  20%      { transform: translateX(-5px); }
+  40%      { transform: translateX(5px); }
+  60%      { transform: translateX(-4px); }
+  80%      { transform: translateX(4px); }
+}
+.tps-shake {
+  animation: tps-shake 350ms ease-out both;
+}
+
+/* 4. Success entrance — scale + fade in */
+@keyframes tps-success-in {
+  0%   { opacity: 0; transform: scale(0.98); }
+  50%  { opacity: 1; transform: scale(1.01); }
+  100% { opacity: 1; transform: scale(1); }
+}
+.tps-success-enter {
+  animation: tps-success-in 400ms ease-out both;
+}
+
+/* 5. Panel slide-in — notification dropdown */
+@keyframes tps-panel-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.tps-panel-enter {
+  animation: tps-panel-in 150ms ease-out both;
+}

@@ -423,7 +423,7 @@ const CsvUploader = ({ onUploadSuccess }) => {
         )}
 
         {successMsg && !loading && (
-          <div className="flex items-center gap-3 text-[#1A1A1A] font-medium p-4 bg-[#F3F4F6] border border-[#E5E7EB]" style={{ borderRadius: '0px' }}>
+          <div className="tps-success-enter flex items-center gap-3 text-[#1A1A1A] font-medium p-4 bg-[#F3F4F6] border border-[#E5E7EB]" style={{ borderRadius: '0px' }}>
             <CheckCircle2 size={20} />
             {successMsg}
           </div>

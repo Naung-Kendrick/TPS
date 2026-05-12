@@ -83,7 +83,9 @@ const Layout = () => {
           transform: 'rotate(-8deg)',
         }} />
         <main style={{ flex: 1, overflowY: 'auto', backgroundColor: 'transparent', position: 'relative', zIndex: 1 }} className="main-content">
-          <Outlet />
+          <div key={location.pathname} className="tps-page-enter" style={{ minHeight: '100%' }}>
+            <Outlet />
+          </div>
         </main>
       </div>
       <style>{`

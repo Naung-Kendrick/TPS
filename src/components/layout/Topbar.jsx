@@ -120,7 +120,7 @@ const Topbar = () => {
 
           {/* Dropdown panel */}
           {panelOpen && (
-            <div style={{
+            <div className="tps-panel-enter" style={{
               position: 'absolute', top: 'calc(100% + 8px)', right: 0,
               width: '340px', maxHeight: '480px',
               backgroundColor: '#FFFFFF', border: '1px solid #E5E7EB',

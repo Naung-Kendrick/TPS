@@ -59,7 +59,7 @@ const EmptyState = ({
   const isError = ['offline', 'error', 'permission', 'server'].includes(type);
 
   return (
-    <div style={{
+    <div className={isError ? 'tps-shake' : ''} style={{
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',

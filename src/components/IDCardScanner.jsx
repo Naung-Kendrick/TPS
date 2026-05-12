@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 import {
   ScanLine, Search, X, CheckCircle2, AlertCircle, Loader2,
   User, Home, MapPin, CreditCard, Hash, Camera, Keyboard,
-  ZoomIn, ZoomOut
+  ZoomIn, ZoomOut, Users
 } from 'lucide-react';
 
 const IDCardScanner = () => {
@@ -17,6 +17,9 @@ const IDCardScanner = () => {
   const [zoom, setZoom] = useState(1);
   const [zoomRange, setZoomRange] = useState({ min: 1, max: 1 });
   const [scanFlash, setScanFlash] = useState(false);
+  const [familyModal, setFamilyModal] = useState(false);
+  const [familyMembers, setFamilyMembers] = useState([]);
+  const [familyLoading, setFamilyLoading] = useState(false);
 
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
@@ -189,7 +192,27 @@ const IDCardScanner = () => {
     setResult(null);
     setError(null);
     setInputValue('');
+    setFamilyModal(false);
+    setFamilyMembers([]);
     if (inputRef.current) inputRef.current.focus();
+  };
+
+  const openFamilyModal = async () => {
+    if (!result?.household_no) return;
+    setFamilyModal(true);
+    setFamilyLoading(true);
+    const { data } = await supabase
+      .from('households')
+      .select('*')
+      .eq('household_no', result.household_no)
+      .order('created_at', { ascending: true });
+    // Sort: head first, then spouse, then children
+    const order = { 'ဦးစီး': 1, 'ဇနီး': 2, 'ခင်ပွန်း': 2, 'သား': 3, 'သမီး': 3 };
+    const sorted = (data || []).sort((a, b) =>
+      (order[a.household_relationship] || 99) - (order[b.household_relationship] || 99)
+    );
+    setFamilyMembers(sorted);
+    setFamilyLoading(false);
   };
 
   const InfoRow = ({ icon: Icon, label, value }) => {
@@ -514,7 +537,7 @@ const IDCardScanner = () => {
           </div>
 
           {/* Address Section */}
-          <div className="p-4">
+          <div className="p-4 border-b border-[#E5E7EB]">
             <p className="text-xs font-semibold text-[#737373] uppercase tracking-widest mb-3">Address</p>
             <InfoRow icon={Home} label="House No." value={result.house_no} />
             <InfoRow icon={MapPin} label="Ward / Village / Group" value={result.ward_village_group} />
@@ -523,6 +546,117 @@ const IDCardScanner = () => {
             {result.address && (
               <InfoRow icon={MapPin} label="Full Address" value={result.address} />
             )}
+          </div>
+
+          {/* View Family Button */}
+          <div className="p-4">
+            <button
+              onClick={openFamilyModal}
+              className="flex items-center gap-2 w-full justify-center py-2.5 border border-[#1A1A1A] text-[#1A1A1A] text-sm font-medium hover:bg-[#1A1A1A] hover:text-white transition-colors"
+              style={{ borderRadius: '0px' }}
+            >
+              <Users size={16} />
+              View All Family Members
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Family Modal */}
+      {familyModal && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 10000,
+          backgroundColor: 'rgba(0,0,0,0.5)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: '16px',
+        }}>
+          <div style={{
+            backgroundColor: '#FFFFFF',
+            width: '100%', maxWidth: '95vw',
+            maxHeight: '90vh', display: 'flex', flexDirection: 'column',
+            border: '1px solid #E5E7EB',
+          }}>
+            {/* Modal Header */}
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '12px 16px', borderBottom: '1px solid #E5E7EB', backgroundColor: '#FAFAFA',
+              flexShrink: 0,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <Users size={16} style={{ color: '#1A1A1A' }} />
+                <div>
+                  <p style={{ margin: 0, fontSize: '13px', fontWeight: '600', color: '#1A1A1A', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Family Roster: {result.household_no}</p>
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <span style={{ fontSize: '10px', color: '#737373', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{familyMembers.length} member{familyMembers.length !== 1 ? 's' : ''}</span>
+                <button onClick={() => setFamilyModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: '#737373' }}>
+                  <X size={16} />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body — scrollable table */}
+            <div style={{ overflowY: 'auto', overflowX: 'auto', flex: 1 }}>
+              {familyLoading ? (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', padding: '40px' }}>
+                  <Loader2 size={18} className="animate-spin" style={{ color: '#1A1A1A' }} />
+                  <span style={{ fontSize: '12px', color: '#737373' }}>Loading family members...</span>
+                </div>
+              ) : familyMembers.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '40px', color: '#737373', fontSize: '12px' }}>No family members found.</div>
+              ) : (
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px', tableLayout: 'auto' }}>
+                  <thead>
+                    <tr style={{ backgroundColor: '#FAFAFA', borderBottom: '1px solid #E5E7EB' }}>
+                      {['No.', 'Name', 'Date of Birth', 'Gender', "Father's Name", "Mother's Name", 'Relationship', 'Occupation', 'Previous ID No.', "Ta'ang Land ID No.", 'Nationality', 'Resident Status', 'Religious', 'Submission Date'].map((h, i) => (
+                        <th key={i} style={{ padding: '8px 8px', fontSize: '9.5px', fontWeight: 600, color: '#737373', textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap', textAlign: 'left' }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {familyMembers.map((m, i) => {
+                      const isMe = m.taang_land_id_no === result.taang_land_id_no;
+                      const rowBg = isMe ? '#F3F4F6' : '#FFFFFF';
+                      const td = (val) => <td style={{ padding: '7px 8px', whiteSpace: 'nowrap', color: '#737373' }}>{val || '—'}</td>;
+                      return (
+                        <tr key={m.id || i} style={{ borderBottom: '1px solid #F3F4F6', backgroundColor: rowBg }}>
+                          <td style={{ padding: '7px 8px', color: '#9CA3AF', fontWeight: 600, whiteSpace: 'nowrap' }}>{i + 1}</td>
+                          <td style={{ padding: '7px 8px', fontWeight: isMe ? 700 : 600, whiteSpace: 'nowrap', color: '#1A1A1A' }}>
+                            {m.name}
+                            {m.household_relationship === 'ဦးစီး' && <span style={{ marginLeft: '4px', border: '1px solid #1A1A1A', padding: '0 3px', fontSize: '8px', fontWeight: 700 }}>HEAD</span>}
+                            {isMe && <span style={{ marginLeft: '4px', backgroundColor: '#1A1A1A', color: '#fff', padding: '0 4px', fontSize: '8px', fontWeight: 700, letterSpacing: '0.05em' }}>YOU</span>}
+                          </td>
+                          {td(m.date_of_birth)}
+                          {td(m.gender)}
+                          {td(m.fathers_name)}
+                          {td(m.mothers_name)}
+                          {td(m.household_relationship)}
+                          {td(m.occupation)}
+                          {td(m.previous_id_no)}
+                          {td(m.taang_land_id_no)}
+                          {td(m.nationality)}
+                          {td(m.resident_status)}
+                          {td(m.religious)}
+                          {td(m.submission_date || (m.created_at ? m.created_at.split('T')[0] : null))}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div style={{ padding: '10px 16px', borderTop: '1px solid #E5E7EB', backgroundColor: '#FAFAFA', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+              <span style={{ fontSize: '11px', color: '#737373' }}>{familyMembers.length} member{familyMembers.length !== 1 ? 's' : ''} in household</span>
+              <button
+                onClick={() => setFamilyModal(false)}
+                style={{ padding: '6px 20px', backgroundColor: '#1A1A1A', color: '#fff', border: 'none', fontSize: '11px', fontWeight: '600', cursor: 'pointer', letterSpacing: '0.05em' }}
+              >
+                CLOSE
+              </button>
+            </div>
           </div>
         </div>
       )}

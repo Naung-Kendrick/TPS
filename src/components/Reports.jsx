@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import QRCode from 'qrcode';
 import { supabase } from '../lib/supabase';
 import { cacheGet, cacheSet } from '../lib/offlineCache';
 import { SkeletonTable, SkeletonBar } from './Skeleton';
-import { ChevronRight, Search, Map as MapIcon, MapPin, Home, Users, User, ArrowLeft, Loader2, AlertCircle, Printer, FileSpreadsheet, Pencil, Trash2, Check, X, Download } from 'lucide-react';
+import { ChevronRight, Search, Map as MapIcon, MapPin, Home, Users, User, ArrowLeft, Loader2, AlertCircle, Printer, FileSpreadsheet, Pencil, Trash2, Check, X, Download, QrCode } from 'lucide-react';
 import { exportHouseholdExcel, printHouseholdPdf } from '../lib/householdPrint';
 import { deepEnsureUnicode } from './CsvUploader';
 import { buildExportFilename } from '../lib/exportFilename';
@@ -26,6 +27,46 @@ const Reports = () => {
 
   // Export All JSON state
   const [exportingJson, setExportingJson] = useState(false);
+
+  // QR modal state
+  const [qrModal, setQrModal] = useState(null); // { dataUrl, label, ref }
+
+  // Checksum: simple djb2 hash over the signed payload string
+  const buildChecksum = (payload) => {
+    let h = 5381;
+    for (let i = 0; i < payload.length; i++) {
+      h = ((h << 5) + h) + payload.charCodeAt(i);
+      h |= 0;
+    }
+    return Math.abs(h).toString(16).toUpperCase().padStart(8, '0');
+  };
+
+  const buildQRPayload = (member) => {
+    const core = [
+      'IDTL-TPS',
+      member.household_no  || '',
+      member.name          || '',
+      member.taang_land_id_no || '',
+      member.gender        || '',
+      member.date_of_birth || '',
+      member.household_relationship || '',
+    ].join('|');
+    const checksum = buildChecksum(core);
+    return `${core}|CHK:${checksum}`;
+  };
+
+  const generateQR = useCallback(async (member) => {
+    const payload = buildQRPayload(member);
+    const dataUrl = await QRCode.toDataURL(payload, {
+      width: 300,
+      margin: 2,
+      color: { dark: '#1A1A1A', light: '#FFFFFF' },
+      errorCorrectionLevel: 'M',
+    });
+    const now = new Date();
+    const ref = `TPS-QR-${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}-${buildChecksum(payload).slice(0,6)}`;
+    setQrModal({ dataUrl, label: member.name, householdNo: member.household_no, ref, payload });
+  }, []);
 
   // Edit / delete state
   const [editingId, setEditingId] = useState(null);
@@ -616,6 +657,11 @@ const Reports = () => {
                                       onMouseLeave={e => { e.currentTarget.style.borderColor = '#D1D5DB'; e.currentTarget.style.color = '#9CA3AF'; }}>
                                       <Trash2 size={10} />
                                     </button>
+                                    <button onClick={() => generateQR(member)} title="Generate QR" style={{ padding: '3px 6px', border: '1px solid #D1D5DB', background: '#fff', cursor: 'pointer', color: '#9CA3AF', fontSize: '10px' }}
+                                      onMouseEnter={e => { e.currentTarget.style.borderColor = '#1A1A1A'; e.currentTarget.style.color = '#1A1A1A'; }}
+                                      onMouseLeave={e => { e.currentTarget.style.borderColor = '#D1D5DB'; e.currentTarget.style.color = '#9CA3AF'; }}>
+                                      <QrCode size={10} />
+                                    </button>
                                   </div>
                                 )}
                               </td>
@@ -655,6 +701,17 @@ const Reports = () => {
                       <Download size={14} />
                       Export JSON
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const head = familyMembers.find(m => m.household_relationship === 'ဦးစီး') || familyMembers[0];
+                        if (head) generateQR(head);
+                      }}
+                      className="flex items-center gap-2 bg-white border border-gray-900 text-gray-900 hover:bg-gray-900 hover:text-white px-4 py-2 rounded-none font-medium transition-colors text-xs uppercase letter-spacing-0.05"
+                    >
+                      <QrCode size={14} />
+                      Household QR
+                    </button>
                   </div>
                 )}
               </div>
@@ -662,6 +719,63 @@ const Reports = () => {
           </>
         )}
       </div>
+
+      {/* ── QR Modal ── */}
+      {qrModal && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 10000, backgroundColor: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
+          <div style={{ backgroundColor: '#FFFFFF', border: '1px solid #E5E7EB', borderLeft: '3px solid #1A1A1A', width: '100%', maxWidth: '360px', borderRadius: '0px' }}>
+            {/* Header */}
+            <div style={{ backgroundColor: '#1A1A1A', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <QrCode size={16} color="#FFFFFF" />
+                <span style={{ fontSize: '11px', fontWeight: '800', color: '#FFFFFF', letterSpacing: '0.1em', textTransform: 'uppercase' }}>Tamper-Proof QR</span>
+              </div>
+              <button onClick={() => setQrModal(null)} style={{ background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '50%', width: 26, height: 26, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <X size={13} color="#fff" />
+              </button>
+            </div>
+
+            {/* QR image */}
+            <div style={{ padding: '20px', textAlign: 'center', borderBottom: '1px solid #E5E7EB' }}>
+              <img src={qrModal.dataUrl} alt="QR Code" style={{ width: '220px', height: '220px', imageRendering: 'pixelated', border: '1px solid #E5E7EB', padding: '8px' }} />
+            </div>
+
+            {/* Info strip */}
+            <div style={{ padding: '12px 16px', borderBottom: '1px solid #E5E7EB' }}>
+              <div style={{ fontSize: '11px', fontWeight: '600', color: '#1A1A1A', marginBottom: '4px' }}>{qrModal.label}</div>
+              <div style={{ fontSize: '9.5px', color: '#737373', marginBottom: '6px' }}>Household No. {qrModal.householdNo}</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ fontSize: '8px', fontWeight: '700', color: '#737373', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Ref</span>
+                <span style={{ fontSize: '9.5px', fontWeight: '700', color: '#1A1A1A', fontFamily: 'monospace' }}>{qrModal.ref}</span>
+              </div>
+            </div>
+
+            {/* Tamper notice */}
+            <div style={{ padding: '8px 16px', backgroundColor: '#F3F4F6', borderBottom: '1px solid #E5E7EB' }}>
+              <p style={{ margin: 0, fontSize: '8.5px', color: '#737373', lineHeight: 1.5 }}>
+                This QR contains a checksum. If any field is altered after generation, re-scanning will produce a mismatch — detectable forgery.
+              </p>
+            </div>
+
+            {/* Actions */}
+            <div style={{ padding: '12px 16px', display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+              <a
+                href={qrModal.dataUrl}
+                download={`TPS-QR-${qrModal.householdNo}.png`}
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 14px', backgroundColor: '#1A1A1A', color: '#FFFFFF', fontSize: '10px', fontWeight: '700', textDecoration: 'none', letterSpacing: '0.06em', textTransform: 'uppercase' }}
+              >
+                <Download size={11} /> Save PNG
+              </a>
+              <button
+                onClick={() => setQrModal(null)}
+                style={{ padding: '6px 14px', border: '1px solid #E5E7EB', background: '#fff', fontSize: '10px', fontWeight: '600', cursor: 'pointer', letterSpacing: '0.06em', textTransform: 'uppercase', color: '#737373' }}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

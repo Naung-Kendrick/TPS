@@ -418,7 +418,10 @@ const IDCardScanner = () => {
               {/* Top bar */}
               <div style={{
                 position: 'absolute', top: 0, left: 0, right: 0,
-                padding: '16px 20px',
+                paddingTop: 'calc(16px + env(safe-area-inset-top, 0px))',
+                paddingBottom: '16px',
+                paddingLeft: '20px',
+                paddingRight: '20px',
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                 background: 'linear-gradient(to bottom, rgba(0,0,0,0.6), transparent)',
               }}>
@@ -451,15 +454,22 @@ const IDCardScanner = () => {
               {/* Bottom bar — zoom */}
               <div style={{
                 position: 'absolute', bottom: 0, left: 0, right: 0,
-                padding: '20px 28px 32px',
-                background: 'linear-gradient(to top, rgba(0,0,0,0.7), transparent)',
-                display: 'flex', alignItems: 'center', gap: '14px',
+                paddingTop: '20px',
+                paddingLeft: '24px',
+                paddingRight: '24px',
+                paddingBottom: 'calc(72px + env(safe-area-inset-bottom, 0px))',
+                background: 'linear-gradient(to top, rgba(0,0,0,0.85) 60%, transparent)',
+                display: 'flex', alignItems: 'center', gap: '16px',
               }}>
+                {/* Zoom level badge */}
+                <span style={{ color: '#4FC3F7', fontSize: '11px', fontWeight: '700', minWidth: '32px', textAlign: 'center', letterSpacing: '0.03em' }}>
+                  {parseFloat(zoom).toFixed(1)}×
+                </span>
                 <button
                   onClick={() => handleZoomChange(Math.max(zoomRange.min, zoom - 0.5))}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}
+                  style={{ background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '50%', cursor: 'pointer', padding: 0, width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
                 >
-                  <ZoomOut size={22} color="rgba(255,255,255,0.85)" />
+                  <ZoomOut size={22} color="#fff" />
                 </button>
                 <input
                   type="range"
@@ -468,13 +478,13 @@ const IDCardScanner = () => {
                   step={0.1}
                   value={zoom}
                   onChange={(e) => handleZoomChange(e.target.value)}
-                  style={{ flex: 1, accentColor: '#4FC3F7', cursor: 'pointer', height: '4px' }}
+                  style={{ flex: 1, accentColor: '#4FC3F7', cursor: 'pointer', height: '6px', touchAction: 'none' }}
                 />
                 <button
                   onClick={() => handleZoomChange(Math.min(zoomRange.max, zoom + 0.5))}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}
+                  style={{ background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '50%', cursor: 'pointer', padding: 0, width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
                 >
-                  <ZoomIn size={22} color="rgba(255,255,255,0.85)" />
+                  <ZoomIn size={22} color="#fff" />
                 </button>
               </div>
 

@@ -23,23 +23,27 @@ const Layout = () => {
   const cancelledRef = useRef(false);
 
   useEffect(() => {
-    // Walk up the DOM from a node and check if it (or any ancestor up to <body>)
-    // is horizontally scrollable with actual overflow content.
-    const isInsideHScrollable = (node) => {
+    // Walk up the DOM from a node and return true if any ancestor is:
+    // 1. A horizontally scrollable container with actual overflow content, OR
+    // 2. A fixed-position element (modal, overlay, camera view)
+    const shouldCancelSwipe = (node) => {
       let el = node;
       while (el && el !== document.body) {
         if (el.nodeType !== 1) { el = el.parentElement; continue; }
         const style = window.getComputedStyle(el);
+        // Block inside horizontally scrollable containers that have real overflow
         const overflowX = style.overflowX;
         const canScrollX = overflowX === 'auto' || overflowX === 'scroll' || overflowX === 'overlay';
         if (canScrollX && el.scrollWidth > el.clientWidth + 4) return true;
+        // Block inside fixed-position elements (modals, camera overlay, dropdowns)
+        if (style.position === 'fixed') return true;
         el = el.parentElement;
       }
       return false;
     };
 
     const onStart = (e) => {
-      cancelledRef.current = isInsideHScrollable(e.target);
+      cancelledRef.current = shouldCancelSwipe(e.target);
       txRef.current = e.touches[0].clientX;
       tyRef.current = e.touches[0].clientY;
     };

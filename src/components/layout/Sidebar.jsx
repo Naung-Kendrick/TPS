@@ -11,7 +11,6 @@ const Sidebar = () => {
   const moreSheetRef = useRef(null);
   const touchStartX = useRef(null);
   const touchStartY = useRef(null);
-  const touchStartEdge = useRef(null);
 
   // Close drawer/more on route change (mobile)
   useEffect(() => { setOpen(false); setMoreOpen(false); }, [location.pathname]);
@@ -23,53 +22,27 @@ const Sidebar = () => {
     return () => window.removeEventListener('resize', handler);
   }, []);
 
-  // Swipe gestures — Gmail/WhatsApp style:
-  // • Swipe RIGHT anywhere (except inside horizontal scrollables) → open drawer
-  // • Swipe LEFT anywhere → close drawer
+  // Swipe gestures: swipe left to close drawer; swipe right from left edge to open
   useEffect(() => {
-    const isInsideHorizontalScroll = (el) => {
-      while (el && el !== document.body) {
-        const style = window.getComputedStyle(el);
-        const overflow = style.overflowX;
-        if ((overflow === 'auto' || overflow === 'scroll') && el.scrollWidth > el.clientWidth) {
-          return true;
-        }
-        el = el.parentElement;
-      }
-      return false;
-    };
-
     const onTouchStart = (e) => {
-      const t = e.touches[0];
-      touchStartX.current = t.clientX;
-      touchStartY.current = t.clientY;
-      touchStartEdge.current = t.clientX;
-      // Mark if touch started inside a horizontal scrollable — skip swipe if so
-      touchStartEdge.isScrollable = isInsideHorizontalScroll(e.target);
+      touchStartX.current = e.touches[0].clientX;
+      touchStartY.current = e.touches[0].clientY;
     };
-
     const onTouchEnd = (e) => {
       if (touchStartX.current === null) return;
       const dx = e.changedTouches[0].clientX - touchStartX.current;
       const dy = Math.abs(e.changedTouches[0].clientY - touchStartY.current);
-      const absDx = Math.abs(dx);
-
-      // Must be more horizontal than vertical, and at least 40px travel
-      if (dy > absDx || absDx < 40) {
-        touchStartX.current = null;
-        return;
-      }
-
-      if (open && dx < -40) {
-        // Swipe left anywhere → close
+      // Only treat as horizontal swipe if horizontal movement dominates
+      if (dy > Math.abs(dx) * 0.8) { touchStartX.current = null; return; }
+      if (open && dx < -50) {
+        // Swipe left anywhere → close drawer
         setOpen(false);
-      } else if (!open && dx > 40 && !touchStartEdge.isScrollable) {
-        // Swipe right on non-scrollable area → open
+      } else if (!open && dx > 50 && touchStartX.current < 30) {
+        // Swipe right from left edge (within 30px) → open drawer
         setOpen(true);
       }
       touchStartX.current = null;
     };
-
     document.addEventListener('touchstart', onTouchStart, { passive: true });
     document.addEventListener('touchend', onTouchEnd, { passive: true });
     return () => {
@@ -227,43 +200,25 @@ const Sidebar = () => {
         <SidebarContent />
       </div>
 
-      {/* ── Mobile overlay (tap-to-close) — only on mobile ── */}
-      <div
-        onClick={() => setOpen(false)}
-        className="mobile-overlay"
-        style={{
-          display: 'none', // shown via CSS on mobile
-          position: 'fixed', inset: 0,
-          backgroundColor: open ? 'rgba(0,0,0,0.4)' : 'transparent',
-          zIndex: 1000,
-          pointerEvents: open ? 'auto' : 'none',
-          transition: 'background-color 0.25s ease',
-        }}
-      />
+      {/* ── Mobile drawer overlay ── */}
+      {open && (
+        <div
+          onClick={() => setOpen(false)}
+          style={{
+            display: 'none', position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.4)', zIndex: 1000,
+          }}
+          className="mobile-overlay"
+        />
+      )}
 
       {/* ── Mobile drawer ── */}
-      <div
-        className="mobile-drawer"
-        style={{
-          display: 'none', // shown via CSS on mobile
-          position: 'fixed', top: 0, left: 0, bottom: 0, zIndex: 1001,
-          transform: open ? 'translateX(0)' : 'translateX(-100%)',
-          transition: 'transform 0.25s ease',
-        }}
-      >
+      <div className="mobile-drawer" style={{
+        display: 'none', position: 'fixed', top: 0, left: 0, bottom: 0, zIndex: 1001,
+        transform: open ? 'translateX(0)' : 'translateX(-100%)',
+        transition: 'transform 0.25s ease',
+      }}>
         <SidebarContent />
       </div>
-
-      {/* ── Left-edge swipe-to-open strip (mobile only, always rendered) ── */}
-      <div
-        className="mobile-swipe-edge"
-        style={{
-          display: 'none', // shown via CSS on mobile
-          position: 'fixed', top: 0, left: 0, bottom: 0,
-          width: '20px', zIndex: 999,
-          pointerEvents: open ? 'none' : 'auto',
-        }}
-      />
 
       {/* ── Bottom Navigation Bar (mobile only) ── */}
       <div className="bottom-nav" style={{
@@ -360,16 +315,14 @@ const Sidebar = () => {
           .desktop-sidebar { display: block !important; }
           .mobile-drawer { display: none !important; }
           .mobile-overlay { display: none !important; }
-          .mobile-swipe-edge { display: none !important; }
           .bottom-nav { display: none !important; }
           .bottom-nav-overlay { display: none !important; }
         }
         @media (max-width: 767px) {
           .mobile-topbar { display: flex !important; }
           .desktop-sidebar { display: none !important; }
-          .mobile-drawer { display: block !important; }
-          .mobile-overlay { display: block !important; }
-          .mobile-swipe-edge { display: block !important; }
+          .mobile-drawer { display: none !important; }
+          .mobile-overlay { display: none !important; }
           .sidebar-close-btn { display: flex !important; }
           .bottom-nav { display: flex !important; }
         }

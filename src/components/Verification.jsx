@@ -235,8 +235,7 @@ const Verification = () => {
               <button 
                 type="submit" 
                 disabled={loading}
-                className="flex items-center gap-2 bg-gray-900 hover:bg-white hover:text-gray-900 border border-transparent hover:border-gray-900 text-white px-5 rounded-none font-medium transition-colors text-xs uppercase letter-spacing-0.05 disabled:opacity-50"
-                style={{ minHeight: '44px' }}
+                className="flex items-center gap-2 bg-gray-900 hover:bg-white hover:text-gray-900 border border-transparent hover:border-gray-900 text-white px-5 py-2 rounded-none font-medium transition-colors text-xs uppercase letter-spacing-0.05 disabled:opacity-50"
               >
                 {loading ? <RotateCcw size={14} className="animate-spin" /> : null}
                 Verify Data
@@ -245,8 +244,7 @@ const Verification = () => {
                 type="button" 
                 onClick={handleClear}
                 disabled={loading}
-                className="flex items-center gap-2 bg-white border border-gray-200 text-gray-900 hover:bg-gray-50 px-5 rounded-none font-medium transition-colors text-xs uppercase letter-spacing-0.05 disabled:opacity-50"
-                style={{ minHeight: '44px' }}
+                className="flex items-center gap-2 bg-white border border-gray-200 text-gray-900 hover:bg-gray-50 px-5 py-2 rounded-none font-medium transition-colors text-xs uppercase letter-spacing-0.05 disabled:opacity-50"
               >
                 Clear Filters
               </button>
@@ -324,12 +322,11 @@ const Verification = () => {
                             <td className="px-4 py-3 text-center sticky right-0 bg-white border-l border-gray-200">
                               <button
                                 onClick={() => handleViewFamily(person.household_no)}
-                                className={`inline-flex items-center gap-1 px-3 border text-xs font-medium transition-all ${
+                                className={`inline-flex items-center gap-1 px-3 py-1 border text-xs font-medium transition-all ${
                                   expandedHouseholdNo === person.household_no
                                     ? 'bg-gray-900 text-white border-transparent'
                                     : 'bg-white text-gray-900 border-gray-900 hover:bg-gray-50'
                                 }`}
-                                style={{ minHeight: '44px', whiteSpace: 'nowrap' }}
                               >
                                 {expandedHouseholdNo === person.household_no ? 'CLOSE' : 'VIEW FAMILY'}
                               </button>
@@ -349,9 +346,8 @@ const Verification = () => {
                                       <button
                                         onClick={() => { setExpandedHouseholdNo(null); setFamilyMembers([]); }}
                                         className="text-gray-500 hover:text-gray-900 transition-colors"
-                                        style={{ minWidth: '44px', minHeight: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0 }}
                                       >
-                                        <X size={16} />
+                                        <X size={14} />
                                       </button>
                                     </div>
 
@@ -443,8 +439,7 @@ const Verification = () => {
                                               <button
                                                 type="button"
                                                 onClick={() => handlePrintPdf(expandedHouseholdNo, familyMembers)}
-                                                className="flex items-center gap-2 bg-gray-900 hover:bg-white hover:text-gray-900 border border-gray-900 text-white px-4 rounded-none font-medium transition-colors text-xs uppercase letter-spacing-0.05"
-                                                style={{ minHeight: '44px' }}
+                                                className="flex items-center gap-2 bg-gray-900 hover:bg-white hover:text-gray-900 border border-gray-900 text-white px-4 py-2 rounded-none font-medium transition-colors text-xs uppercase letter-spacing-0.05"
                                               >
                                                 <Printer size={14} />
                                                 Print PDF
@@ -452,8 +447,7 @@ const Verification = () => {
                                               <button
                                                 type="button"
                                                 onClick={() => handleExportExcel(expandedHouseholdNo, familyMembers)}
-                                                className="flex items-center gap-2 bg-white border border-gray-900 text-gray-900 hover:bg-gray-900 hover:text-white px-4 rounded-none font-medium transition-colors text-xs uppercase letter-spacing-0.05"
-                                                style={{ minHeight: '44px' }}
+                                                className="flex items-center gap-2 bg-white border border-gray-900 text-gray-900 hover:bg-gray-900 hover:text-white px-4 py-2 rounded-none font-medium transition-colors text-xs uppercase letter-spacing-0.05"
                                               >
                                                 <FileSpreadsheet size={14} />
                                                 Export Excel

@@ -365,14 +365,14 @@ const Reports = () => {
         </div>
         
         <div className="flex flex-wrap items-center gap-2 text-xs font-medium text-gray-500 uppercase letter-spacing-0.02">
-          <button onClick={() => jumpToLevel(1)} style={{ minHeight: '44px', padding: '0 8px' }} className={`flex items-center gap-1 hover:text-gray-900 transition-colors ${level === 1 ? 'text-gray-900 font-bold' : ''}`}>
+          <button onClick={() => jumpToLevel(1)} className={`flex items-center gap-1 hover:text-gray-900 transition-colors ${level === 1 ? 'text-gray-900 font-bold' : ''}`}>
             <MapIcon size={14} /> Districts
           </button>
           
           {path.district && (
             <>
               <ChevronRight size={14} />
-              <button onClick={() => jumpToLevel(2)} style={{ minHeight: '44px', padding: '0 8px' }} className={`flex items-center gap-1 hover:text-gray-900 transition-colors ${level === 2 ? 'text-gray-900 font-bold' : ''}`}>
+              <button onClick={() => jumpToLevel(2)} className={`flex items-center gap-1 hover:text-gray-900 transition-colors ${level === 2 ? 'text-gray-900 font-bold' : ''}`}>
                 <MapPin size={14} /> {path.district}
               </button>
             </>
@@ -381,7 +381,7 @@ const Reports = () => {
           {path.township && (
             <>
               <ChevronRight size={14} />
-              <button onClick={() => jumpToLevel(3)} style={{ minHeight: '44px', padding: '0 8px' }} className={`flex items-center gap-1 hover:text-gray-900 transition-colors ${level === 3 ? 'text-gray-900 font-bold' : ''}`}>
+              <button onClick={() => jumpToLevel(3)} className={`flex items-center gap-1 hover:text-gray-900 transition-colors ${level === 3 ? 'text-gray-900 font-bold' : ''}`}>
                 <Home size={14} /> {path.township}
               </button>
             </>
@@ -390,7 +390,7 @@ const Reports = () => {
           {path.village && (
             <>
               <ChevronRight size={14} />
-              <button onClick={() => jumpToLevel(4)} style={{ minHeight: '44px', padding: '0 8px' }} className={`flex items-center gap-1 hover:text-gray-900 transition-colors ${level === 4 ? 'text-gray-900 font-bold' : ''}`}>
+              <button onClick={() => jumpToLevel(4)} className={`flex items-center gap-1 hover:text-gray-900 transition-colors ${level === 4 ? 'text-gray-900 font-bold' : ''}`}>
                 <Users size={14} /> {path.village}
               </button>
             </>
@@ -417,7 +417,7 @@ const Reports = () => {
       {/* CONTROLS */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-6">
         {level > 1 ? (
-          <button onClick={goBack} style={{ minHeight: '44px' }} className="flex items-center gap-2 px-4 bg-white border border-gray-200 text-gray-900 hover:bg-gray-50 transition-colors font-medium text-xs uppercase letter-spacing-0.05">
+          <button onClick={goBack} className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-900 hover:bg-gray-50 transition-colors font-medium text-xs uppercase letter-spacing-0.05">
             <ArrowLeft size={14} /> Back
           </button>
         ) : <div />}
@@ -503,7 +503,7 @@ const Reports = () => {
                           <td style={{ ...tdStyle, textAlign: 'right' }}>
                             <button 
                               onClick={() => handleNavigate(5, { headName: head.name, householdNo: head.household_no })}
-                              style={{ minHeight: '44px' }} className="inline-flex items-center gap-1 bg-white border border-gray-900 text-gray-900 px-3 text-xs font-medium hover:bg-gray-50 transition-colors uppercase"
+                              className="inline-flex items-center gap-1 bg-white border border-gray-900 text-gray-900 px-3 py-1 text-xs font-medium hover:bg-gray-50 transition-colors uppercase"
                             >
                               View Family <ChevronRight size={14} />
                             </button>
@@ -526,10 +526,10 @@ const Reports = () => {
                       <p className="text-sm font-semibold text-gray-900 mb-2">Delete Member?</p>
                       <p className="text-xs text-gray-500 mb-6">This will permanently remove this record from the database. This action cannot be undone.</p>
                       <div className="flex gap-3 justify-end">
-                        <button onClick={cancelDelete} disabled={deleting} style={{ minHeight: '44px' }} className="px-4 text-xs border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors">
+                        <button onClick={cancelDelete} disabled={deleting} className="px-4 py-2 text-xs border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors">
                           Cancel
                         </button>
-                        <button onClick={doDelete} disabled={deleting} style={{ minHeight: '44px' }} className="px-4 text-xs bg-red-600 text-white hover:bg-red-700 transition-colors flex items-center gap-2">
+                        <button onClick={doDelete} disabled={deleting} className="px-4 py-2 text-xs bg-red-600 text-white hover:bg-red-700 transition-colors flex items-center gap-2">
                           {deleting ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
                           {deleting ? 'Deleting...' : 'Delete'}
                         </button>
@@ -597,21 +597,21 @@ const Reports = () => {
                               <td style={{ padding: '7px 6px', whiteSpace: 'nowrap', textAlign: 'center' }}>
                                 {isEditing ? (
                                   <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
-                                    <button onClick={saveEdit} disabled={saving} style={{ minWidth: '44px', minHeight: '44px', padding: '0 8px', border: '1px solid #1A1A1A', background: '#1A1A1A', color: '#fff', cursor: 'pointer', fontSize: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px' }}>
+                                    <button onClick={saveEdit} disabled={saving} style={{ padding: '3px 8px', border: '1px solid #1A1A1A', background: '#1A1A1A', color: '#fff', cursor: 'pointer', fontSize: '10px', display: 'flex', alignItems: 'center', gap: '3px' }}>
                                       {saving ? <Loader2 size={9} className="animate-spin" /> : <Check size={9} />} Save
                                     </button>
-                                    <button onClick={cancelEdit} style={{ minWidth: '44px', minHeight: '44px', padding: '0 8px', border: '1px solid #D1D5DB', background: '#fff', cursor: 'pointer', fontSize: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px' }}>
+                                    <button onClick={cancelEdit} style={{ padding: '3px 8px', border: '1px solid #D1D5DB', background: '#fff', cursor: 'pointer', fontSize: '10px', display: 'flex', alignItems: 'center', gap: '3px' }}>
                                       <X size={9} /> Cancel
                                     </button>
                                   </div>
                                 ) : (
                                   <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
-                                    <button onClick={() => startEdit(member)} title="Edit" style={{ minWidth: '44px', minHeight: '44px', border: '1px solid #D1D5DB', background: '#fff', cursor: 'pointer', color: '#6B7280', fontSize: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                    <button onClick={() => startEdit(member)} title="Edit" style={{ padding: '3px 6px', border: '1px solid #D1D5DB', background: '#fff', cursor: 'pointer', color: '#6B7280', fontSize: '10px' }}
                                       onMouseEnter={e => { e.currentTarget.style.borderColor = '#1A1A1A'; e.currentTarget.style.color = '#1A1A1A'; }}
                                       onMouseLeave={e => { e.currentTarget.style.borderColor = '#D1D5DB'; e.currentTarget.style.color = '#6B7280'; }}>
                                       <Pencil size={10} />
                                     </button>
-                                    <button onClick={() => confirmDelete(member.id)} title="Delete" style={{ minWidth: '44px', minHeight: '44px', border: '1px solid #D1D5DB', background: '#fff', cursor: 'pointer', color: '#9CA3AF', fontSize: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                    <button onClick={() => confirmDelete(member.id)} title="Delete" style={{ padding: '3px 6px', border: '1px solid #D1D5DB', background: '#fff', cursor: 'pointer', color: '#9CA3AF', fontSize: '10px' }}
                                       onMouseEnter={e => { e.currentTarget.style.borderColor = '#EF4444'; e.currentTarget.style.color = '#EF4444'; }}
                                       onMouseLeave={e => { e.currentTarget.style.borderColor = '#D1D5DB'; e.currentTarget.style.color = '#9CA3AF'; }}>
                                       <Trash2 size={10} />
@@ -634,7 +634,7 @@ const Reports = () => {
                     <button
                       type="button"
                       onClick={() => printHouseholdPdf(path.householdNo, familyMembers)}
-                      style={{ minHeight: '44px' }} className="flex items-center gap-2 bg-gray-900 hover:bg-white hover:text-gray-900 border border-gray-900 text-white px-4 rounded-none font-medium transition-colors text-xs uppercase letter-spacing-0.05"
+                      className="flex items-center gap-2 bg-gray-900 hover:bg-white hover:text-gray-900 border border-gray-900 text-white px-4 py-2 rounded-none font-medium transition-colors text-xs uppercase letter-spacing-0.05"
                     >
                       <Printer size={14} />
                       Print PDF
@@ -642,7 +642,7 @@ const Reports = () => {
                     <button
                       type="button"
                       onClick={() => exportHouseholdExcel(path.householdNo, familyMembers)}
-                      style={{ minHeight: '44px' }} className="flex items-center gap-2 bg-white border border-gray-900 text-gray-900 hover:bg-gray-900 hover:text-white px-4 rounded-none font-medium transition-colors text-xs uppercase letter-spacing-0.05"
+                      className="flex items-center gap-2 bg-white border border-gray-900 text-gray-900 hover:bg-gray-900 hover:text-white px-4 py-2 rounded-none font-medium transition-colors text-xs uppercase letter-spacing-0.05"
                     >
                       <FileSpreadsheet size={14} />
                       Export Excel
@@ -650,7 +650,7 @@ const Reports = () => {
                     <button
                       type="button"
                       onClick={exportHouseholdJson}
-                      style={{ minHeight: '44px' }} className="flex items-center gap-2 bg-white border border-gray-900 text-gray-900 hover:bg-gray-900 hover:text-white px-4 rounded-none font-medium transition-colors text-xs uppercase letter-spacing-0.05"
+                      className="flex items-center gap-2 bg-white border border-gray-900 text-gray-900 hover:bg-gray-900 hover:text-white px-4 py-2 rounded-none font-medium transition-colors text-xs uppercase letter-spacing-0.05"
                     >
                       <Download size={14} />
                       Export JSON

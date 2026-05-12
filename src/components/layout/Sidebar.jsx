@@ -23,33 +23,53 @@ const Sidebar = () => {
     return () => window.removeEventListener('resize', handler);
   }, []);
 
-  // Swipe gestures: swipe left to close drawer; swipe right from left edge to open
+  // Swipe gestures — Gmail/WhatsApp style:
+  // • Swipe RIGHT anywhere (except inside horizontal scrollables) → open drawer
+  // • Swipe LEFT anywhere → close drawer
   useEffect(() => {
+    const isInsideHorizontalScroll = (el) => {
+      while (el && el !== document.body) {
+        const style = window.getComputedStyle(el);
+        const overflow = style.overflowX;
+        if ((overflow === 'auto' || overflow === 'scroll') && el.scrollWidth > el.clientWidth) {
+          return true;
+        }
+        el = el.parentElement;
+      }
+      return false;
+    };
+
     const onTouchStart = (e) => {
       const t = e.touches[0];
       touchStartX.current = t.clientX;
       touchStartY.current = t.clientY;
-      touchStartEdge.current = t.clientX; // capture edge position at start
+      touchStartEdge.current = t.clientX;
+      // Mark if touch started inside a horizontal scrollable — skip swipe if so
+      touchStartEdge.isScrollable = isInsideHorizontalScroll(e.target);
     };
+
     const onTouchEnd = (e) => {
       if (touchStartX.current === null) return;
-      const endX = e.changedTouches[0].clientX;
-      const endY = e.changedTouches[0].clientY;
-      const dx = endX - touchStartX.current;
-      const dy = Math.abs(endY - touchStartY.current);
+      const dx = e.changedTouches[0].clientX - touchStartX.current;
+      const dy = Math.abs(e.changedTouches[0].clientY - touchStartY.current);
       const absDx = Math.abs(dx);
-      // Ignore if mostly vertical (scroll), require horizontal dominance
+
+      // Must be more horizontal than vertical, and at least 40px travel
       if (dy > absDx || absDx < 40) {
         touchStartX.current = null;
         return;
       }
+
       if (open && dx < -40) {
+        // Swipe left anywhere → close
         setOpen(false);
-      } else if (!open && dx > 40 && touchStartEdge.current <= 40) {
+      } else if (!open && dx > 40 && !touchStartEdge.isScrollable) {
+        // Swipe right on non-scrollable area → open
         setOpen(true);
       }
       touchStartX.current = null;
     };
+
     document.addEventListener('touchstart', onTouchStart, { passive: true });
     document.addEventListener('touchend', onTouchEnd, { passive: true });
     return () => {

@@ -636,26 +636,37 @@ const HouseholdForm = () => {
             {/* Sticky footer buttons */}
             <div style={{
               padding: '10px 20px', borderTop: '1px solid #E5E7EB',
-              display: 'flex', justifyContent: 'flex-end', gap: '12px', flexShrink: 0,
-              backgroundColor: '#FAFAFA'
-            }}>
+              display: 'flex', justifyContent: 'flex-end', gap: '10px', flexShrink: 0,
+              backgroundColor: '#FAFAFA', flexWrap: 'wrap',
+            }}
+              className="form-action-bar"
+            >
+              <style>{`
+                @media (max-width: 767px) {
+                  .form-action-bar { flex-direction: column !important; }
+                  .form-action-bar button { width: 100% !important; min-height: 44px !important; font-size: 13px !important; justify-content: center; }
+                }
+              `}</style>
               <button type="button" onClick={closeForm} style={{
                 padding: '8px 16px', border: '1px solid #E5E7EB', backgroundColor: '#FFFFFF',
-                color: '#1A1A1A', fontWeight: '500', fontSize: '12px', cursor: 'pointer', textTransform: 'uppercase'
+                color: '#1A1A1A', fontWeight: '500', fontSize: '12px', cursor: 'pointer', textTransform: 'uppercase',
+                minHeight: '40px', display: 'flex', alignItems: 'center',
               }}>
                 CANCEL
               </button>
               <button type="button" onClick={() => submitForm('SAME_HOUSEHOLD')} disabled={loading} style={{
                 padding: '8px 16px', border: '1px solid #1A1A1A', backgroundColor: '#FFFFFF',
                 color: '#1A1A1A', fontWeight: '500', fontSize: '12px',
-                cursor: loading ? 'not-allowed' : 'pointer', textTransform: 'uppercase'
+                cursor: loading ? 'not-allowed' : 'pointer', textTransform: 'uppercase',
+                minHeight: '40px', display: 'flex', alignItems: 'center',
               }}>
                 {loading ? 'SAVING...' : 'ADD MEMBER'}
               </button>
               <button type="button" onClick={() => submitForm('NEW_HOUSEHOLD')} disabled={loading} style={{
                 padding: '8px 16px', border: '1px solid #1A1A1A', backgroundColor: '#1A1A1A',
                 color: '#FFFFFF', fontWeight: '500', fontSize: '12px',
-                cursor: loading ? 'not-allowed' : 'pointer', textTransform: 'uppercase'
+                cursor: loading ? 'not-allowed' : 'pointer', textTransform: 'uppercase',
+                minHeight: '40px', display: 'flex', alignItems: 'center',
               }}>
                 {loading ? 'SAVING...' : 'NEW HOUSEHOLD'}
               </button>

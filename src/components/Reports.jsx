@@ -528,6 +528,61 @@ const Reports = () => {
                   .family-table-scroll::-webkit-scrollbar-thumb { background: #C4C4C4; border-radius: 999px; border: 2px solid #F3F4F6; }
                   .family-table-scroll::-webkit-scrollbar-thumb:hover { background: #9CA3AF; }
                   .family-table-scroll { scrollbar-width: auto; scrollbar-color: #C4C4C4 #F3F4F6; }
+
+                  /* Sticky export bar on mobile */
+                  @media (max-width: 767px) {
+                    .reports-action-bar {
+                      position: sticky;
+                      bottom: 0;
+                      z-index: 10;
+                      box-shadow: 0 -2px 8px rgba(0,0,0,0.06);
+                    }
+                    .reports-action-btn {
+                      flex: 1;
+                      min-height: 44px !important;
+                      justify-content: center;
+                      font-size: 11px !important;
+                    }
+
+                    /* Card layout: hide table, show cards */
+                    .family-table-scroll table thead { display: none; }
+                    .family-table-scroll table tbody tr {
+                      display: block;
+                      border: 1px solid #E5E7EB;
+                      margin: 8px;
+                      padding: 10px;
+                      background: #fff;
+                    }
+                    .family-table-scroll table tbody tr td {
+                      display: flex;
+                      justify-content: space-between;
+                      align-items: flex-start;
+                      padding: 4px 0 !important;
+                      border-bottom: 1px solid #F3F4F6;
+                      font-size: 12px !important;
+                      white-space: normal !important;
+                    }
+                    .family-table-scroll table tbody tr td:last-child { border-bottom: none; }
+                    .family-table-scroll table tbody tr td::before {
+                      content: attr(data-label);
+                      font-size: 10px;
+                      font-weight: 600;
+                      color: #737373;
+                      text-transform: uppercase;
+                      letter-spacing: 0.04em;
+                      min-width: 100px;
+                      flex-shrink: 0;
+                    }
+
+                    /* Bigger touch targets for edit/delete icon buttons */
+                    .family-table-scroll button {
+                      min-width: 36px !important;
+                      min-height: 36px !important;
+                      display: flex !important;
+                      align-items: center !important;
+                      justify-content: center !important;
+                    }
+                  }
                 `}</style>
                 <div style={{ position: 'relative' }}>
                   <div ref={tableScrollRef} className="family-table-scroll" style={{ overflowX: 'auto', scrollBehavior: 'smooth', paddingBottom: '4px' }}>
@@ -551,49 +606,49 @@ const Reports = () => {
                             : (member[key] || '—');
                           return (
                             <tr key={member.id} style={{ borderBottom: '1px solid #F3F4F6', background: isEditing ? '#F0F9FF' : undefined }}>
-                              <td style={{ padding: '7px 6px', color: '#9CA3AF', fontWeight: 600, whiteSpace: 'nowrap' }}>{idx + 1}</td>
-                              <td style={{ padding: '7px 6px', fontWeight: isEditing ? 400 : 600, whiteSpace: isEditing ? 'normal' : 'nowrap' }}>
+                              <td data-label="No." style={{ padding: '7px 6px', color: '#9CA3AF', fontWeight: 600, whiteSpace: 'nowrap' }}>{idx + 1}</td>
+                              <td data-label="Name" style={{ padding: '7px 6px', fontWeight: isEditing ? 400 : 600, whiteSpace: isEditing ? 'normal' : 'nowrap' }}>
                                 {isEditing
                                   ? <input value={editForm.name || ''} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} style={{ ...inStyle, minWidth: '100px' }} />
                                   : <>{member.name}{member.household_relationship === 'ဦးစီး' && <span style={{ marginLeft: '4px', border: '1px solid #1A1A1A', padding: '0 3px', fontSize: '8px', fontWeight: 700 }}>HEAD</span>}</>}
                               </td>
-                              <td style={{ padding: '7px 6px', whiteSpace: isEditing ? 'normal' : 'nowrap' }}>{cell('date_of_birth')}</td>
-                              <td style={{ padding: '7px 6px', whiteSpace: isEditing ? 'normal' : 'nowrap' }}>{cell('gender')}</td>
-                              <td style={{ padding: '7px 6px', whiteSpace: isEditing ? 'normal' : 'nowrap' }}>{cell('fathers_name')}</td>
-                              <td style={{ padding: '7px 6px', whiteSpace: isEditing ? 'normal' : 'nowrap' }}>{cell('mothers_name')}</td>
-                              <td style={{ padding: '7px 6px', whiteSpace: isEditing ? 'normal' : 'nowrap' }}>{cell('household_relationship')}</td>
-                              <td style={{ padding: '7px 6px', whiteSpace: isEditing ? 'normal' : 'nowrap' }}>{cell('occupation')}</td>
-                              <td style={{ padding: '7px 6px', whiteSpace: isEditing ? 'normal' : 'nowrap' }}>{cell('previous_id_no')}</td>
-                              <td style={{ padding: '7px 6px', whiteSpace: isEditing ? 'normal' : 'nowrap' }}>{cell('taang_land_id_no')}</td>
-                              <td style={{ padding: '7px 6px', whiteSpace: isEditing ? 'normal' : 'nowrap' }}>{cell('nationality')}</td>
-                              <td style={{ padding: '7px 6px', whiteSpace: isEditing ? 'normal' : 'nowrap' }}>{cell('resident_status')}</td>
-                              <td style={{ padding: '7px 6px', whiteSpace: isEditing ? 'normal' : 'nowrap' }}>{cell('religious')}</td>
-                              <td style={{ padding: '7px 6px', whiteSpace: isEditing ? 'normal' : 'nowrap' }}>
+                              <td data-label="Date of Birth" style={{ padding: '7px 6px', whiteSpace: isEditing ? 'normal' : 'nowrap' }}>{cell('date_of_birth')}</td>
+                              <td data-label="Gender" style={{ padding: '7px 6px', whiteSpace: isEditing ? 'normal' : 'nowrap' }}>{cell('gender')}</td>
+                              <td data-label="Father's Name" style={{ padding: '7px 6px', whiteSpace: isEditing ? 'normal' : 'nowrap' }}>{cell('fathers_name')}</td>
+                              <td data-label="Mother's Name" style={{ padding: '7px 6px', whiteSpace: isEditing ? 'normal' : 'nowrap' }}>{cell('mothers_name')}</td>
+                              <td data-label="Relationship" style={{ padding: '7px 6px', whiteSpace: isEditing ? 'normal' : 'nowrap' }}>{cell('household_relationship')}</td>
+                              <td data-label="Occupation" style={{ padding: '7px 6px', whiteSpace: isEditing ? 'normal' : 'nowrap' }}>{cell('occupation')}</td>
+                              <td data-label="Previous ID" style={{ padding: '7px 6px', whiteSpace: isEditing ? 'normal' : 'nowrap' }}>{cell('previous_id_no')}</td>
+                              <td data-label="Ta'ang Land ID" style={{ padding: '7px 6px', whiteSpace: isEditing ? 'normal' : 'nowrap' }}>{cell('taang_land_id_no')}</td>
+                              <td data-label="Nationality" style={{ padding: '7px 6px', whiteSpace: isEditing ? 'normal' : 'nowrap' }}>{cell('nationality')}</td>
+                              <td data-label="Resident Status" style={{ padding: '7px 6px', whiteSpace: isEditing ? 'normal' : 'nowrap' }}>{cell('resident_status')}</td>
+                              <td data-label="Religious" style={{ padding: '7px 6px', whiteSpace: isEditing ? 'normal' : 'nowrap' }}>{cell('religious')}</td>
+                              <td data-label="Submission Date" style={{ padding: '7px 6px', whiteSpace: isEditing ? 'normal' : 'nowrap' }}>
                                 {isEditing
                                   ? <input value={editForm.submission_date || ''} onChange={e => setEditForm(f => ({ ...f, submission_date: e.target.value }))} style={inStyle} />
                                   : (member.submission_date || (member.created_at ? member.created_at.split('T')[0] : '—'))}
                               </td>
-                              <td style={{ padding: '7px 6px', whiteSpace: 'nowrap', textAlign: 'center' }}>
+                              <td data-label="Actions" style={{ padding: '7px 6px', whiteSpace: 'nowrap', textAlign: 'center' }}>
                                 {isEditing ? (
                                   <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
-                                    <button onClick={saveEdit} disabled={saving} style={{ padding: '3px 8px', border: '1px solid #1A1A1A', background: '#1A1A1A', color: '#fff', cursor: 'pointer', fontSize: '10px', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                    <button onClick={saveEdit} disabled={saving} style={{ padding: '6px 10px', border: '1px solid #1A1A1A', background: '#1A1A1A', color: '#fff', cursor: 'pointer', fontSize: '10px', display: 'flex', alignItems: 'center', gap: '3px', minHeight: '36px' }}>
                                       {saving ? <Loader2 size={9} className="animate-spin" /> : <Check size={9} />} Save
                                     </button>
-                                    <button onClick={cancelEdit} style={{ padding: '3px 8px', border: '1px solid #D1D5DB', background: '#fff', cursor: 'pointer', fontSize: '10px', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                    <button onClick={cancelEdit} style={{ padding: '6px 10px', border: '1px solid #D1D5DB', background: '#fff', cursor: 'pointer', fontSize: '10px', display: 'flex', alignItems: 'center', gap: '3px', minHeight: '36px' }}>
                                       <X size={9} /> Cancel
                                     </button>
                                   </div>
                                 ) : (
                                   <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
-                                    <button onClick={() => startEdit(member)} title="Edit" style={{ padding: '3px 6px', border: '1px solid #D1D5DB', background: '#fff', cursor: 'pointer', color: '#6B7280', fontSize: '10px' }}
+                                    <button onClick={() => startEdit(member)} title="Edit" style={{ padding: '6px 8px', border: '1px solid #D1D5DB', background: '#fff', cursor: 'pointer', color: '#6B7280', fontSize: '10px', minWidth: '36px', minHeight: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                                       onMouseEnter={e => { e.currentTarget.style.borderColor = '#1A1A1A'; e.currentTarget.style.color = '#1A1A1A'; }}
                                       onMouseLeave={e => { e.currentTarget.style.borderColor = '#D1D5DB'; e.currentTarget.style.color = '#6B7280'; }}>
-                                      <Pencil size={10} />
+                                      <Pencil size={12} />
                                     </button>
-                                    <button onClick={() => confirmDelete(member.id)} title="Delete" style={{ padding: '3px 6px', border: '1px solid #D1D5DB', background: '#fff', cursor: 'pointer', color: '#9CA3AF', fontSize: '10px' }}
+                                    <button onClick={() => confirmDelete(member.id)} title="Delete" style={{ padding: '6px 8px', border: '1px solid #D1D5DB', background: '#fff', cursor: 'pointer', color: '#9CA3AF', fontSize: '10px', minWidth: '36px', minHeight: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                                       onMouseEnter={e => { e.currentTarget.style.borderColor = '#EF4444'; e.currentTarget.style.color = '#EF4444'; }}
                                       onMouseLeave={e => { e.currentTarget.style.borderColor = '#D1D5DB'; e.currentTarget.style.color = '#9CA3AF'; }}>
-                                      <Trash2 size={10} />
+                                      <Trash2 size={12} />
                                     </button>
                                   </div>
                                 )}
@@ -608,12 +663,12 @@ const Reports = () => {
                 </div>{/* end relative wrapper */}
 
                 {familyMembers.length > 0 && (
-                  <div className="px-6 py-3 bg-white border-t border-gray-200 flex flex-wrap items-center justify-end gap-3">
-                    <span className="text-[11px] text-gray-500 uppercase letter-spacing-0.05 mr-auto">Print / Export Household Registration</span>
+                  <div className="reports-action-bar px-4 py-3 bg-white border-t border-gray-200 flex flex-wrap items-center justify-end gap-2">
+                    <span className="text-[11px] text-gray-500 uppercase mr-auto hidden sm:block">Print / Export Household Registration</span>
                     <button
                       type="button"
                       onClick={() => printHouseholdPdf(path.householdNo, familyMembers)}
-                      className="flex items-center gap-2 bg-gray-900 hover:bg-white hover:text-gray-900 border border-gray-900 text-white px-4 py-2 rounded-none font-medium transition-colors text-xs uppercase letter-spacing-0.05"
+                      className="reports-action-btn flex items-center gap-2 bg-gray-900 hover:bg-white hover:text-gray-900 border border-gray-900 text-white px-4 py-2 rounded-none font-medium transition-colors text-xs uppercase"
                     >
                       <Printer size={14} />
                       Print PDF
@@ -621,7 +676,7 @@ const Reports = () => {
                     <button
                       type="button"
                       onClick={() => exportHouseholdExcel(path.householdNo, familyMembers)}
-                      className="flex items-center gap-2 bg-white border border-gray-900 text-gray-900 hover:bg-gray-900 hover:text-white px-4 py-2 rounded-none font-medium transition-colors text-xs uppercase letter-spacing-0.05"
+                      className="reports-action-btn flex items-center gap-2 bg-white border border-gray-900 text-gray-900 hover:bg-gray-900 hover:text-white px-4 py-2 rounded-none font-medium transition-colors text-xs uppercase"
                     >
                       <FileSpreadsheet size={14} />
                       Export Excel
@@ -629,7 +684,7 @@ const Reports = () => {
                     <button
                       type="button"
                       onClick={exportHouseholdJson}
-                      className="flex items-center gap-2 bg-white border border-gray-900 text-gray-900 hover:bg-gray-900 hover:text-white px-4 py-2 rounded-none font-medium transition-colors text-xs uppercase letter-spacing-0.05"
+                      className="reports-action-btn flex items-center gap-2 bg-white border border-gray-900 text-gray-900 hover:bg-gray-900 hover:text-white px-4 py-2 rounded-none font-medium transition-colors text-xs uppercase"
                     >
                       <Download size={14} />
                       Export JSON

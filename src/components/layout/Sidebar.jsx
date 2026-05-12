@@ -1,14 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { Users, UserPlus, LineChart, FileText, Settings, Upload, ScanLine, Menu, X } from 'lucide-react';
+import { Users, UserPlus, LineChart, FileText, Settings, Upload, ScanLine, Menu, X, MoreHorizontal } from 'lucide-react';
 import logo from '../../assets/fonts/IDTL_logo.png';
 
 const Sidebar = () => {
   const [open, setOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const location = useLocation();
+  const touchStartX = useRef(null);
+  const touchStartY = useRef(null);
 
   // Close drawer on route change (mobile)
-  useEffect(() => { setOpen(false); }, [location.pathname]);
+  useEffect(() => { setOpen(false); setMoreOpen(false); }, [location.pathname]);
 
   // Close drawer on wide screen resize
   useEffect(() => {
@@ -16,6 +19,30 @@ const Sidebar = () => {
     window.addEventListener('resize', handler);
     return () => window.removeEventListener('resize', handler);
   }, []);
+
+  // Swipe to open (from left edge) / close drawer
+  useEffect(() => {
+    const handleTouchStart = (e) => {
+      touchStartX.current = e.touches[0].clientX;
+      touchStartY.current = e.touches[0].clientY;
+    };
+    const handleTouchEnd = (e) => {
+      if (touchStartX.current === null) return;
+      const dx = e.changedTouches[0].clientX - touchStartX.current;
+      const dy = Math.abs(e.changedTouches[0].clientY - touchStartY.current);
+      // Only register horizontal swipes
+      if (dy > 60) { touchStartX.current = null; return; }
+      if (!open && touchStartX.current < 32 && dx > 60) setOpen(true);
+      if (open && dx < -60) setOpen(false);
+      touchStartX.current = null;
+    };
+    document.addEventListener('touchstart', handleTouchStart, { passive: true });
+    document.addEventListener('touchend', handleTouchEnd, { passive: true });
+    return () => {
+      document.removeEventListener('touchstart', handleTouchStart);
+      document.removeEventListener('touchend', handleTouchEnd);
+    };
+  }, [open]);
 
   const menuItems = [
     { id: 'verification',     path: '/verification',     label: 'Data Verification',      icon: Users          },
@@ -131,20 +158,101 @@ const Sidebar = () => {
         <SidebarContent />
       </div>
 
+      {/* ── Bottom Navigation (mobile only) ── */}
+      {/* Primary 5 items always visible; remaining 2 in "More" popover */}
+      <nav className="bottom-nav" style={{
+        display: 'none', position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 900,
+        backgroundColor: '#FFFFFF', borderTop: '1px solid #E5E7EB',
+        height: '60px', alignItems: 'stretch',
+      }}>
+        {menuItems.slice(0, 5).map(item => {
+          const isActive = location.pathname === item.path || location.pathname.startsWith(item.path + '/');
+          return (
+            <NavLink
+              key={item.id}
+              to={item.path}
+              style={{
+                flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
+                justifyContent: 'center', gap: '3px', textDecoration: 'none',
+                color: isActive ? '#1A1A1A' : '#9CA3AF',
+                borderTop: isActive ? '2px solid #1A1A1A' : '2px solid transparent',
+                minWidth: 0, padding: '6px 2px 4px',
+                WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              <item.icon size={20} strokeWidth={isActive ? 2 : 1.5} />
+              <span style={{ fontSize: '9px', fontWeight: isActive ? '600' : '400', letterSpacing: '0.02em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%', textAlign: 'center' }}>
+                {item.label.split(' ')[0]}
+              </span>
+            </NavLink>
+          );
+        })}
+
+        {/* More button */}
+        <button
+          onClick={() => setMoreOpen(v => !v)}
+          style={{
+            flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
+            justifyContent: 'center', gap: '3px', background: 'none', border: 'none',
+            cursor: 'pointer', color: menuItems.slice(5).some(i => location.pathname === i.path) ? '#1A1A1A' : '#9CA3AF',
+            borderTop: menuItems.slice(5).some(i => location.pathname === i.path) ? '2px solid #1A1A1A' : '2px solid transparent',
+            minWidth: 0, padding: '6px 2px 4px',
+            WebkitTapHighlightColor: 'transparent',
+          }}
+        >
+          <MoreHorizontal size={20} strokeWidth={1.5} />
+          <span style={{ fontSize: '9px', fontWeight: '400', letterSpacing: '0.02em' }}>More</span>
+        </button>
+
+        {/* More popover */}
+        {moreOpen && (
+          <>
+            <div onClick={() => setMoreOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 898 }} />
+            <div style={{
+              position: 'fixed', bottom: '64px', right: '8px', zIndex: 899,
+              backgroundColor: '#FFFFFF', border: '1px solid #E5E7EB',
+              minWidth: '180px', boxShadow: '0 -4px 16px rgba(0,0,0,0.08)',
+            }}>
+              {menuItems.slice(5).map(item => {
+                const isActive = location.pathname === item.path;
+                return (
+                  <NavLink
+                    key={item.id}
+                    to={item.path}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '10px',
+                      padding: '12px 16px', textDecoration: 'none',
+                      color: '#1A1A1A', fontSize: '12px', fontWeight: isActive ? '600' : '400',
+                      borderLeft: isActive ? '3px solid #1A1A1A' : '3px solid transparent',
+                      WebkitTapHighlightColor: 'transparent',
+                    }}
+                  >
+                    <item.icon size={16} strokeWidth={isActive ? 2 : 1.5} />
+                    {item.label}
+                  </NavLink>
+                );
+              })}
+            </div>
+          </>
+        )}
+      </nav>
+
       {/* Responsive CSS */}
       <style>{`
         @media (min-width: 768px) {
-          .mobile-topbar { display: none !important; }
+          .mobile-topbar   { display: none !important; }
           .desktop-sidebar { display: block !important; }
-          .mobile-drawer { display: none !important; }
-          .mobile-overlay { display: none !important; }
+          .mobile-drawer   { display: none !important; }
+          .mobile-overlay  { display: none !important; }
+          .bottom-nav      { display: none !important; }
         }
         @media (max-width: 767px) {
-          .mobile-topbar { display: flex !important; }
+          .mobile-topbar   { display: flex !important; }
           .desktop-sidebar { display: none !important; }
-          .mobile-drawer { display: block !important; }
-          .mobile-overlay { display: block !important; }
+          .mobile-drawer   { display: block !important; }
+          .mobile-overlay  { display: block !important; }
           .sidebar-close-btn { display: flex !important; }
+          .bottom-nav      { display: flex !important; }
         }
       `}</style>
     </>

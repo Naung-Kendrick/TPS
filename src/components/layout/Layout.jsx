@@ -33,6 +33,7 @@ const Layout = () => {
         @media (max-width: 767px) {
           .main-content {
             padding-top: 52px;
+            padding-bottom: 68px;
           }
         }
       `}</style>

@@ -20,13 +20,34 @@ const Layout = () => {
   const txRef = useRef(null);
   const tyRef = useRef(null);
 
+  const cancelledRef = useRef(false);
+
   useEffect(() => {
+    // Walk up the DOM from a node and check if it (or any ancestor up to <body>)
+    // is horizontally scrollable with actual overflow content.
+    const isInsideHScrollable = (node) => {
+      let el = node;
+      while (el && el !== document.body) {
+        if (el.nodeType !== 1) { el = el.parentElement; continue; }
+        const style = window.getComputedStyle(el);
+        const overflowX = style.overflowX;
+        const canScrollX = overflowX === 'auto' || overflowX === 'scroll' || overflowX === 'overlay';
+        if (canScrollX && el.scrollWidth > el.clientWidth + 4) return true;
+        el = el.parentElement;
+      }
+      return false;
+    };
+
     const onStart = (e) => {
+      cancelledRef.current = isInsideHScrollable(e.target);
       txRef.current = e.touches[0].clientX;
       tyRef.current = e.touches[0].clientY;
     };
+
     const onEnd = (e) => {
       if (txRef.current === null) return;
+      if (cancelledRef.current) { txRef.current = null; return; }
+
       const dx = e.changedTouches[0].clientX - txRef.current;
       const dy = Math.abs(e.changedTouches[0].clientY - tyRef.current);
       const startX = txRef.current;
@@ -45,10 +66,8 @@ const Layout = () => {
       if (cur === -1) return;
 
       if (dx < 0 && cur < PAGE_ORDER.length - 1) {
-        // Swipe left → next page
         navigate(PAGE_ORDER[cur + 1]);
       } else if (dx > 0 && cur > 0) {
-        // Swipe right → previous page
         navigate(PAGE_ORDER[cur - 1]);
       }
     };

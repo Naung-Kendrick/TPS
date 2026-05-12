@@ -134,25 +134,34 @@ const Sidebar = () => {
       {/* ── Mobile branding header ── */}
       <div className="mobile-topbar" style={{
         display: 'none', position: 'fixed', top: 0, left: 0, right: 0, zIndex: 900,
-        backgroundColor: '#FAFAFA', borderBottom: '1px solid #E5E7EB',
-        borderLeft: '3px solid #1A1A1A',
+        backgroundColor: '#FAFAFA',
+        borderBottom: '2px solid #1A1A1A',
         alignItems: 'center', justifyContent: 'flex-start', gap: '10px',
-        padding: '8px 14px', height: '48px',
+        padding: '0 14px', height: '48px',
       }}>
+        {/* Seal */}
         <div style={{
-          width: '28px', height: '28px', flexShrink: 0,
+          width: '30px', height: '30px', flexShrink: 0,
           border: '2px solid #1A1A1A', backgroundColor: '#FFFFFF',
           display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
         }}>
-          <img src={logo} alt="IDTL Seal" style={{ width: '90%', height: '90%', objectFit: 'contain' }} />
+          <img src={logo} alt="IDTL Seal" style={{ width: '88%', height: '88%', objectFit: 'contain' }} />
         </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: '8px', fontWeight: '700', color: '#737373', letterSpacing: '0.12em', textTransform: 'uppercase', lineHeight: 1, marginBottom: '2px' }}>Ta'ang Land Immigration Dept.</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{ fontSize: '13px', fontWeight: '800', color: '#1A1A1A', letterSpacing: '0.06em', textTransform: 'uppercase', lineHeight: 1 }}>TPS</span>
-            <span style={{ fontSize: '7.5px', fontWeight: '700', color: '#FFFFFF', backgroundColor: '#1A1A1A', padding: '1px 5px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>IDTL · 2025</span>
-          </div>
+
+        {/* Title block */}
+        <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', minWidth: 0 }}>
+          <span style={{ fontSize: '7.5px', fontWeight: '600', color: '#737373', letterSpacing: '0.1em', textTransform: 'uppercase', lineHeight: 1, whiteSpace: 'nowrap' }}>IDTL · Ta'ang Land Immigration</span>
+          <span style={{ fontSize: '13px', fontWeight: '800', color: '#1A1A1A', letterSpacing: '0.07em', textTransform: 'uppercase', lineHeight: 1.2 }}>TPS</span>
         </div>
+
+        {/* Official badge — pushed to right */}
+        <span style={{
+          marginLeft: 'auto', flexShrink: 0,
+          fontSize: '7px', fontWeight: '700', color: '#FFFFFF',
+          backgroundColor: '#1A1A1A',
+          padding: '3px 7px', letterSpacing: '0.08em', textTransform: 'uppercase',
+          whiteSpace: 'nowrap',
+        }}>OFFICIAL</span>
       </div>
 
       {/* ── Desktop sidebar ── */}

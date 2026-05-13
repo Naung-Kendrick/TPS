@@ -81,14 +81,15 @@ export const exportStatisticsExcel = ({
     { s: { r: 1, c: 0 }, e: { r: 1, c: colCount1 - 1 } },
   ];
   ws1['!cols'] = [
-    { wch: 5 }, { wch: 20 }, { wch: 11 },
-    { wch: 8 }, { wch: 8 }, { wch: 9 },
-    { wch: 9 }, { wch: 9 }, { wch: 9 },
+    { wch: 5 }, { wch: 22 }, { wch: 11 },
+    { wch: 9 }, { wch: 9 }, { wch: 10 },
+    { wch: 9 }, { wch: 9 }, { wch: 10 },
     { wch: 10 }, { wch: 10 }, { wch: 10 },
-    { wch: 9 }, { wch: 9 }, { wch: 9 },
-    ...allReligions.map(() => ({ wch: 12 })),
-    { wch: 11 }
+    { wch: 9 }, { wch: 9 }, { wch: 10 },
+    ...allReligions.map(() => ({ wch: 18 })),
+    { wch: 14 }
   ];
+  ws1['!rows'] = [{ hpt: 24 }, { hpt: 18 }, { hpt: 12 }, { hpt: 36 }];
   XLSX.utils.book_append_sheet(wb, ws1, 'Population, Age, Religion');
 
   // ── Sheet 2: Nationality ─────────────────────────────────────────────────────
@@ -126,10 +127,11 @@ export const exportStatisticsExcel = ({
     { s: { r: 1, c: 0 }, e: { r: 1, c: colCount2 - 1 } },
   ];
   ws2['!cols'] = [
-    { wch: 5 }, { wch: 20 }, { wch: 8 }, { wch: 8 }, { wch: 9 },
-    ...allNationalities.map(() => ({ wch: 12 })),
-    { wch: 11 }
+    { wch: 5 }, { wch: 22 }, { wch: 9 }, { wch: 9 }, { wch: 10 },
+    ...allNationalities.map(() => ({ wch: 18 })),
+    { wch: 14 }
   ];
+  ws2['!rows'] = [{ hpt: 24 }, { hpt: 18 }, { hpt: 12 }, { hpt: 36 }];
   XLSX.utils.book_append_sheet(wb, ws2, 'Nationality');
 
   const suffix = selectedWard || selectedTownship || selectedDistrict || 'All';

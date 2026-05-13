@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { SkeletonStatGrid, SkeletonBar } from './Skeleton';
 import { supabase } from '../lib/supabase';
-import { Users, User, Home, Search, BarChart2, MapPin, Globe } from 'lucide-react';
+import { Users, User, Home, Search, BarChart2, MapPin, Globe, Printer, FileSpreadsheet } from 'lucide-react';
 import { deepEnsureUnicode } from './CsvUploader';
 import EmptyState from './EmptyState';
+import { printStatistics, exportStatisticsExcel } from '../lib/statisticsPrint';
 
 const toMyanmarNum = (num) => {
   const myanmarNumbers = ['၀', '၁', '၂', '၃', '၄', '၅', '၆', '၇', '၈', '၉'];
@@ -453,8 +454,43 @@ const PopulationStatistics = () => {
         const tdMonoS = { ...tdS, fontFamily: 'var(--font-mono)' };
         const tdBold = { ...tdMonoS, fontWeight: '600', backgroundColor: '#FAFAFA' };
 
+        const printArgs = {
+          groupLabel, wardStats, totalStats, allReligions, allNationalities,
+          selectedDistrict, selectedTownship, selectedWard,
+        };
+
         return (
           <>
+            {/* ── Print / Export toolbar ─────────────────────── */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginBottom: '12px' }}>
+              <button
+                type="button"
+                onClick={() => exportStatisticsExcel(printArgs)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '6px',
+                  padding: '7px 16px', border: '1px solid #1A1A1A', backgroundColor: '#FFFFFF',
+                  color: '#1A1A1A', fontSize: '11px', fontWeight: '500', cursor: 'pointer',
+                  textTransform: 'uppercase', letterSpacing: '0.05em',
+                }}
+              >
+                <FileSpreadsheet size={13} />
+                Export Excel
+              </button>
+              <button
+                type="button"
+                onClick={() => printStatistics(printArgs)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '6px',
+                  padding: '7px 16px', border: '1px solid #1A1A1A', backgroundColor: '#1A1A1A',
+                  color: '#FFFFFF', fontSize: '11px', fontWeight: '500', cursor: 'pointer',
+                  textTransform: 'uppercase', letterSpacing: '0.05em',
+                }}
+              >
+                <Printer size={13} />
+                Print (Legal)
+              </button>
+            </div>
+
             {/* ── Table 1: Population + Age + Religious ─────── */}
             <div style={sectionCardStyle}>
               <div style={sectionTitleStyle}>SUMMARY TABLE (1) — POPULATION, AGE, RELIGION</div>

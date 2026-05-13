@@ -395,9 +395,22 @@ const PopulationStatistics = () => {
         const isMale = (g) => g && (g === 'ကျား' || g === 'က');
         const isFemale = (g) => g && g === 'မ';
 
+        // Group by the appropriate level based on active filters
+        const groupKey = selectedTownship
+          ? 'ward_village_group'
+          : selectedDistrict
+            ? 'township'
+            : 'district';
+
+        const groupLabel = selectedTownship
+          ? 'ရပ်ကွက်/အုပ်စု'
+          : selectedDistrict
+            ? 'မြို့နယ်'
+            : 'ခရိုင်';
+
         const wardGroups = {};
         currentData.forEach(d => {
-          const ward = d.ward_village_group || 'အခြား';
+          const ward = d[groupKey] || 'အခြား';
           if (!wardGroups[ward]) wardGroups[ward] = [];
           wardGroups[ward].push(d);
         });
@@ -450,7 +463,7 @@ const PopulationStatistics = () => {
                   <thead>
                     <tr>
                       <th rowSpan={2} style={thS}>စဉ်</th>
-                      <th rowSpan={2} style={thS}>ရပ်ကွက်/အုပ်စု</th>
+                      <th rowSpan={2} style={thS}>{groupLabel}</th>
                       <th rowSpan={2} style={thS}>အိမ်ထ</th>
                       <th colSpan={3} style={thS}>လူဦးရေပေါင်း</th>
                       <th colSpan={3} style={thS}>၁၆ နှစ်အောက်</th>
@@ -522,7 +535,7 @@ const PopulationStatistics = () => {
                   <thead>
                     <tr>
                       <th rowSpan={2} style={thS}>စဉ်</th>
-                      <th rowSpan={2} style={thS}>ရပ်ကွက်/အုပ်စု</th>
+                      <th rowSpan={2} style={thS}>{groupLabel}</th>
                       <th colSpan={3} style={thS}>လူဦးရေပေါင်း</th>
                       {allNationalities.length > 0 && <th colSpan={allNationalities.length} style={thS}>လူမျိုးအလိုက်</th>}
                       <th rowSpan={2} style={thS}>ပြည်နယ်ခြားသား</th>

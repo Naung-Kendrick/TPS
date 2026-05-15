@@ -185,6 +185,7 @@ const HouseholdForm = () => {
   const [viewFamilyLoading, setViewFamilyLoading] = useState(false);
 
   const [dob, setDob] = useState({ day: '', month: '', year: '' });
+  const [wardVillageError, setWardVillageError] = useState('');
 
   // Restore draft on mount
   useEffect(() => {
@@ -272,8 +273,91 @@ const HouseholdForm = () => {
     }
   };
 
+  // Auto-correct Ward/Village/Group by adding space before suffix if missing
+  const autoCorrectWardVillageGroup = (value) => {
+    if (!value || value.trim() === '') return value;
+    const str = value.trim();
+    
+    // Check for missing space before "ရပ်ကွက်" (Ward)
+    const wardMatch = str.match(/^(.+?)ရပ်ကွက်$/);
+    if (wardMatch && !str.includes(' ရပ်ကွက်')) {
+      return `${wardMatch[1].trim()} ရပ်ကွက်`;
+    }
+    
+    // Check for missing space before "ရွာ" (Village)
+    const villageMatch = str.match(/^(.+?)ရွာ$/);
+    if (villageMatch && !str.includes(' ရွာ') && str !== 'ရွာ') {
+      return `${villageMatch[1].trim()} ရွာ`;
+    }
+    
+    // Check for missing space before "အုပ်စု" (Group)
+    const groupMatch = str.match(/^(.+?)အုပ်စု$/);
+    if (groupMatch && !str.includes(' အုပ်စု')) {
+      return `${groupMatch[1].trim()} အုပ်စု`;
+    }
+    
+    return str;
+  };
+
+  // Detect Ward/Village/Group types from value (handles comma-separated)
+  const getWardVillageGroupTypes = (value) => {
+    if (!value || typeof value !== 'string') return ['unknown'];
+    
+    // Split by comma and clean up each part
+    const parts = value.split(/[,၊]/).map(p => p.trim()).filter(p => p !== '');
+    if (parts.length === 0) return ['unknown'];
+    
+    // Detect type for each part
+    const types = parts.map(part => {
+      const str = part.trim();
+      if (str === '') return 'unknown';
+      
+      // Check for Ward (ရပ်ကွက်)
+      if (str.includes('ရပ်ကွက်')) return 'ward';
+      
+      // Check for Group (အုပ်စု) - MUST check BEFORE Village
+      if (str.includes('အုပ်စု')) return 'group';
+      
+      // Check for Village (ရွာ)
+      if (str.includes('ရွာ')) return 'village';
+      
+      return 'unknown';
+    });
+    
+    // Remove duplicates and 'unknown'
+    return [...new Set(types.filter(t => t !== 'unknown'))];
+  };
+
+  // Simple validation - just check if it contains one of the keywords
+  const validateWardVillageGroup = (value) => {
+    if (!value || value.trim() === '') return '';
+    const str = value.trim();
+    
+    // Just check if it contains any of the keywords
+    const types = getWardVillageGroupTypes(str);
+    if (types.length === 0 || (types.length === 1 && types[0] === 'unknown')) {
+      return `"ရပ်ကွက်", "ရွာ", သို့မဟုတ် "အုပ်စု" ပါဝင်ရမည်`;
+    }
+    
+    return ''; // Valid
+  };
+
   const handleChange = useCallback((e) => {
     const { name, value } = e.target;
+    
+    // Auto-correct and validate ward_village_group on change
+    if (name === 'ward_village_group') {
+      const corrected = autoCorrectWardVillageGroup(value);
+      const error = validateWardVillageGroup(corrected);
+      setWardVillageError(error);
+      
+      setFormData(prev => ({
+        ...prev,
+        [name]: corrected
+      }));
+      return;
+    }
+    
     setFormData(prev => ({
       ...prev,
       [name]: value
@@ -320,21 +404,27 @@ const HouseholdForm = () => {
     setError(null);
     setSuccess(false);
 
+    // Add the detected types to the payload (array)
+    const payload = {
+      ...formData,
+      ward_village_group_type: getWardVillageGroupTypes(formData.ward_village_group)
+    };
+
     try {
       let savedLocally = false;
 
       if (!navigator.onLine) {
         // Device is offline — queue the write
-        enqueue({ table: 'households', type: 'insert', payload: { ...formData } });
+        enqueue({ table: 'households', type: 'insert', payload });
         savedLocally = true;
       } else {
         const { error: supabaseError } = await supabase
           .from('households')
-          .insert([formData]);
+          .insert([payload]);
 
         if (supabaseError) {
           // Network error mid-request — queue it
-          enqueue({ table: 'households', type: 'insert', payload: { ...formData } });
+          enqueue({ table: 'households', type: 'insert', payload });
           savedLocally = true;
         }
       }
@@ -606,7 +696,9 @@ const HouseholdForm = () => {
 
       <div style={{ ...groupStyle, gridColumn: 'span 1' }}>
         <label style={labelStyle}>ရပ်ကွက် / ကျေးရွာ / အုပ်စု</label>
-        <input type="text" name="ward_village_group" value={formData.ward_village_group} onChange={handleChange} placeholder="ရပ်ကွက် / ကျေးရွာ ဖြည့်ပါ" style={inputStyle} autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} />
+        <input type="text" name="ward_village_group" value={formData.ward_village_group} onChange={handleChange} placeholder="ဥပမာ - ကောင်းတပ် ရပ်ကွက် / အေးချမ်း ရွာ / အုပ်စု" style={{ ...inputStyle, borderColor: wardVillageError ? '#EF4444' : undefined }} autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} />
+        {wardVillageError && <p style={{ margin: '4px 0 0', fontSize: '10px', color: '#EF4444', fontWeight: '500' }}>{wardVillageError}</p>}
+        <p style={{ margin: '2px 0 0', fontSize: '9px', color: '#9CA3AF' }}>Auto-fix: ကောင်းတပ်ရပ်ကွက်→ကောင်းတပ် ရပ်ကွက် | အေးချမ်းရွာ→အေးချမ်း ရွာ</p>
       </div>
 
       <div style={{ ...groupStyle, gridColumn: 'span 1' }}>
@@ -628,7 +720,7 @@ const HouseholdForm = () => {
       </div>
 
     </div>
-  ), [formData, dob, autoFillMessage, isCustomRelationship, isCustomReligion, handleChange, handleDobChange, checkHouseholdExists, inputStyle, labelStyle, groupStyle, days, months, years, toMyanmarNum]);
+  ), [formData, dob, autoFillMessage, isCustomRelationship, isCustomReligion, handleChange, handleDobChange, checkHouseholdExists, inputStyle, labelStyle, groupStyle, days, months, years, toMyanmarNum, wardVillageError]);
 
   return (
     <div style={{ padding: '32px' }} className="max-w-7xl mx-auto">

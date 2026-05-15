@@ -35,7 +35,11 @@ const Verification = () => {
     fathers_name: '',
     ward_village_group: '',
     township: '',
-    district: ''
+    district: '',
+    previous_id_region: '',
+    previous_id_township: '',
+    previous_id_type: '',
+    previous_id_serial: ''
   });
 
   const [results, setResults] = useState(null);
@@ -58,7 +62,11 @@ const Verification = () => {
       fathers_name: '',
       ward_village_group: '',
       township: '',
-      district: ''
+      district: '',
+      previous_id_region: '',
+      previous_id_township: '',
+      previous_id_type: '',
+      previous_id_serial: ''
     });
     setResults(null);
     setHasSearched(false);
@@ -91,6 +99,16 @@ const Verification = () => {
       if (formData.ward_village_group.trim()) query = query.ilike('ward_village_group', `%${formData.ward_village_group.trim()}%`);
       if (formData.township.trim()) query = query.ilike('township', `%${formData.township.trim()}%`);
       if (formData.district.trim()) query = query.ilike('district', `%${formData.district.trim()}%`);
+      
+      // Previous ID No. search (4 parts - each optional, searched independently)
+      const prevRegion = formData.previous_id_region.trim();
+      const prevTownship = formData.previous_id_township.trim();
+      const prevType = formData.previous_id_type.trim();
+      const prevSerial = formData.previous_id_serial.trim();
+      if (prevRegion) query = query.ilike('previous_id_no', `%${prevRegion}%`);
+      if (prevTownship) query = query.ilike('previous_id_no', `%${prevTownship}%`);
+      if (prevType) query = query.ilike('previous_id_no', `%${prevType}%`);
+      if (prevSerial) query = query.ilike('previous_id_no', `%${prevSerial}%`);
 
       const { data, error } = await query.limit(50);
 
@@ -235,6 +253,57 @@ const Verification = () => {
                   placeholder="Enter district"
                 />
               </div>
+            </div>
+
+            {/* Previous ID No. - 4 Box Search */}
+            <div className="mb-6">
+              <label className="block text-xs font-medium text-gray-600 mb-2 uppercase letter-spacing-0.02">
+                Previous ID No. (NRC) - ယခင် မှတ်ပုံတင်အမှတ်
+              </label>
+              <div className="flex items-center gap-2 max-w-xl">
+                <input 
+                  type="text" 
+                  name="previous_id_region" 
+                  value={formData.previous_id_region} 
+                  onChange={handleChange}
+                  className="w-20 px-3 py-2 bg-white border border-gray-200 rounded-none focus:outline-none focus:border-gray-900 transition-colors text-sm text-center font-mono"
+                  placeholder="၁၃"
+                  maxLength="3"
+                />
+                <span className="text-gray-500 font-medium">/</span>
+                <input 
+                  type="text" 
+                  name="previous_id_township" 
+                  value={formData.previous_id_township} 
+                  onChange={handleChange}
+                  className="w-24 px-3 py-2 bg-white border border-gray-200 rounded-none focus:outline-none focus:border-gray-900 transition-colors text-sm text-center font-mono"
+                  placeholder="နခန"
+                  maxLength="5"
+                />
+                <span className="text-gray-500 font-medium">(</span>
+                <input 
+                  type="text" 
+                  name="previous_id_type" 
+                  value={formData.previous_id_type} 
+                  onChange={handleChange}
+                  className="w-20 px-3 py-2 bg-white border border-gray-200 rounded-none focus:outline-none focus:border-gray-900 transition-colors text-sm text-center font-mono"
+                  placeholder="နိုင်"
+                  maxLength="4"
+                />
+                <span className="text-gray-500 font-medium">)</span>
+                <input 
+                  type="text" 
+                  name="previous_id_serial" 
+                  value={formData.previous_id_serial} 
+                  onChange={handleChange}
+                  className="w-28 px-3 py-2 bg-white border border-gray-200 rounded-none focus:outline-none focus:border-gray-900 transition-colors text-sm text-center font-mono"
+                  placeholder="၀၉၆၉၁၅"
+                  maxLength="8"
+                />
+              </div>
+              <p className="text-[10px] text-gray-400 mt-1">
+                Format: Region / Township Code (Type) Serial | ဥပမာ - ၁၃/နခန(နိုင်)၀၉၆၉၁၅ — Search using 1, 2, 3, or all 4 boxes
+              </p>
             </div>
             
             <div className="flex items-center gap-4">

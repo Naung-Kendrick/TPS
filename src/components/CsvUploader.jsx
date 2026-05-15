@@ -81,17 +81,186 @@ const validateMyanmarText = (text) => {
   return issues.length > 0 ? issues.join('; ') : null;
 };
 
+// Auto-correct Ward/Village/Group by adding space before suffix if missing
+// Handles: "ကောင်းတပ်ရပ်ကွက်" → "ကောင်းတပ် ရပ်ကွက်"
+const autoCorrectWardVillageGroup = (value) => {
+  if (!value || typeof value !== 'string') return value;
+  const str = value.trim();
+  if (str === '') return str;
+  
+  // Check for missing space before "ရပ်ကွက်" (Ward)
+  // Pattern: something ending with chars followed immediately by "ရပ်ကွက်"
+  const wardMatch = str.match(/^(.+?)ရပ်ကွက်$/);
+  if (wardMatch && !str.includes(' ရပ်ကွက်')) {
+    return `${wardMatch[1].trim()} ရပ်ကွက်`;
+  }
+  
+  // Check for missing space before "ရွာ" (Village)
+  // Pattern: word characters followed immediately by "ရွာ" at end
+  const villageMatch = str.match(/^(.+?)ရွာ$/);
+  if (villageMatch && !str.includes(' ရွာ') && str !== 'ရွာ') {
+    return `${villageMatch[1].trim()} ရွာ`;
+  }
+  
+  // Check for missing space before "အုပ်စု" (Group)
+  const groupMatch = str.match(/^(.+?)အုပ်စု$/);
+  if (groupMatch && !str.includes(' အုပ်စု')) {
+    return `${groupMatch[1].trim()} အုပ်စု`;
+  }
+  
+  return str;
+};
+
+// Detect Ward/Village/Group type from value
+// Returns: 'ward' | 'village' | 'group' | 'unknown'
+const detectWardVillageGroupType = (value) => {
+  if (!value || typeof value !== 'string') return 'unknown';
+  const str = value.trim();
+  if (str === '') return 'unknown';
+  
+  // Check for Ward (ရပ်ကွက်)
+  if (str.includes('ရပ်ကွက်')) {
+    return 'ward';
+  }
+  
+  // Check for Group (အုပ်စု) - MUST check BEFORE Village
+  // because group names might contain "ရွာ" (e.g., "ကျေးရွာအုပ်စု")
+  if (str.includes('အုပ်စု')) {
+    return 'group';
+  }
+  
+  // Check for Village (ရွာ)
+  if (str.includes('ရွာ')) {
+    return 'village';
+  }
+  
+  return 'unknown';
+};
+
+// Split comma-separated ward/village/group values and return array of types
+// e.g., "ကောင်းတပ် ရွာ , အောင်ချမ်းသာ အုပ်စု" → ['village', 'group']
+const getWardVillageGroupTypes = (value) => {
+  if (!value || typeof value !== 'string') return ['unknown'];
+  
+  // Split by comma and clean up each part
+  const parts = value.split(/[,၊]/).map(p => p.trim()).filter(p => p !== '');
+  
+  if (parts.length === 0) return ['unknown'];
+  
+  // Auto-correct each part and detect its type
+  const types = parts.map(part => {
+    const corrected = autoCorrectWardVillageGroup(part);
+    return detectWardVillageGroupType(corrected);
+  });
+  
+  // Remove duplicates and 'unknown'
+  return [...new Set(types.filter(t => t !== 'unknown'))];
+};
+
+// Simple validation - just check if it contains one of the keywords
+const validateWardVillageGroup = (value) => {
+  if (!value || typeof value !== 'string') return 'Value is required';
+  const str = value.trim();
+  if (str === '') return 'Value is required';
+  
+  // Auto-correct first
+  const corrected = autoCorrectWardVillageGroup(str);
+  
+  // Just check if it contains any of the keywords
+  const type = detectWardVillageGroupType(corrected);
+  if (type === 'unknown') {
+    return `Must contain "ရပ်ကွက်" (Ward), "ရွာ" (Village), or "အုပ်စု" (Group)`;
+  }
+  
+  return null; // Valid
+};
+
+// Validate household-level ID requirements
+// Rule 1: At least one member per household must have Ta'ang Land ID
+// Rule 2: At least 1-2 members per household must have Previous ID
+const validateHouseholdIDRequirements = (data) => {
+  const errors = [];
+  
+  // Group by household
+  const households = data.reduce((acc, row) => {
+    const hn = row.household_no || 'UNKNOWN';
+    if (!acc[hn]) acc[hn] = [];
+    acc[hn].push(row);
+    return acc;
+  }, {});
+  
+  Object.entries(households).forEach(([householdNo, members]) => {
+    const hasTaangLandID = members.some(m => m.taang_land_id_no && m.taang_land_id_no.trim() !== '');
+    const previousIDCount = members.filter(m => m.previous_id_no && m.previous_id_no.trim() !== '').length;
+    
+    if (!hasTaangLandID) {
+      errors.push({
+        householdNo,
+        issue: 'No Ta\'ang Land ID',
+        detail: 'At least one family member must have a Ta\'ang Land ID No.',
+        rowNumbers: members.map((m, i) => i + 2).slice(0, 3) // First 3 rows as reference
+      });
+    }
+    
+    if (previousIDCount < 1) {
+      errors.push({
+        householdNo,
+        issue: 'No Previous ID',
+        detail: 'At least one family member must have a Previous ID No. (NRC).',
+        rowNumbers: members.map((m, i) => i + 2).slice(0, 3)
+      });
+    }
+    
+    // Warning if more than 2 previous IDs (soft rule, just log)
+    if (previousIDCount > 2) {
+      // This is allowed but unusual - no error, just informational
+    }
+  });
+  
+  return errors;
+};
+
 // Shared: run validation + Supabase upsert for a flat array of parsed rows
 const processAndUpload = async (formattedData, setValidationErrors, setShowModal, setLoading, setSuccessMsg, onUploadSuccess, fileInputRef) => {
   const errorsFound = [];
+  
+  // Check household-level ID requirements first
+  const householdIDErrors = validateHouseholdIDRequirements(formattedData);
+  if (householdIDErrors.length > 0) {
+    householdIDErrors.forEach(err => {
+      errorsFound.push({
+        rowNumber: err.rowNumbers.join(', ') + '...',
+        name: `Household: ${err.householdNo}`,
+        missingFields: null,
+        spellingIssues: [`${err.issue}: ${err.detail}`]
+      });
+    });
+  }
 
+  // Process each row and add ward_village_group_type as array
+  const processedData = [];
+  
   formattedData.forEach((parsedRow, index) => {
+    // Get all types from comma-separated ward_village_group
+    const types = getWardVillageGroupTypes(parsedRow.ward_village_group);
+    
+    // Create record with types array
+    const processedRow = {
+      ...parsedRow,
+      ward_village_group_type: types // Array: ['village', 'group'] or ['ward'] etc.
+    };
+    processedData.push(processedRow);
+    
+    // Validate using original value
     const missingFields = [];
     if (!parsedRow.ward_village_group) missingFields.push('Ward/Village/Group');
     if (!parsedRow.township) missingFields.push('Township');
     if (!parsedRow.district) missingFields.push('District');
     if (!parsedRow.gender) missingFields.push('Gender');
     if (!parsedRow.household_relationship) missingFields.push('Household Relationship');
+
+    // Validate Ward/Village/Group format (simple check only)
+    const wardVillageError = validateWardVillageGroup(parsedRow.ward_village_group);
 
     const myanmarFieldsToCheck = [
       { key: 'name', label: 'Name' },
@@ -110,6 +279,11 @@ const processAndUpload = async (formattedData, setValidationErrors, setShowModal
     for (const field of myanmarFieldsToCheck) {
       const issue = validateMyanmarText(parsedRow[field.key]);
       if (issue) spellingIssues.push(`${field.label}: "${parsedRow[field.key]}" (${issue})`);
+    }
+
+    // Add ward/village/group format error if present
+    if (wardVillageError) {
+      spellingIssues.push(`Ward/Village/Group: ${wardVillageError}`);
     }
 
     if (missingFields.length > 0 || spellingIssues.length > 0) {
@@ -134,8 +308,9 @@ const processAndUpload = async (formattedData, setValidationErrors, setShowModal
   let duplicateCount = 0;
   let dbErrors = [];
 
-  for (let i = 0; i < formattedData.length; i++) {
-    const rowData = formattedData[i];
+  // Upload the processed data with types array
+  for (let i = 0; i < processedData.length; i++) {
+    const rowData = processedData[i];
     const { data: existing } = await supabase
       .from('households')
       .select('id')
@@ -224,6 +399,22 @@ const CsvUploader = ({ onUploadSuccess }) => {
 
         if (formattedData.length === 0) throw new Error('JSON file has no member records.');
 
+        // Validate household-level ID requirements for JSON upload
+        const householdIDErrors = validateHouseholdIDRequirements(formattedData);
+        if (householdIDErrors.length > 0) {
+          const householdErrors = householdIDErrors.map(err => ({
+            rowNumber: err.rowNumbers.join(', ') + '...',
+            name: `Household: ${err.householdNo}`,
+            missingFields: null,
+            spellingIssues: [`${err.issue}: ${err.detail}`]
+          }));
+          setValidationErrors(householdErrors);
+          setShowModal(true);
+          setLoading(false);
+          if (fileInputRef.current) fileInputRef.current.value = '';
+          return;
+        }
+
         await processAndUpload(
           formattedData,
           setValidationErrors, setShowModal, setLoading, setSuccessMsg, onUploadSuccess, fileInputRef
@@ -287,6 +478,14 @@ const CsvUploader = ({ onUploadSuccess }) => {
             if (rawDistrict && rawDistrict.trim() !== '') currentDistrict = rawDistrict.trim();
 
             const cell = (key) => (row[key] || '').trim();
+            
+            // Auto-correct ward_village_group during CSV parsing
+            let wardValue = ensureUnicode(currentWard);
+            wardValue = autoCorrectWardVillageGroup(wardValue);
+            
+            // Get all types (handles comma-separated values)
+            const wardTypes = getWardVillageGroupTypes(wardValue);
+            
             const parsedRow = {
               household_no: ensureUnicode(currentHouseholdNo),
               name: ensureUnicode(cell('Name')),
@@ -302,11 +501,12 @@ const CsvUploader = ({ onUploadSuccess }) => {
               resident_status: ensureUnicode(cell('Resident Status')),
               religious: ensureUnicode(cell('Religious')),
               house_no: ensureUnicode(cell('House NO.')),
-              ward_village_group: ensureUnicode(currentWard),
+              ward_village_group: wardValue,
+              ward_village_group_type: wardTypes, // Array of types
               township: ensureUnicode(currentTownship),
               district: ensureUnicode(currentDistrict),
               submission_date: cell('Submission Date'),
-              address: ensureUnicode(`${cell('House NO.')}, ${currentWard}, ${currentTownship}, ${currentDistrict}`)
+              address: ensureUnicode(`${cell('House NO.')}, ${wardValue}, ${currentTownship}, ${currentDistrict}`)
             };
 
             // 2. Strict Validation Check (After Forward-Fill)
@@ -339,6 +539,12 @@ const CsvUploader = ({ onUploadSuccess }) => {
               }
             }
 
+            // 2c. Ward/Village/Group Format Validation
+            const wardVillageError = validateWardVillageGroup(parsedRow.ward_village_group);
+            if (wardVillageError) {
+              spellingIssues.push(`Ward/Village/Group: ${wardVillageError}`);
+            }
+
             // 3. Error Tracking
             if (missingFields.length > 0 || spellingIssues.length > 0) {
               errorsFound.push({
@@ -356,7 +562,27 @@ const CsvUploader = ({ onUploadSuccess }) => {
             throw new Error('The CSV file is empty or formatted incorrectly.');
           }
 
-          // 4. Delegate to shared upload processor
+          // 4. Validate household-level ID requirements
+          const householdIDErrors = validateHouseholdIDRequirements(formattedData);
+          if (householdIDErrors.length > 0) {
+            const householdErrors = householdIDErrors.map(err => ({
+              rowNumber: err.rowNumbers.join(', ') + '...',
+              name: `Household: ${err.householdNo}`,
+              missingFields: null,
+              spellingIssues: [`${err.issue}: ${err.detail}`]
+            }));
+            errorsFound.push(...householdErrors);
+          }
+
+          if (errorsFound.length > 0) {
+            setValidationErrors(errorsFound);
+            setShowModal(true);
+            setLoading(false);
+            if (fileInputRef.current) fileInputRef.current.value = '';
+            return;
+          }
+
+          // 5. Delegate to shared upload processor
           await processAndUpload(
             formattedData,
             setValidationErrors, setShowModal, setLoading, setSuccessMsg, onUploadSuccess, fileInputRef
@@ -481,7 +707,7 @@ const CsvUploader = ({ onUploadSuccess }) => {
                           )}
                           {err.spellingIssues && (
                             <div>
-                              <span className="text-xs font-semibold text-[#737373] uppercase tracking-wide">⚠ Myanmar Text Errors:</span>
+                              <span className="text-xs font-semibold text-[#737373] uppercase tracking-wide">⚠ Data Validation Errors:</span>
                               <div className="mt-1 space-y-1">
                                 {err.spellingIssues.map((issue, i) => (
                                   <div key={i} className="bg-[#FAFAFA] text-[#1A1A1A] px-2 py-1 text-xs border border-[#E5E7EB] font-medium" style={{ borderRadius: '0px' }}>

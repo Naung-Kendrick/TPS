@@ -157,9 +157,41 @@ export const printStatistics = ({
       ? `${selectedDistrict} / ${selectedTownship}`
       : selectedDistrict || 'All Districts';
 
+  const PRINT_PAGE_ROWS = 40;
+
+  // ── Helpers ──────────────────────────────────────────────────────────────────
+  const chunkArray = (arr, size) => {
+    const chunks = [];
+    for (let i = 0; i < arr.length; i += size) chunks.push(arr.slice(i, i + size));
+    return chunks.length ? chunks : [[]];
+  };
+
   // ── Table 1: Population, Age, Religion ──────────────────────────────────────
   const relThs = allReligions.map(r => `<th>${safeHtml(r)}</th>`).join('');
-  const table1Rows = wardStats.map((w, i) => `
+
+  const table1Header = `
+    <thead>
+      <tr>
+        <th rowspan="2" style="width:3%">စဉ်</th>
+        <th rowspan="2" style="min-width:70px">${safeHtml(groupLabel)}</th>
+        <th rowspan="2">အိမ်ထ</th>
+        <th colspan="3" class="group-header">လူဦးရေပေါင်း</th>
+        <th colspan="3" class="group-header">၁၆ နှစ်အောက်</th>
+        <th colspan="3" class="group-header">၁၆ - ၆၀ နှစ်</th>
+        <th colspan="3" class="group-header">၆၀ နှစ်အထက်</th>
+        ${allReligions.length > 0 ? `<th colspan="${allReligions.length}" class="group-header">ကိုးကွယ်သည့်ဘာသာ</th>` : ''}
+        <th rowspan="2">ပြည်နယ်<br>ခြားသား</th>
+      </tr>
+      <tr>
+        <th>ကျား</th><th>မ</th><th>ပေါင်း</th>
+        <th>ကျား</th><th>မ</th><th>ပေါင်း</th>
+        <th>ကျား</th><th>မ</th><th>ပေါင်း</th>
+        <th>ကျား</th><th>မ</th><th>ပေါင်း</th>
+        ${relThs}
+      </tr>
+    </thead>`;
+
+  const makeTable1Row = (w, i) => `
     <tr>
       <td class="num">${toMM(i + 1)}</td>
       <td class="name">${safeHtml(w.name)}</td>
@@ -178,9 +210,9 @@ export const printStatistics = ({
       <td class="num">${toMM(w.a60m + w.a60f)}</td>
       ${allReligions.map(r => `<td class="num">${w.relCounts[r] ? toMM(w.relCounts[r]) : '-'}</td>`).join('')}
       <td class="num">${w.nonLocal ? toMM(w.nonLocal) : '-'}</td>
-    </tr>`).join('');
+    </tr>`;
 
-  const table1Total = `
+  const table1TotalRow = `
     <tr class="total-row">
       <td class="num"></td>
       <td class="name bold">စုစုပေါင်း</td>
@@ -201,9 +233,38 @@ export const printStatistics = ({
       <td class="num bold">${totalStats.nonLocal ? toMM(totalStats.nonLocal) : '-'}</td>
     </tr>`;
 
+  const table1Chunks = chunkArray(wardStats, PRINT_PAGE_ROWS);
+  const table1Html = table1Chunks.map((chunk, ci) => {
+    const isLast = ci === table1Chunks.length - 1;
+    const rows = chunk.map((w, i) => makeTable1Row(w, ci * PRINT_PAGE_ROWS + i)).join('');
+    return `
+      ${ci > 0 ? '<div class="page-break"></div>' : ''}
+      <div class="section-title">
+        Summary Table (1) — Population, Age &amp; Religion
+        ${table1Chunks.length > 1 ? `<span style="font-weight:400;font-size:8.5px;margin-left:8px">(${ci + 1} / ${table1Chunks.length})</span>` : ''}
+      </div>
+      <table>${table1Header}<tbody>${rows}${isLast ? table1TotalRow : ''}</tbody></table>`;
+  }).join('');
+
   // ── Table 2: Nationality ─────────────────────────────────────────────────────
   const natThs = allNationalities.map(n => `<th>${safeHtml(n)}</th>`).join('');
-  const table2Rows = wardStats.map((w, i) => `
+
+  const table2Header = `
+    <thead>
+      <tr>
+        <th rowspan="2" style="width:3%">စဉ်</th>
+        <th rowspan="2" style="min-width:70px">${safeHtml(groupLabel)}</th>
+        <th colspan="3" class="group-header">လူဦးရေပေါင်း</th>
+        ${allNationalities.length > 0 ? `<th colspan="${allNationalities.length}" class="group-header">လူမျိုးအလိုက်</th>` : ''}
+        <th rowspan="2">ပြည်နယ်<br>ခြားသား</th>
+      </tr>
+      <tr>
+        <th>ကျား</th><th>မ</th><th>ပေါင်း</th>
+        ${natThs}
+      </tr>
+    </thead>`;
+
+  const makeTable2Row = (w, i) => `
     <tr>
       <td class="num">${toMM(i + 1)}</td>
       <td class="name">${safeHtml(w.name)}</td>
@@ -212,9 +273,9 @@ export const printStatistics = ({
       <td class="num bold green">${toMM(w.total)}</td>
       ${allNationalities.map(n => `<td class="num">${w.natCounts[n] ? toMM(w.natCounts[n]) : '-'}</td>`).join('')}
       <td class="num">${w.nonLocal ? toMM(w.nonLocal) : '-'}</td>
-    </tr>`).join('');
+    </tr>`;
 
-  const table2Total = `
+  const table2TotalRow = `
     <tr class="total-row">
       <td class="num"></td>
       <td class="name bold">စုစုပေါင်း</td>
@@ -224,6 +285,19 @@ export const printStatistics = ({
       ${allNationalities.map(n => `<td class="num bold">${totalStats.natCounts[n] ? toMM(totalStats.natCounts[n]) : '-'}</td>`).join('')}
       <td class="num bold">${totalStats.nonLocal ? toMM(totalStats.nonLocal) : '-'}</td>
     </tr>`;
+
+  const table2Chunks = chunkArray(wardStats, PRINT_PAGE_ROWS);
+  const table2Html = table2Chunks.map((chunk, ci) => {
+    const isLast = ci === table2Chunks.length - 1;
+    const rows = chunk.map((w, i) => makeTable2Row(w, ci * PRINT_PAGE_ROWS + i)).join('');
+    return `
+      <div class="page-break"></div>
+      <div class="section-title">
+        Summary Table (2) — Nationality
+        ${table2Chunks.length > 1 ? `<span style="font-weight:400;font-size:8.5px;margin-left:8px">(${ci + 1} / ${table2Chunks.length})</span>` : ''}
+      </div>
+      <table>${table2Header}<tbody>${rows}${isLast ? table2TotalRow : ''}</tbody></table>`;
+  }).join('');
 
   const html = `<!DOCTYPE html>
 <html>
@@ -332,56 +406,8 @@ export const printStatistics = ({
       <span><b>Printed:</b> ${safeHtml(dateStr)}</span>
     </div>
 
-    <!-- ── Table 1 ── -->
-    <div class="section-title">Summary Table (1) — Population, Age &amp; Religion</div>
-    <table>
-      <thead>
-        <tr>
-          <th rowspan="2" style="width:3%">စဉ်</th>
-          <th rowspan="2" style="min-width:70px">${safeHtml(groupLabel)}</th>
-          <th rowspan="2">အိမ်ထ</th>
-          <th colspan="3" class="group-header">လူဦးရေပေါင်း</th>
-          <th colspan="3" class="group-header">၁၆ နှစ်အောက်</th>
-          <th colspan="3" class="group-header">၁၆ - ၆၀ နှစ်</th>
-          <th colspan="3" class="group-header">၆၀ နှစ်အထက်</th>
-          ${allReligions.length > 0 ? `<th colspan="${allReligions.length}" class="group-header">ကိုးကွယ်သည့်ဘာသာ</th>` : ''}
-          <th rowspan="2">ပြည်နယ်<br>ခြားသား</th>
-        </tr>
-        <tr>
-          <th>ကျား</th><th>မ</th><th>ပေါင်း</th>
-          <th>ကျား</th><th>မ</th><th>ပေါင်း</th>
-          <th>ကျား</th><th>မ</th><th>ပေါင်း</th>
-          <th>ကျား</th><th>မ</th><th>ပေါင်း</th>
-          ${relThs}
-        </tr>
-      </thead>
-      <tbody>
-        ${table1Rows}
-        ${table1Total}
-      </tbody>
-    </table>
-
-    <!-- ── Table 2 ── -->
-    <div class="section-title" style="margin-top:14px">Summary Table (2) — Nationality</div>
-    <table>
-      <thead>
-        <tr>
-          <th rowspan="2" style="width:3%">စဉ်</th>
-          <th rowspan="2" style="min-width:70px">${safeHtml(groupLabel)}</th>
-          <th colspan="3" class="group-header">လူဦးရေပေါင်း</th>
-          ${allNationalities.length > 0 ? `<th colspan="${allNationalities.length}" class="group-header">လူမျိုးအလိုက်</th>` : ''}
-          <th rowspan="2">ပြည်နယ်<br>ခြားသား</th>
-        </tr>
-        <tr>
-          <th>ကျား</th><th>မ</th><th>ပေါင်း</th>
-          ${natThs}
-        </tr>
-      </thead>
-      <tbody>
-        ${table2Rows}
-        ${table2Total}
-      </tbody>
-    </table>
+    ${table1Html}
+    ${table2Html}
 
     <div class="doc-footer">
       <span>Ta'ang Land Immigration Department &mdash; Confidential</span>

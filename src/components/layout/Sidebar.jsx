@@ -3,7 +3,7 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { Users, UserPlus, LineChart, FileText, Settings, Upload, ScanLine, Menu, X, MoreHorizontal } from 'lucide-react';
 import logo from '../../assets/fonts/IDTL_logo.png';
 
-const Sidebar = () => {
+const Sidebar = ({ user }) => {
   const [open, setOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const location = useLocation();
@@ -69,12 +69,20 @@ const Sidebar = () => {
     { id: 'statistics',       path: '/statistics',       label: 'Population Statistics',  icon: LineChart      },
     { id: 'registration',     path: '/registration',     label: 'Household Registration', icon: UserPlus       },
     { id: 'central-database', path: '/central-database', label: 'Central Database',       icon: FileText       },
+    { id: 'users',            path: '/users',            label: 'User Management',        icon: Users          },
     { id: 'settings',         path: '/settings',         label: 'Settings',               icon: Settings       },
   ];
 
+  // Role-based filtering
+  const filteredMenuItems = menuItems.filter(item => {
+    if (item.id === 'users') return user?.role === 'system' || user?.role === 'master' || user?.role === 'admin';
+    if (item.id === 'upload') return user?.role === 'system' || user?.role === 'master' || user?.role === 'admin' || user?.role === 'ops';
+    return true;
+  });
+
   // Bottom nav: first 4 primary + "More" for the rest
-  const primaryNav = menuItems.slice(0, 4);
-  const moreNav = menuItems.slice(4);
+  const primaryNav = filteredMenuItems.slice(0, 4);
+  const moreNav = filteredMenuItems.slice(4);
 
   const SidebarContent = () => (
     <div style={{
@@ -139,7 +147,7 @@ const Sidebar = () => {
         <div style={{ fontSize: '10px', fontWeight: '600', color: '#737373', padding: '0 12px 8px', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
           Navigation
         </div>
-        {menuItems.map(item => (
+        {filteredMenuItems.map(item => (
           <NavLink
             key={item.id}
             to={item.path}
@@ -172,13 +180,24 @@ const Sidebar = () => {
         display: 'none', position: 'fixed', top: 0, left: 0, right: 0, zIndex: 900,
         backgroundColor: '#FAFAFA',
         borderBottom: '2px solid #1A1A1A',
-        alignItems: 'center', justifyContent: 'flex-start', gap: '10px',
+        alignItems: 'center', justifyContent: 'flex-start', gap: '12px',
         padding: '0 14px', height: '48px',
       }}>
+        {/* Menu Toggle */}
+        <button 
+          onClick={() => setOpen(true)}
+          style={{
+            background: 'none', border: 'none', color: '#1A1A1A', padding: '4px',
+            cursor: 'pointer', display: 'flex', alignItems: 'center'
+          }}
+        >
+          <Menu size={22} />
+        </button>
+
         {/* Seal */}
         <div style={{
-          width: '30px', height: '30px', flexShrink: 0,
-          border: '2px solid #1A1A1A', backgroundColor: '#FFFFFF',
+          width: '28px', height: '28px', flexShrink: 0,
+          border: '1px solid #1A1A1A', backgroundColor: '#FFFFFF',
           display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
         }}>
           <img src={logo} alt="IDTL Seal" style={{ width: '88%', height: '88%', objectFit: 'contain' }} />
@@ -186,9 +205,8 @@ const Sidebar = () => {
 
         {/* Title block */}
         <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', minWidth: 0 }}>
-          <span style={{ fontSize: '7.5px', fontWeight: '600', color: '#737373', letterSpacing: '0.1em', textTransform: 'uppercase', lineHeight: 1, whiteSpace: 'nowrap' }}>IDTL · Ta'ang Land Immigration</span>
-          <span style={{ fontSize: '13px', fontWeight: '800', color: '#1A1A1A', letterSpacing: '0.07em', textTransform: 'uppercase', lineHeight: 1.2 }}>TPS</span>
-          <span style={{ fontSize: '8px', fontWeight: '500', color: '#737373', letterSpacing: '0.01em', lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>တီုင်စေတ်မေန်းတိုအီး အဆိုးယကပီုန်တအာင်း</span>
+          <span style={{ fontSize: '12px', fontWeight: '800', color: '#1A1A1A', letterSpacing: '0.07em', textTransform: 'uppercase', lineHeight: 1.1 }}>TPS</span>
+          <span style={{ fontSize: '7px', fontWeight: '600', color: '#737373', letterSpacing: '0.05em', textTransform: 'uppercase', lineHeight: 1, whiteSpace: 'nowrap' }}>Ta'ang Population System</span>
         </div>
 
         {/* Official badge — pushed to right */}

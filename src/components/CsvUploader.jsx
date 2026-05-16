@@ -678,7 +678,7 @@ const CsvUploader = ({ onUploadSuccess }) => {
                 We found <span className="text-[#1A1A1A] font-bold">{validationErrors.length}</span> errors in your CSV file. You must fix these missing fields in Excel before we can upload this file to the database.
               </p>
 
-              <div className="border border-[#E5E7EB] overflow-hidden">
+              <div className="tps-responsive-table">
                 <table className="w-full text-left border-collapse">
                   <thead className="bg-[#FAFAFA] border-b border-[#E5E7EB] sticky top-0">
                     <tr>

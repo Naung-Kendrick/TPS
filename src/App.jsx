@@ -1,4 +1,4 @@
-import { Suspense, lazy } from 'react'
+import { Suspense, lazy, useState } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import Layout from './components/layout/Layout'
 import './App.css'
@@ -11,6 +11,8 @@ const Reports            = lazy(() => import('./components/Reports'))
 const PopulationStatistics = lazy(() => import('./components/PopulationStatistics'))
 const HouseholdForm      = lazy(() => import('./components/HouseholdForm'))
 const IDCardScanner      = lazy(() => import('./components/IDCardScanner'))
+const Login              = lazy(() => import('./components/Login'))
+const UserManagement     = lazy(() => import('./components/UserManagement'))
 
 const PageFallback = () => (
   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
@@ -45,9 +47,26 @@ const Placeholder = ({ title }) => (
 )
 
 function App() {
+  const [user, setUser] = useState(null);
+
+  const handleLogin = (data) => {
+    setUser(data);
+  };
+
+  if (!user) {
+    return (
+      <Suspense fallback={<PageFallback />}>
+        <Routes>
+          <Route path="/login" element={<Login onLogin={handleLogin} />} />
+          <Route path="*" element={<Navigate to="/login" replace />} />
+        </Routes>
+      </Suspense>
+    );
+  }
+
   return (
     <Routes>
-      <Route path="/" element={<Layout />}>
+      <Route path="/" element={<Layout user={user} />}>
         <Route index element={<Navigate to="/verification" replace />} />
         <Route path="verification" element={<Suspense fallback={<PageFallback />}><Verification /></Suspense>} />
         <Route path="upload" element={<Suspense fallback={<PageFallback />}><UploadPage /></Suspense>} />
@@ -55,10 +74,13 @@ function App() {
         <Route path="central-database" element={<Suspense fallback={<PageFallback />}><Reports /></Suspense>} />
         <Route path="statistics" element={<Suspense fallback={<PageFallback />}><PopulationStatistics /></Suspense>} />
         <Route path="registration" element={<Suspense fallback={<PageFallback />}><HouseholdForm /></Suspense>} />
+        <Route path="users" element={<Suspense fallback={<PageFallback />}><UserManagement /></Suspense>} />
         <Route path="settings" element={<Placeholder title="Settings" />} />
+        <Route path="*" element={<Navigate to="/verification" replace />} />
       </Route>
+      <Route path="/login" element={<Navigate to="/verification" replace />} />
     </Routes>
-  )
+  );
 }
 
 export default App

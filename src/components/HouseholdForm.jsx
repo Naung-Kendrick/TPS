@@ -551,7 +551,7 @@ const HouseholdForm = () => {
   }, [DRAFT_KEY]);
 
   const formFieldsJSX = useMemo(() => (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px 14px', alignItems: 'start' }}>
+    <div className="tps-grid tps-grid-4" style={{ gap: '10px 14px', alignItems: 'start' }}>
 
       <div style={{ ...groupStyle, gridColumn: 'span 1' }}>
         <label style={labelStyle}>အိမ်ထောင်စုစာရင်းအမှတ် (Household No.)</label>

@@ -354,7 +354,12 @@ const PopulationStatistics = () => {
   };
 
   return (
-    <div style={{ padding: '32px' }} className="max-w-7xl mx-auto bg-white">
+    <div className="tps-page-container max-w-7xl mx-auto bg-white" style={{ padding: '32px' }}>
+      <style>{`
+        @media (max-width: 767px) {
+          .tps-page-container { padding: 16px !important; }
+        }
+      `}</style>
       {/* Header */}
       <div style={{ marginBottom: '32px' }}>
         <h2 style={{ fontSize: '20px', margin: '0 0 8px 0', color: colors.black, fontWeight: '500', letterSpacing: '0.02em' }}>
@@ -370,7 +375,7 @@ const PopulationStatistics = () => {
         <div style={sectionTitleStyle}>
           <Search size={14} color={colors.black} /> FILTER BY LOCATION
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '24px' }}>
+        <div className="tps-grid tps-grid-4" style={{ gap: '24px' }}>
           {/* District */}
           <div>
             <label style={{ fontSize: '11px', fontWeight: '500', color: '#737373', display: 'block', letterSpacing: '0.02em' }}>
@@ -463,7 +468,7 @@ const PopulationStatistics = () => {
       </div>
 
       {/* ─── Summary Cards ─────────────────────────────────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '24px', marginBottom: '24px' }}>
+      <div className="tps-grid tps-grid-4" style={{ gap: '24px', marginBottom: '24px' }}>
         <StatCard label="Total Population" value={totalPopulation} icon={Users} color={colors.forestGreen} />
         <StatCard label="Male" value={totalMale} icon={User} color={colors.slateGray} />
         <StatCard label="Female" value={totalFemale} icon={User} color={colors.mutedClay} />
@@ -475,7 +480,7 @@ const PopulationStatistics = () => {
         <div style={sectionTitleStyle}>
           <BarChart2 size={14} color={colors.black} /> AGE DISTRIBUTION
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '24px' }}>
+        <div className="tps-grid tps-grid-4" style={{ gap: '24px' }}>
           <div style={{ padding: '24px', border: `1px solid ${colors.oliveGreen}`, textAlign: 'center' }}>
             <div style={{ fontSize: '10px', color: '#737373', fontWeight: '600', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Under 16</div>
             <div style={{ fontSize: '11px', color: '#737373', marginBottom: '12px' }}>အသက် ၁၆ နှစ်အောက်</div>
@@ -502,7 +507,7 @@ const PopulationStatistics = () => {
       </div>
 
       {/* ─── Breakdown Section ──────────────────────────────────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(400px, 1fr))', gap: '24px', marginBottom: '24px' }}>
+      <div className="tps-grid tps-grid-2" style={{ gap: '24px', marginBottom: '24px' }}>
         {/* ─── Religious Statistics ───────────────────────── */}
         <div style={sectionCardStyle}>
           <div style={sectionTitleStyle}>
@@ -676,7 +681,7 @@ const PopulationStatistics = () => {
           return (
             <div style={sectionCardStyle}>
               <div style={sectionTitleStyle}>{title}</div>
-              <div style={{ overflowX: 'auto' }}>
+              <div className="tps-responsive-table">
                 <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #E5E7EB', minWidth: '600px' }}>
                   <thead>
                     <tr>
@@ -746,7 +751,7 @@ const PopulationStatistics = () => {
           return (
             <div style={sectionCardStyle}>
               <div style={sectionTitleStyle}>{title}</div>
-              <div style={{ overflowX: 'auto' }}>
+              <div className="tps-responsive-table">
                 <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #E5E7EB', minWidth: '900px' }}>
                   <thead>
                     <tr>
@@ -861,7 +866,7 @@ const PopulationStatistics = () => {
             ) : (
               <div style={sectionCardStyle}>
                 <div style={sectionTitleStyle}>SUMMARY TABLE (1) — POPULATION, AGE, RELIGION</div>
-              <div style={{ overflowX: 'auto' }}>
+              <div className="tps-responsive-table">
                 <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #E5E7EB', minWidth: '900px' }}>
                   <thead>
                     <tr>
@@ -964,7 +969,7 @@ const PopulationStatistics = () => {
             ) : (
             <div style={sectionCardStyle}>
               <div style={sectionTitleStyle}>SUMMARY TABLE (2) — NATIONALITY</div>
-              <div style={{ overflowX: 'auto' }}>
+              <div className="tps-responsive-table">
                 <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #E5E7EB', minWidth: '600px' }}>
                   <thead>
                     <tr>

@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { exportHouseholdExcel, printHouseholdPdf } from '../lib/householdPrint';
 import { Search, RotateCcw, AlertCircle, CheckCircle2, X, Loader2, Printer, FileSpreadsheet } from 'lucide-react';
@@ -260,7 +260,7 @@ const Verification = () => {
               <label className="block text-xs font-medium text-gray-600 mb-2 uppercase letter-spacing-0.02">
                 Previous ID No. (NRC) - ယခင် မှတ်ပုံတင်အမှတ်
               </label>
-              <div className="flex items-center gap-2 max-w-xl">
+              <div className="flex flex-wrap items-center gap-2 max-w-xl">
                 <input 
                   type="text" 
                   name="previous_id_region" 
@@ -361,8 +361,7 @@ const Verification = () => {
                 <h3 className="font-semibold text-gray-900 text-sm uppercase">Verification Successful: {results.length} Match(es) Found</h3>
               </div>
               
-              <div className="border border-gray-200 overflow-hidden bg-white">
-                <div className="overflow-x-auto">
+              <div className="tps-responsive-table">
                   <table className="w-full text-left border-collapse whitespace-nowrap text-xs">
                     <thead>
                       <tr className="bg-gray-50 border-b border-gray-200">
@@ -430,7 +429,7 @@ const Verification = () => {
                             <tr>
                               <td colSpan="20" className="p-0 bg-gray-50 border-b border-gray-200">
                                 <div className="p-6">
-                                  <div className="bg-white border border-gray-200">
+                                  <div className="bg-white border border-gray-200 tps-responsive-table">
                                     <div className="px-6 py-3 border-b border-gray-200 flex items-center justify-between">
                                       <h3 className="font-semibold text-gray-900 flex items-center gap-2 text-xs uppercase letter-spacing-0.05">
                                         Family Roster - Household: {expandedHouseholdNo}
@@ -560,12 +559,11 @@ const Verification = () => {
                   </table>
                 </div>
               </div>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-};
-
-export default Verification;
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+    
+    export default Verification;

@@ -14,7 +14,7 @@ const PAGE_ORDER = [
   '/settings',
 ];
 
-const Layout = () => {
+const Layout = ({ user }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const txRef = useRef(null);
@@ -86,7 +86,7 @@ const Layout = () => {
 
   return (
     <div style={{ display: 'flex', width: '100%', minHeight: '100vh', backgroundColor: '#FFFFFF' }}>
-      <Sidebar />
+      <Sidebar user={user} />
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden', position: 'relative' }}>
         {/* Watermark — corner stamp seal */}
         <div style={{

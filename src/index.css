@@ -86,7 +86,42 @@ body {
 #root {
   min-height: 100vh;
   width: 100%;
-  display: flex;
+}
+
+/* ── Global Layout Utilities ─────────────────────────── */
+.tps-responsive-table {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin-bottom: 1rem;
+  border: 1px solid var(--n-border);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  white-space: nowrap; /* Prevent text wrapping in tables for cleaner government look */
+}
+
+.tps-grid {
+  display: grid;
+  gap: 16px;
+}
+
+@media (min-width: 1024px) {
+  .tps-grid-4 { grid-template-columns: repeat(4, 1fr); }
+  .tps-grid-3 { grid-template-columns: repeat(3, 1fr); }
+  .tps-grid-2 { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .tps-grid-4 { grid-template-columns: repeat(2, 1fr); }
+  .tps-grid-3 { grid-template-columns: repeat(2, 1fr); }
+  .tps-grid-2 { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 767px) {
+  .tps-grid-4, .tps-grid-3, .tps-grid-2 { grid-template-columns: repeat(1, 1fr); }
 }
 
 /* ── Buttons ──────────────────────────────────────────── */

@@ -121,7 +121,9 @@ table {
 }
 
 @media (max-width: 767px) {
-  .tps-grid-4, .tps-grid-3, .tps-grid-2 { grid-template-columns: repeat(1, 1fr); }
+  .tps-grid-4 { grid-template-columns: repeat(2, 1fr); }
+  .tps-grid-3 { grid-template-columns: repeat(1, 1fr); }
+  .tps-grid-2 { grid-template-columns: repeat(2, 1fr); }
 }
 
 /* ── Buttons ──────────────────────────────────────────── */

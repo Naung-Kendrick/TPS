@@ -180,23 +180,14 @@ const Sidebar = ({ user }) => {
         display: 'none', position: 'fixed', top: 0, left: 0, right: 0, zIndex: 900,
         backgroundColor: '#FAFAFA',
         borderBottom: '2px solid #1A1A1A',
-        alignItems: 'center', justifyContent: 'flex-start', gap: '12px',
-        padding: '0 14px', height: '48px',
+        alignItems: 'center', justifyContent: 'flex-start', gap: '14px',
+        padding: '0 16px', height: '56px',
       }}>
-        {/* Menu Toggle */}
-        <button 
-          onClick={() => setOpen(true)}
-          style={{
-            background: 'none', border: 'none', color: '#1A1A1A', padding: '4px',
-            cursor: 'pointer', display: 'flex', alignItems: 'center'
-          }}
-        >
-          <Menu size={22} />
-        </button>
+        {/* Menu Toggle Removed for better mobile header space - Navigation is handled by bottom bar and swipe gestures */}
 
         {/* Seal */}
         <div style={{
-          width: '28px', height: '28px', flexShrink: 0,
+          width: '36px', height: '36px', flexShrink: 0,
           border: '1px solid #1A1A1A', backgroundColor: '#FFFFFF',
           display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
         }}>
@@ -205,16 +196,16 @@ const Sidebar = ({ user }) => {
 
         {/* Title block */}
         <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', minWidth: 0 }}>
-          <span style={{ fontSize: '12px', fontWeight: '800', color: '#1A1A1A', letterSpacing: '0.07em', textTransform: 'uppercase', lineHeight: 1.1 }}>TPS</span>
-          <span style={{ fontSize: '7px', fontWeight: '600', color: '#737373', letterSpacing: '0.05em', textTransform: 'uppercase', lineHeight: 1, whiteSpace: 'nowrap' }}>Ta'ang Population System</span>
+          <span style={{ fontSize: '16px', fontWeight: '800', color: '#1A1A1A', letterSpacing: '0.07em', textTransform: 'uppercase', lineHeight: 1.1 }}>TPS</span>
+          <span style={{ fontSize: '9px', fontWeight: '600', color: '#737373', letterSpacing: '0.05em', textTransform: 'uppercase', lineHeight: 1, whiteSpace: 'nowrap' }}>Ta'ang Population System</span>
         </div>
 
         {/* Official badge — pushed to right */}
         <span style={{
           marginLeft: 'auto', flexShrink: 0,
-          fontSize: '7px', fontWeight: '700', color: '#FFFFFF',
+          fontSize: '9px', fontWeight: '700', color: '#FFFFFF',
           backgroundColor: '#1A1A1A',
-          padding: '3px 7px', letterSpacing: '0.08em', textTransform: 'uppercase',
+          padding: '4px 8px', letterSpacing: '0.08em', textTransform: 'uppercase',
           whiteSpace: 'nowrap',
         }}>OFFICIAL</span>
       </div>

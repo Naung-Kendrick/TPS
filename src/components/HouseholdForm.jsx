@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useOutletContext } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { enqueue } from '../lib/retryQueue';
 
@@ -146,6 +147,7 @@ const MyanmarCalendar = ({ value, onChange }) => {
 };
 
 const HouseholdForm = () => {
+  const { user } = useOutletContext();
   const [formData, setFormData] = useState({
     household_no: '',
     name: '',
@@ -407,7 +409,10 @@ const HouseholdForm = () => {
     // Add the detected types to the payload (array)
     const payload = {
       ...formData,
-      ward_village_group_type: getWardVillageGroupTypes(formData.ward_village_group)
+      ward_village_group_type: getWardVillageGroupTypes(formData.ward_village_group),
+      updated_at: new Date().toISOString(),
+      updated_by: user?.username || 'unknown',
+      status: 'active' // Explicitly set status for new records
     };
 
     try {

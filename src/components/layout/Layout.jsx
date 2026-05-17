@@ -107,7 +107,7 @@ const Layout = ({ user }) => {
         }} />
         <main style={{ flex: 1, overflowY: 'auto', backgroundColor: 'transparent', position: 'relative', zIndex: 1 }} className="main-content">
           <div key={location.pathname} className="tps-page-enter" style={{ minHeight: '100%' }}>
-            <Outlet />
+            <Outlet context={{ user }} />
           </div>
         </main>
       </div>

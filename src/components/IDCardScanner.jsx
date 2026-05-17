@@ -5,8 +5,9 @@ import { pushNotification, NOTIF_TYPES } from '../lib/notifications';
 import {
   ScanLine, Search, X, CheckCircle2, AlertCircle, Loader2,
   User, Home, MapPin, CreditCard, Hash, Camera, Keyboard,
-  ZoomIn, ZoomOut, Users
+  ZoomIn, ZoomOut, Users, Info
 } from 'lucide-react';
+import StatusBadge from './StatusBadge';
 
 const IDCardScanner = () => {
   const [mode, setMode] = useState('manual');
@@ -75,8 +76,9 @@ const IDCardScanner = () => {
     // Strategy 1: exact match
     const res1 = await supabase
       .from('households')
-      .select('name, household_no, taang_land_id_no, house_no, ward_village_group, township, district, address, gender, date_of_birth, nationality, occupation, household_relationship')
+      .select('name, household_no, taang_land_id_no, house_no, ward_village_group, township, district, address, gender, date_of_birth, nationality, occupation, household_relationship, status')
       .eq('taang_land_id_no', numericId)
+      .neq('status', 'inactive')
       .limit(1)
       .maybeSingle();
 
@@ -86,8 +88,9 @@ const IDCardScanner = () => {
       // Strategy 2: partial ilike — covers "No - 01003..." stored format
       const res2 = await supabase
         .from('households')
-        .select('name, household_no, taang_land_id_no, house_no, ward_village_group, township, district, address, gender, date_of_birth, nationality, occupation, household_relationship')
+        .select('name, household_no, taang_land_id_no, house_no, ward_village_group, township, district, address, gender, date_of_birth, nationality, occupation, household_relationship, status')
         .ilike('taang_land_id_no', `%${numericId}%`)
+        .neq('status', 'inactive')
         .limit(1)
         .maybeSingle();
 
@@ -595,6 +598,15 @@ const IDCardScanner = () => {
           {/* Identity Section */}
           <div className="p-4 border-b border-[#E5E7EB]">
             <p className="text-xs font-semibold text-[#737373] uppercase tracking-widest mb-3">Identity</p>
+            <div className="flex items-start gap-3 py-3 border-b border-[#E5E7EB]">
+              <div className="p-1.5 bg-[#F3F4F6] mt-0.5" style={{ borderRadius: '0px' }}>
+                <Info size={14} className="text-[#737373]" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-[#737373] uppercase tracking-wide font-semibold mb-1">Current Status</p>
+                <StatusBadge status={result.status} />
+              </div>
+            </div>
             <InfoRow icon={User} label="Full Name" value={result.name} />
             <InfoRow icon={CreditCard} label="Ta'ang Land ID No." value={result.taang_land_id_no} />
             <InfoRow icon={Hash} label="Household No." value={result.household_no} />
@@ -678,7 +690,7 @@ const IDCardScanner = () => {
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px', tableLayout: 'auto' }}>
                   <thead>
                     <tr style={{ backgroundColor: '#FAFAFA', borderBottom: '1px solid #E5E7EB' }}>
-                      {['No.', 'Name', 'Date of Birth', 'Gender', "Father's Name", "Mother's Name", 'Relationship', 'Occupation', 'Previous ID No.', "Ta'ang Land ID No.", 'Nationality', 'Resident Status', 'Religious', 'Submission Date'].map((h, i) => (
+                      {['No.', 'Name', 'Status', 'Date of Birth', 'Gender', "Father's Name", "Mother's Name", 'Relationship', 'Occupation', 'Previous ID No.', "Ta'ang Land ID No.", 'Nationality', 'Resident Status', 'Religious', 'Submission Date'].map((h, i) => (
                         <th key={i} style={{ padding: '8px 8px', fontSize: '9.5px', fontWeight: 600, color: '#737373', textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap', textAlign: 'left' }}>{h}</th>
                       ))}
                     </tr>
@@ -695,6 +707,9 @@ const IDCardScanner = () => {
                             {m.name}
                             {m.household_relationship === 'ဦးစီး' && <span style={{ marginLeft: '4px', border: '1px solid #1A1A1A', padding: '0 3px', fontSize: '8px', fontWeight: 700 }}>HEAD</span>}
                             {isMe && <span style={{ marginLeft: '4px', backgroundColor: '#1A1A1A', color: '#fff', padding: '0 4px', fontSize: '8px', fontWeight: 700, letterSpacing: '0.05em' }}>YOU</span>}
+                          </td>
+                          <td style={{ padding: '7px 8px', whiteSpace: 'nowrap' }}>
+                            <StatusBadge status={m.status} />
                           </td>
                           {td(m.date_of_birth)}
                           {td(m.gender)}

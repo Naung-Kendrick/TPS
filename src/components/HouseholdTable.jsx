@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
+import { useOutletContext } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import EditHouseholdModal from './EditHouseholdModal';
 import EmptyState from './EmptyState';
 
 const HouseholdTable = ({ refreshTrigger }) => {
+  const { user } = useOutletContext();
   const [households, setHouseholds] = useState([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
@@ -44,6 +46,7 @@ const HouseholdTable = ({ refreshTrigger }) => {
     let query = supabase
       .from('households')
       .select('*', { count: 'exact' })
+      .neq('status', 'inactive')
       .order('created_at', { ascending: false });
 
     const searchTerm = `%${search}%`;
@@ -69,7 +72,11 @@ const HouseholdTable = ({ refreshTrigger }) => {
     if (window.confirm('Are you sure you want to delete this record?')) {
       const { error } = await supabase
         .from('households')
-        .delete()
+        .update({
+          status: 'inactive',
+          updated_at: new Date().toISOString(),
+          updated_by: user?.username || 'unknown'
+        })
         .eq('id', id);
 
       if (error) {

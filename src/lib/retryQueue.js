@@ -38,6 +38,12 @@ export async function drainQueue(onProgress) {
         ({ error } = await supabase.from(op.table).insert([op.payload]));
       } else if (op.type === 'update') {
         ({ error } = await supabase.from(op.table).update(op.payload).eq('id', op.recordId));
+      } else if (op.type === 'soft_delete') {
+        ({ error } = await supabase.from(op.table).update({
+          status: 'inactive',
+          updated_at: new Date().toISOString(),
+          updated_by: op.updated_by || 'system'
+        }).eq('id', op.recordId));
       } else if (op.type === 'delete') {
         ({ error } = await supabase.from(op.table).delete().eq('id', op.recordId));
       }

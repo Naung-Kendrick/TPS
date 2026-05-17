@@ -33,7 +33,9 @@ const Verification = () => {
     household_no: '',
     name: '',
     fathers_name: '',
-    ward_village_group: '',
+    ward: '',
+    village: '',
+    group: '',
     township: '',
     district: '',
     previous_id_region: '',
@@ -55,12 +57,38 @@ const Verification = () => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
+  // Highlight matching search terms in text
+  const highlight = (text, ...terms) => {
+    if (!text) return '-';
+    const str = String(text);
+    const active = terms.filter(t => t && t.trim() !== '');
+    if (active.length === 0) return str;
+    const escaped = active.map(t => t.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+    const regex = new RegExp(`(${escaped.join('|')})`, 'gi');
+    const parts = str.split(regex);
+    if (parts.length === 1) return str;
+    return parts.map((part, i) =>
+      regex.test(part)
+        ? <mark key={i} style={{ backgroundColor: '#C8E6C9', color: '#1B5E20', fontWeight: '700', padding: '0 2px', borderRadius: '2px' }}>{part}</mark>
+        : part
+    );
+  };
+
+  // Normalize household_no for flexible search: strip spaces around hyphens
+  // Matches both "ကောင်းတပ်-၁" and "ကောင်းတပ် - ၁" stored in DB
+  const normalizeHouseholdSearch = (value) => {
+    if (!value) return value;
+    return value.replace(/\s*-\s*/g, '-').trim();
+  };
+
   const handleClear = () => {
     setFormData({
       household_no: '',
       name: '',
       fathers_name: '',
-      ward_village_group: '',
+      ward: '',
+      village: '',
+      group: '',
       township: '',
       district: '',
       previous_id_region: '',
@@ -93,10 +121,15 @@ const Verification = () => {
     try {
       let query = supabase.from('households').select('*');
 
-      if (formData.household_no.trim()) query = query.ilike('household_no', `%${formData.household_no.trim()}%`);
+      if (formData.household_no.trim()) {
+        const hnSearch = normalizeHouseholdSearch(formData.household_no);
+        query = query.ilike('household_no', `%${hnSearch}%`);
+      }
       if (formData.name.trim()) query = query.ilike('name', `%${formData.name.trim()}%`);
       if (formData.fathers_name.trim()) query = query.ilike('fathers_name', `%${formData.fathers_name.trim()}%`);
-      if (formData.ward_village_group.trim()) query = query.ilike('ward_village_group', `%${formData.ward_village_group.trim()}%`);
+      if (formData.ward.trim()) query = query.ilike('ward_village_group', `%${formData.ward.trim()}%`);
+      if (formData.village.trim()) query = query.ilike('ward_village_group', `%${formData.village.trim()}%`);
+      if (formData.group.trim()) query = query.ilike('ward_village_group', `%${formData.group.trim()}%`);
       if (formData.township.trim()) query = query.ilike('township', `%${formData.township.trim()}%`);
       if (formData.district.trim()) query = query.ilike('district', `%${formData.district.trim()}%`);
       
@@ -221,36 +254,58 @@ const Verification = () => {
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1 uppercase letter-spacing-0.02">Ward / Village / Group</label>
+                <label className="block text-xs font-medium text-gray-600 mb-1 uppercase letter-spacing-0.02">Ward <span className="normal-case text-gray-400">(ရပ်ကွက်)</span></label>
                 <input 
                   type="text" 
-                  name="ward_village_group" 
-                  value={formData.ward_village_group} 
+                  name="ward" 
+                  value={formData.ward} 
                   onChange={handleChange}
                   className="w-full px-3 py-2 bg-white border border-gray-200 rounded-none focus:outline-none focus:border-gray-900 transition-colors text-sm"
-                  placeholder="Enter village"
+                  placeholder="ရပ်ကွက် ရှာပါ"
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1 uppercase letter-spacing-0.02">Township</label>
+                <label className="block text-xs font-medium text-gray-600 mb-1 uppercase letter-spacing-0.02">Village <span className="normal-case text-gray-400">(ရွာ)</span></label>
+                <input 
+                  type="text" 
+                  name="village" 
+                  value={formData.village} 
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 bg-white border border-gray-200 rounded-none focus:outline-none focus:border-gray-900 transition-colors text-sm"
+                  placeholder="ရွာ ရှာပါ"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1 uppercase letter-spacing-0.02">Group <span className="normal-case text-gray-400">(အုပ်စု)</span></label>
+                <input 
+                  type="text" 
+                  name="group" 
+                  value={formData.group} 
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 bg-white border border-gray-200 rounded-none focus:outline-none focus:border-gray-900 transition-colors text-sm"
+                  placeholder="အုပ်စု ရှာပါ"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1 uppercase letter-spacing-0.02">Township <span className="normal-case text-gray-400">(မြို့နယ်)</span></label>
                 <input 
                   type="text" 
                   name="township" 
                   value={formData.township} 
                   onChange={handleChange}
                   className="w-full px-3 py-2 bg-white border border-gray-200 rounded-none focus:outline-none focus:border-gray-900 transition-colors text-sm"
-                  placeholder="Enter township"
+                  placeholder="မြို့နယ် ရှာပါ"
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1 uppercase letter-spacing-0.02">District</label>
+                <label className="block text-xs font-medium text-gray-600 mb-1 uppercase letter-spacing-0.02">District <span className="normal-case text-gray-400">(ခရိုင်)</span></label>
                 <input 
                   type="text" 
                   name="district" 
                   value={formData.district} 
                   onChange={handleChange}
                   className="w-full px-3 py-2 bg-white border border-gray-200 rounded-none focus:outline-none focus:border-gray-900 transition-colors text-sm"
-                  placeholder="Enter district"
+                  placeholder="ခရိုင် ရှာပါ"
                 />
               </div>
             </div>
@@ -260,43 +315,43 @@ const Verification = () => {
               <label className="block text-xs font-medium text-gray-600 mb-2 uppercase letter-spacing-0.02">
                 Previous ID No. (NRC) - ယခင် မှတ်ပုံတင်အမှတ်
               </label>
-              <div className="flex flex-wrap items-center gap-2 max-w-xl">
+              <div className="flex items-center gap-1 sm:gap-2 w-full max-w-xl">
                 <input 
                   type="text" 
                   name="previous_id_region" 
                   value={formData.previous_id_region} 
                   onChange={handleChange}
-                  className="w-20 px-3 py-2 bg-white border border-gray-200 rounded-none focus:outline-none focus:border-gray-900 transition-colors text-sm text-center font-mono"
+                  className="flex-[2] min-w-0 px-1 sm:px-3 py-2 bg-white border border-gray-200 rounded-none focus:outline-none focus:border-gray-900 transition-colors text-xs sm:text-sm text-center font-mono"
                   placeholder="၁၃"
                   maxLength="3"
                 />
-                <span className="text-gray-500 font-medium">/</span>
+                <span className="flex-shrink-0 text-gray-500 font-medium text-xs sm:text-sm">/</span>
                 <input 
                   type="text" 
                   name="previous_id_township" 
                   value={formData.previous_id_township} 
                   onChange={handleChange}
-                  className="w-24 px-3 py-2 bg-white border border-gray-200 rounded-none focus:outline-none focus:border-gray-900 transition-colors text-sm text-center font-mono"
+                  className="flex-[3] min-w-0 px-1 sm:px-3 py-2 bg-white border border-gray-200 rounded-none focus:outline-none focus:border-gray-900 transition-colors text-xs sm:text-sm text-center font-mono"
                   placeholder="နခန"
                   maxLength="5"
                 />
-                <span className="text-gray-500 font-medium">(</span>
+                <span className="flex-shrink-0 text-gray-500 font-medium text-xs sm:text-sm">(</span>
                 <input 
                   type="text" 
                   name="previous_id_type" 
                   value={formData.previous_id_type} 
                   onChange={handleChange}
-                  className="w-20 px-3 py-2 bg-white border border-gray-200 rounded-none focus:outline-none focus:border-gray-900 transition-colors text-sm text-center font-mono"
+                  className="flex-[2] min-w-0 px-1 sm:px-3 py-2 bg-white border border-gray-200 rounded-none focus:outline-none focus:border-gray-900 transition-colors text-xs sm:text-sm text-center font-mono"
                   placeholder="နိုင်"
                   maxLength="4"
                 />
-                <span className="text-gray-500 font-medium">)</span>
+                <span className="flex-shrink-0 text-gray-500 font-medium text-xs sm:text-sm">)</span>
                 <input 
                   type="text" 
                   name="previous_id_serial" 
                   value={formData.previous_id_serial} 
                   onChange={handleChange}
-                  className="w-28 px-3 py-2 bg-white border border-gray-200 rounded-none focus:outline-none focus:border-gray-900 transition-colors text-sm text-center font-mono"
+                  className="flex-[4] min-w-0 px-1 sm:px-3 py-2 bg-white border border-gray-200 rounded-none focus:outline-none focus:border-gray-900 transition-colors text-xs sm:text-sm text-center font-mono"
                   placeholder="၀၉၆၉၁၅"
                   maxLength="8"
                 />
@@ -392,23 +447,23 @@ const Verification = () => {
                         <React.Fragment key={person.id}>
                           <tr className={`border-b border-gray-100 hover:bg-gray-50 transition-colors ${expandedHouseholdNo === person.household_no ? 'bg-gray-50' : ''}`}>
                             <td className="px-4 py-3 text-gray-500 font-mono">{index + 1}</td>
-                            <td className="px-4 py-3 font-semibold text-gray-900 font-mono">{person.household_no}</td>
-                            <td className="px-4 py-3 font-medium text-gray-900">{person.name}</td>
+                            <td className="px-4 py-3 font-semibold text-gray-900 font-mono">{highlight(person.household_no, formData.household_no)}</td>
+                            <td className="px-4 py-3 font-medium text-gray-900">{highlight(person.name, formData.name)}</td>
                             <td className="px-4 py-3 text-gray-700 font-mono">{person.date_of_birth || '-'}</td>
                             <td className="px-4 py-3 text-gray-700">{person.gender || '-'}</td>
-                            <td className="px-4 py-3 text-gray-700">{person.fathers_name || '-'}</td>
+                            <td className="px-4 py-3 text-gray-700">{highlight(person.fathers_name, formData.fathers_name)}</td>
                             <td className="px-4 py-3 text-gray-700">{person.mothers_name || '-'}</td>
                             <td className="px-4 py-3 text-gray-700">{person.household_relationship || '-'}</td>
                             <td className="px-4 py-3 text-gray-700">{person.occupation || '-'}</td>
-                            <td className="px-4 py-3 text-gray-700 font-mono">{person.previous_id_no || '-'}</td>
+                            <td className="px-4 py-3 text-gray-700 font-mono">{highlight(person.previous_id_no, formData.previous_id_region, formData.previous_id_township, formData.previous_id_type, formData.previous_id_serial)}</td>
                             <td className="px-4 py-3 text-gray-700 font-mono">{person.taang_land_id_no || '-'}</td>
                             <td className="px-4 py-3 text-gray-700">{person.nationality || '-'}</td>
                             <td className="px-4 py-3 text-gray-700">{person.resident_status || '-'}</td>
                             <td className="px-4 py-3 text-gray-700">{person.religious || '-'}</td>
                             <td className="px-4 py-3 text-gray-700 font-mono">{person.house_no || '-'}</td>
-                            <td className="px-4 py-3 text-gray-700">{person.ward_village_group || '-'}</td>
-                            <td className="px-4 py-3 text-gray-700">{person.township || '-'}</td>
-                            <td className="px-4 py-3 text-gray-700">{person.district || '-'}</td>
+                            <td className="px-4 py-3 text-gray-700">{highlight(person.ward_village_group, formData.ward, formData.village, formData.group)}</td>
+                            <td className="px-4 py-3 text-gray-700">{highlight(person.township, formData.township)}</td>
+                            <td className="px-4 py-3 text-gray-700">{highlight(person.district, formData.district)}</td>
                             <td className="px-4 py-3 text-gray-700 font-mono">{person.submission_date || person.created_at?.split('T')[0] || '-'}</td>
                             <td className="px-4 py-3 text-center sticky right-0 bg-white border-l border-gray-200">
                               <button
@@ -443,8 +498,8 @@ const Verification = () => {
                                     </div>
 
                                     {familyLoading ? (
-                                      <div className="flex flex-col items-center justify-center py-12 text-gray-500 gap-3">
-                                        <Loader2 className="animate-spin text-gray-900" size={24} />
+                                      <div className="flex flex-col items-center justify-center py-12 gap-3" style={{ color: '#4A6572' }}>
+                                        <Loader2 className="animate-spin" size={24} style={{ color: '#4A6572' }} />
                                         <span className="font-medium text-xs">Loading family members...</span>
                                       </div>
                                     ) : (

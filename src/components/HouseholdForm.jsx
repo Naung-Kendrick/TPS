@@ -273,6 +273,28 @@ const HouseholdForm = () => {
     }
   };
 
+  // Auto-correct Township: ensure space before "မြို့နယ်" suffix
+  const autoCorrectTownship = (value) => {
+    if (!value || value.trim() === '') return value;
+    const str = value.trim();
+    const match = str.match(/^(.+?)မြို့နယ်$/);
+    if (match && !str.includes(' မြို့နယ်')) {
+      return `${match[1].trim()} မြို့နယ်`;
+    }
+    return str;
+  };
+
+  // Auto-correct District: ensure space before "ခရိုင်" suffix
+  const autoCorrectDistrict = (value) => {
+    if (!value || value.trim() === '') return value;
+    const str = value.trim();
+    const match = str.match(/^(.+?)ခရိုင်$/);
+    if (match && !str.includes(' ခရိုင်')) {
+      return `${match[1].trim()} ခရိုင်`;
+    }
+    return str;
+  };
+
   // Auto-correct Ward/Village/Group by adding space before suffix if missing
   const autoCorrectWardVillageGroup = (value) => {
     if (!value || value.trim() === '') return value;
@@ -342,19 +364,31 @@ const HouseholdForm = () => {
     return ''; // Valid
   };
 
+  // Normalize household_no for flexible DB lookup: strip spaces around hyphens
+  const normalizeHouseholdNo = (value) => {
+    if (!value) return value;
+    return value.replace(/\s*-\s*/g, '-').trim();
+  };
+
   const handleChange = useCallback((e) => {
     const { name, value } = e.target;
-    
+
     // Auto-correct and validate ward_village_group on change
     if (name === 'ward_village_group') {
       const corrected = autoCorrectWardVillageGroup(value);
       const error = validateWardVillageGroup(corrected);
       setWardVillageError(error);
-      
-      setFormData(prev => ({
-        ...prev,
-        [name]: corrected
-      }));
+      setFormData(prev => ({ ...prev, [name]: corrected }));
+      return;
+    }
+
+    // Auto-correct township and district suffixes
+    if (name === 'township') {
+      setFormData(prev => ({ ...prev, [name]: autoCorrectTownship(value) }));
+      return;
+    }
+    if (name === 'district') {
+      setFormData(prev => ({ ...prev, [name]: autoCorrectDistrict(value) }));
       return;
     }
     
@@ -368,10 +402,11 @@ const HouseholdForm = () => {
     if (!formData.household_no) return;
     
     try {
+      const normalizedHn = normalizeHouseholdNo(formData.household_no);
       const { data, error: fetchError } = await supabase
         .from('households')
         .select('house_no, ward_village_group, township, district, resident_status, religious, nationality')
-        .eq('household_no', formData.household_no)
+        .ilike('household_no', `%${normalizedHn}%`)
         .limit(1)
         .single();
         
@@ -786,7 +821,8 @@ const HouseholdForm = () => {
               </div>
             )}
             {success && (
-              <div style={{ margin: '12px 24px 0', padding: '10px 12px', border: '1px solid #E5E7EB', color: '#1A1A1A', fontSize: '12px', flexShrink: 0 }}>
+              <div style={{ margin: '12px 24px 0', padding: '10px 12px', border: '1px solid #A5D6A7', backgroundColor: '#F0F7F0', color: '#1B5E20', fontSize: '12px', flexShrink: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ color: '#2E7D32', fontSize: '16px' }}>✓</span>
                 အချက်အလက်များ အောင်မြင်စွာ သိမ်းဆည်းပြီးပါပြီ။
               </div>
             )}

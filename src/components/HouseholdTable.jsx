@@ -46,7 +46,9 @@ const HouseholdTable = ({ refreshTrigger }) => {
       .select('*', { count: 'exact' })
       .order('created_at', { ascending: false });
 
-    const searchTerm = `%${search}%`;
+    // Normalize search: strip spaces around hyphens so "ကောင်းတပ် - ၁" matches "ကောင်းတပ်-၁"
+    const normalizedSearch = search.replace(/\s*-\s*/g, '-');
+    const searchTerm = `%${normalizedSearch}%`;
     query = query.or(`name.ilike.${searchTerm},address.ilike.${searchTerm},household_no.ilike.${searchTerm},taang_land_id_no.ilike.${searchTerm},previous_id_no.ilike.${searchTerm}`);
 
     const from = page * pageSize;

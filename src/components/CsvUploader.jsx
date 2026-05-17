@@ -111,6 +111,33 @@ const autoCorrectWardVillageGroup = (value) => {
   return str;
 };
 
+// Auto-correct Township: ensure space before "မြို့နယ်" suffix
+const autoCorrectTownship = (value) => {
+  if (!value || value.trim() === '') return value;
+  const str = value.trim();
+  const match = str.match(/^(.+?)မြို့နယ်$/);
+  if (match && !str.includes(' မြို့နယ်')) return `${match[1].trim()} မြို့နယ်`;
+  return str;
+};
+
+// Auto-correct District: ensure space before "ခရိုင်" suffix
+const autoCorrectDistrict = (value) => {
+  if (!value || value.trim() === '') return value;
+  const str = value.trim();
+  const match = str.match(/^(.+?)ခရိုင်$/);
+  if (match && !str.includes(' ခရိုင်')) return `${match[1].trim()} ခရိုင်`;
+  return str;
+};
+
+// Auto-format Household No: "ကောင်းတပ်-၁" → "ကောင်းတပ် - ၁"
+const formatHouseholdNo = (value) => {
+  if (!value) return value;
+  let v = String(value).replace(/\s*-\s*/g, '-');
+  v = v.replace(/-/g, ' - ');
+  v = v.replace(/  +/g, ' ').trim();
+  return v;
+};
+
 // Detect Ward/Village/Group type from value
 // Returns: 'ward' | 'village' | 'group' | 'unknown'
 const detectWardVillageGroupType = (value) => {
@@ -314,12 +341,23 @@ const processAndUpload = async (formattedData, setValidationErrors, setShowModal
     const { data: existing } = await supabase
       .from('households')
       .select('id')
-      .eq('name', rowData.name || '')
       .eq('household_no', rowData.household_no || '')
+      .eq('name', rowData.name || '')
       .eq('date_of_birth', rowData.date_of_birth || '')
       .eq('gender', rowData.gender || '')
       .eq('fathers_name', rowData.fathers_name || '')
+      .eq('mothers_name', rowData.mothers_name || '')
+      .eq('household_relationship', rowData.household_relationship || '')
+      .eq('occupation', rowData.occupation || '')
       .eq('previous_id_no', rowData.previous_id_no || '')
+      .eq('taang_land_id_no', rowData.taang_land_id_no || '')
+      .eq('nationality', rowData.nationality || '')
+      .eq('resident_status', rowData.resident_status || '')
+      .eq('religious', rowData.religious || '')
+      .eq('house_no', rowData.house_no || '')
+      .eq('ward_village_group', rowData.ward_village_group || '')
+      .eq('township', rowData.township || '')
+      .eq('district', rowData.district || '')
       .limit(1);
 
     if (existing && existing.length > 0) { duplicateCount++; continue; }
@@ -330,7 +368,7 @@ const processAndUpload = async (formattedData, setValidationErrors, setShowModal
   }
 
   const parts = [];
-  if (successCount > 0) parts.push(`Inserted ${successCount} new records`);
+  if (successCount > 0) parts.push(`✓ Inserted ${successCount} new records`);
   if (duplicateCount > 0) parts.push(`Skipped ${duplicateCount} duplicates`);
   if (dbErrors.length > 0) parts.push(`${dbErrors.length} DB errors`);
   const msg = parts.join(' | ') || 'No changes made.';
@@ -374,7 +412,7 @@ const CsvUploader = ({ onUploadSuccess }) => {
           const members = Array.isArray(hh.members) ? hh.members : [];
           for (const m of members) {
             formattedData.push({
-              household_no: ensureUnicode(String(hhId).trim()),
+              household_no: formatHouseholdNo(ensureUnicode(String(hhId).trim())),
               name: ensureUnicode(m.name || ''),
               date_of_birth: m.dob || m.date_of_birth || '',
               gender: ensureUnicode(m.gender || ''),
@@ -389,8 +427,8 @@ const CsvUploader = ({ onUploadSuccess }) => {
               religious: ensureUnicode(m.religious || ''),
               house_no: ensureUnicode(loc.house_no || m.house_no || ''),
               ward_village_group: ensureUnicode(loc.ward_village || loc.ward_village_group || m.ward_village_group || ''),
-              township: ensureUnicode(loc.township || m.township || ''),
-              district: ensureUnicode(loc.district || m.district || ''),
+              township: autoCorrectTownship(ensureUnicode(loc.township || m.township || '')),
+              district: autoCorrectDistrict(ensureUnicode(loc.district || m.district || '')),
               submission_date: m.submission_date || '',
               address: ensureUnicode(`${loc.house_no || ''}, ${loc.ward_village || ''}, ${loc.township || ''}, ${loc.district || ''}`),
             });
@@ -468,14 +506,14 @@ const CsvUploader = ({ onUploadSuccess }) => {
             const rawTownship = row['Township'];
             const rawDistrict = row['District'];
 
-            // Household Number forward-fill
-            if (rawHn && rawHn.trim() !== '') currentHouseholdNo = rawHn.trim();
+            // Household Number forward-fill (auto-format spacing around hyphens)
+            if (rawHn && rawHn.trim() !== '') currentHouseholdNo = formatHouseholdNo(ensureUnicode(rawHn.trim()));
             else if (index === 0 && (!rawHn || rawHn.trim() === '')) currentHouseholdNo = 'UNKNOWN-1';
 
-            // Region forward-fills
+            // Region forward-fills (auto-correct suffixes + Unicode)
             if (rawWard && rawWard.trim() !== '') currentWard = rawWard.trim();
-            if (rawTownship && rawTownship.trim() !== '') currentTownship = rawTownship.trim();
-            if (rawDistrict && rawDistrict.trim() !== '') currentDistrict = rawDistrict.trim();
+            if (rawTownship && rawTownship.trim() !== '') currentTownship = autoCorrectTownship(ensureUnicode(rawTownship.trim()));
+            if (rawDistrict && rawDistrict.trim() !== '') currentDistrict = autoCorrectDistrict(ensureUnicode(rawDistrict.trim()));
 
             const cell = (key) => (row[key] || '').trim();
             
@@ -487,7 +525,7 @@ const CsvUploader = ({ onUploadSuccess }) => {
             const wardTypes = getWardVillageGroupTypes(wardValue);
             
             const parsedRow = {
-              household_no: ensureUnicode(currentHouseholdNo),
+              household_no: currentHouseholdNo,
               name: ensureUnicode(cell('Name')),
               date_of_birth: cell('Date of birth'),
               gender: ensureUnicode(cell('Gender')),
@@ -503,8 +541,8 @@ const CsvUploader = ({ onUploadSuccess }) => {
               house_no: ensureUnicode(cell('House NO.')),
               ward_village_group: wardValue,
               ward_village_group_type: wardTypes, // Array of types
-              township: ensureUnicode(currentTownship),
-              district: ensureUnicode(currentDistrict),
+              township: currentTownship,
+              district: currentDistrict,
               submission_date: cell('Submission Date'),
               address: ensureUnicode(`${cell('House NO.')}, ${wardValue}, ${currentTownship}, ${currentDistrict}`)
             };
@@ -642,18 +680,19 @@ const CsvUploader = ({ onUploadSuccess }) => {
         </label>
 
         {loading && (
-          <div className="flex items-center gap-3 text-[#1A1A1A] font-medium p-4 bg-[#F3F4F6]" style={{ borderRadius: '0px' }}>
-            <Loader2 className="animate-spin" size={20} />
+          <div className="flex items-center gap-3 font-medium p-4" style={{ borderRadius: '0px', backgroundColor: '#EEF2F5', border: '1px solid #B0BEC5', color: '#4A6572' }}>
+            <Loader2 className="animate-spin" size={20} style={{ color: '#4A6572' }} />
             Processing and validating your file...
           </div>
         )}
 
         {successMsg && !loading && (
-          <div className="tps-success-enter flex items-center gap-3 text-[#1A1A1A] font-medium p-4 bg-[#F3F4F6] border border-[#E5E7EB]" style={{ borderRadius: '0px' }}>
-            <CheckCircle2 size={20} />
+          <div className="tps-success-enter flex items-center gap-3 font-medium p-4" style={{ borderRadius: '0px', backgroundColor: '#F0F7F0', border: '1px solid #A5D6A7', color: '#1B5E20' }}>
+            <CheckCircle2 size={20} style={{ color: '#2E7D32', flexShrink: 0 }} />
             {successMsg}
           </div>
         )}
+
       </div>
 
       {/* ERROR MODAL */}
@@ -662,8 +701,8 @@ const CsvUploader = ({ onUploadSuccess }) => {
           <div className="bg-white w-full max-w-4xl max-h-[90vh] flex flex-col border border-[#E5E7EB]" style={{ borderRadius: '0px' }}>
 
             {/* Modal Header */}
-            <div className="flex items-center justify-between p-6 border-b border-[#E5E7EB] bg-[#FAFAFA]">
-              <div className="flex items-center gap-3 text-[#1A1A1A]">
+            <div className="flex items-center justify-between p-6 border-b border-[#E5E7EB]" style={{ backgroundColor: '#FDF2F2' }}>
+              <div className="flex items-center gap-3" style={{ color: '#B71C1C' }}>
                 <AlertCircle size={24} />
                 <h3 className="text-xl font-bold">Validation Failed: Upload Blocked</h3>
               </div>
@@ -695,10 +734,10 @@ const CsvUploader = ({ onUploadSuccess }) => {
                         <td className="px-4 py-3 text-sm">
                           {err.missingFields && (
                             <div className="mb-2">
-                              <span className="text-xs font-semibold text-[#737373] uppercase tracking-wide">Missing Fields:</span>
+                              <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: '#B71C1C' }}>Missing Fields:</span>
                               <div className="mt-1 flex flex-wrap gap-1">
                                 {err.missingFields.split(', ').map((field, i) => (
-                                  <span key={i} className="inline-block bg-[#F3F4F6] text-[#1A1A1A] px-2 py-0.5 text-xs border border-[#E5E7EB] font-medium" style={{ borderRadius: '0px' }}>
+                                  <span key={i} className="inline-block px-2 py-0.5 text-xs font-medium" style={{ borderRadius: '0px', backgroundColor: '#FDF2F2', color: '#B71C1C', border: '1px solid #FECACA' }}>
                                     {field}
                                   </span>
                                 ))}
@@ -707,10 +746,10 @@ const CsvUploader = ({ onUploadSuccess }) => {
                           )}
                           {err.spellingIssues && (
                             <div>
-                              <span className="text-xs font-semibold text-[#737373] uppercase tracking-wide">⚠ Data Validation Errors:</span>
+                              <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: '#B71C1C' }}>⚠ Data Validation Errors:</span>
                               <div className="mt-1 space-y-1">
                                 {err.spellingIssues.map((issue, i) => (
-                                  <div key={i} className="bg-[#FAFAFA] text-[#1A1A1A] px-2 py-1 text-xs border border-[#E5E7EB] font-medium" style={{ borderRadius: '0px' }}>
+                                  <div key={i} className="px-2 py-1 text-xs font-medium" style={{ borderRadius: '0px', backgroundColor: '#FDF2F2', color: '#7F1D1D', border: '1px solid #FECACA' }}>
                                     {issue}
                                   </div>
                                 ))}

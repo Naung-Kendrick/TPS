@@ -97,6 +97,29 @@ body {
   border: 1px solid var(--n-border);
 }
 
+/* Horizontal scrollbar for tables — matches central-database style */
+.tps-responsive-table::-webkit-scrollbar {
+  height: 12px;
+  background: #F3F4F6;
+}
+.tps-responsive-table::-webkit-scrollbar-track {
+  background: #F3F4F6;
+  border-radius: 999px;
+  margin: 0 4px;
+}
+.tps-responsive-table::-webkit-scrollbar-thumb {
+  background: #C4C4C4;
+  border-radius: 999px;
+  border: 2px solid #F3F4F6;
+}
+.tps-responsive-table::-webkit-scrollbar-thumb:hover {
+  background: #9CA3AF;
+}
+.tps-responsive-table {
+  scrollbar-width: auto;
+  scrollbar-color: #C4C4C4 #F3F4F6;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;
@@ -177,11 +200,11 @@ input::placeholder, textarea::placeholder {
   color: var(--n-text-2);
 }
 
-/* ── Scrollbar ────────────────────────────────────────── */
-::-webkit-scrollbar { width: 4px; height: 4px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #E5E7EB; }
-::-webkit-scrollbar-thumb:hover { background: #D1D5DB; }
+/* ── Scrollbar (global) ─────────────────────────────── */
+::-webkit-scrollbar { width: 8px; height: 12px; }
+::-webkit-scrollbar-track { background: #F3F4F6; border-radius: 999px; }
+::-webkit-scrollbar-thumb { background: #C4C4C4; border-radius: 999px; border: 2px solid #F3F4F6; }
+::-webkit-scrollbar-thumb:hover { background: #9CA3AF; }
 
 /* ── Purposeful Animations ─────────────────────────────── */
 

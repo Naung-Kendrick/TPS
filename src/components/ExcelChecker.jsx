@@ -81,6 +81,96 @@ const validateMyanmarText = (text) => {
   return issues.length > 0 ? issues.join('; ') : null;
 };
 
+// ============ SHARED FORMATTING & VALIDATION (mirrors CsvUploader) ============
+
+// Auto-correct Ward/Village/Group by adding space before suffix if missing
+const autoCorrectWardVillageGroup = (value) => {
+  if (!value || typeof value !== 'string') return value;
+  const str = value.trim();
+  if (str === '') return str;
+  const wardMatch = str.match(/^(.+?)ရပ်ကွက်$/);
+  if (wardMatch && !str.includes(' ရပ်ကွက်')) return `${wardMatch[1].trim()} ရပ်ကွက်`;
+  const villageMatch = str.match(/^(.+?)ရွာ$/);
+  if (villageMatch && !str.includes(' ရွာ') && str !== 'ရွာ') return `${villageMatch[1].trim()} ရွာ`;
+  const groupMatch = str.match(/^(.+?)အုပ်စု$/);
+  if (groupMatch && !str.includes(' အုပ်စု')) return `${groupMatch[1].trim()} အုပ်စု`;
+  return str;
+};
+
+// Auto-correct Township: ensure space before "မြို့နယ်" suffix
+const autoCorrectTownship = (value) => {
+  if (!value || value.trim() === '') return value;
+  const str = value.trim();
+  const match = str.match(/^(.+?)မြို့နယ်$/);
+  if (match && !str.includes(' မြို့နယ်')) return `${match[1].trim()} မြို့နယ်`;
+  return str;
+};
+
+// Auto-correct District: ensure space before "ခရိုင်" suffix
+const autoCorrectDistrict = (value) => {
+  if (!value || value.trim() === '') return value;
+  const str = value.trim();
+  const match = str.match(/^(.+?)ခရိုင်$/);
+  if (match && !str.includes(' ခရိုင်')) return `${match[1].trim()} ခရိုင်`;
+  return str;
+};
+
+// Auto-format Household No: "ကောင်းတပ်-၁" → "ကောင်းတပ် - ၁"
+const formatHouseholdNo = (value) => {
+  if (!value) return value;
+  let v = String(value).replace(/\s*-\s*/g, '-');
+  v = v.replace(/-/g, ' - ');
+  v = v.replace(/  +/g, ' ').trim();
+  return v;
+};
+
+// Detect Ward/Village/Group type
+const detectWardVillageGroupType = (value) => {
+  if (!value || typeof value !== 'string') return 'unknown';
+  const str = value.trim();
+  if (str.includes('ရပ်ကွက်')) return 'ward';
+  if (str.includes('အုပ်စု')) return 'group';
+  if (str.includes('ရွာ')) return 'village';
+  return 'unknown';
+};
+
+// Get types from comma-separated ward_village_group
+const getWardVillageGroupTypes = (value) => {
+  if (!value || typeof value !== 'string') return ['unknown'];
+  const parts = value.split(/[,၊]/).map(p => p.trim()).filter(p => p !== '');
+  if (parts.length === 0) return ['unknown'];
+  const types = parts.map(part => detectWardVillageGroupType(autoCorrectWardVillageGroup(part)));
+  return [...new Set(types.filter(t => t !== 'unknown'))];
+};
+
+// Validate Ward/Village/Group format
+const validateWardVillageGroup = (value) => {
+  if (!value || typeof value !== 'string' || value.trim() === '') return 'Value is required';
+  const corrected = autoCorrectWardVillageGroup(value.trim());
+  if (detectWardVillageGroupType(corrected) === 'unknown') {
+    return `Must contain "ရပ်ကွက်" (Ward), "ရွာ" (Village), or "အုပ်စု" (Group)`;
+  }
+  return null;
+};
+
+// Validate household-level ID requirements (mirrors CsvUploader)
+const validateHouseholdIDRequirements = (data) => {
+  const errors = [];
+  const households = data.reduce((acc, row) => {
+    const hn = row.household_no || 'UNKNOWN';
+    if (!acc[hn]) acc[hn] = [];
+    acc[hn].push(row);
+    return acc;
+  }, {});
+  Object.entries(households).forEach(([householdNo, members]) => {
+    const hasTaangLandID = members.some(m => m.taang_land_id_no && m.taang_land_id_no.trim() !== '');
+    const previousIDCount = members.filter(m => m.previous_id_no && m.previous_id_no.trim() !== '').length;
+    if (!hasTaangLandID) errors.push({ householdNo, issue: "No Ta'ang Land ID", detail: "At least one family member must have a Ta'ang Land ID No.", rowNumbers: members.map((_, i) => i + 2).slice(0, 3) });
+    if (previousIDCount < 1) errors.push({ householdNo, issue: 'No Previous ID', detail: 'At least one family member must have a Previous ID No. (NRC).', rowNumbers: members.map((_, i) => i + 2).slice(0, 3) });
+  });
+  return errors;
+};
+
 // ============ EXCEL CHECKER COMPONENT ============
 
 const REQUIRED_FIELDS = [
@@ -198,26 +288,26 @@ const ExcelChecker = () => {
         }
       });
 
-      // Forward fill logic
+      // Forward fill logic (with auto-format + auto-correct, mirrors CsvUploader)
       if (rowData.household_no && rowData.household_no !== '') {
-        currentHouseholdNo = rowData.household_no;
+        currentHouseholdNo = formatHouseholdNo(ensureUnicode(rowData.household_no));
       } else if (index === 0 && !currentHouseholdNo) {
         currentHouseholdNo = 'UNKNOWN-1';
       }
-
       if (rowData.ward_village_group && rowData.ward_village_group !== '') {
-        currentWard = rowData.ward_village_group;
+        currentWard = autoCorrectWardVillageGroup(ensureUnicode(rowData.ward_village_group));
       }
       if (rowData.township && rowData.township !== '') {
-        currentTownship = rowData.township;
+        currentTownship = autoCorrectTownship(ensureUnicode(rowData.township));
       }
       if (rowData.district && rowData.district !== '') {
-        currentDistrict = rowData.district;
+        currentDistrict = autoCorrectDistrict(ensureUnicode(rowData.district));
       }
 
       // Apply forward-filled values
+      const wardTypes = getWardVillageGroupTypes(currentWard);
       const parsedRow = {
-        household_no: ensureUnicode(currentHouseholdNo),
+        household_no: currentHouseholdNo,
         name: ensureUnicode(rowData.name || ''),
         date_of_birth: rowData.date_of_birth || '',
         gender: ensureUnicode(rowData.gender || ''),
@@ -231,9 +321,10 @@ const ExcelChecker = () => {
         resident_status: ensureUnicode(rowData.resident_status || ''),
         religious: ensureUnicode(rowData.religious || ''),
         house_no: ensureUnicode(rowData.house_no || ''),
-        ward_village_group: ensureUnicode(currentWard),
-        township: ensureUnicode(currentTownship),
-        district: ensureUnicode(currentDistrict),
+        ward_village_group: currentWard,
+        ward_village_group_type: wardTypes,
+        township: currentTownship,
+        district: currentDistrict,
         submission_date: rowData.submission_date || '',
         address: ensureUnicode(`${rowData.house_no || ''}, ${currentWard}, ${currentTownship}, ${currentDistrict}`),
       };
@@ -252,6 +343,10 @@ const ExcelChecker = () => {
       if (!parsedRow.district) missingFields.push('District');
       if (!parsedRow.gender) missingFields.push('Gender');
       if (!parsedRow.household_relationship) missingFields.push('Household Relationship');
+
+      // Validate Ward/Village/Group format
+      const wardFormatError = validateWardVillageGroup(parsedRow.ward_village_group);
+      if (wardFormatError && parsedRow.ward_village_group) missingFields.push(`Ward format: ${wardFormatError}`);
 
       // Check Myanmar text quality
       const spellingIssues = [];
@@ -286,6 +381,19 @@ const ExcelChecker = () => {
       } else {
         validRows.push(parsedRow);
       }
+    });
+
+    // Validate household-level ID requirements (mirrors CsvUploader)
+    const allRows = [...errors.map(e => e.data), ...warnings.map(w => w.data), ...validRows];
+    const householdIDErrors = validateHouseholdIDRequirements(allRows);
+    householdIDErrors.forEach(err => {
+      errors.push({
+        rowNumber: err.rowNumbers.join(', ') + '...',
+        data: { name: `Household: ${err.householdNo}` },
+        missingFields: [`${err.issue}: ${err.detail}`],
+        spellingIssues: [],
+        severity: 'error'
+      });
     });
 
     return {
@@ -465,9 +573,9 @@ const ExcelChecker = () => {
         <span className="font-medium text-[#1A1A1A]">{label}</span>
       </div>
       <div className="flex items-center gap-2">
-        {status === 'pass' && <CheckCircle2 size={20} className="text-[#1A1A1A]" />}
-        {status === 'fail' && <AlertCircle size={20} className="text-[#1A1A1A]" />}
-        {status === 'warning' && <AlertTriangle size={20} className="text-[#737373]" />}
+        {status === 'pass' && <CheckCircle2 size={20} style={{ color: '#2E7D32' }} />}
+        {status === 'fail' && <AlertCircle size={20} style={{ color: '#B71C1C' }} />}
+        {status === 'warning' && <AlertTriangle size={20} style={{ color: '#E65100' }} />}
         {count !== undefined && (
           <span className="font-bold text-[#1A1A1A]">
             {count}
@@ -512,8 +620,8 @@ const ExcelChecker = () => {
           </label>
 
           {loading && (
-            <div className="flex items-center justify-center gap-3 text-[#1A1A1A] font-medium p-4 bg-[#F3F4F6]" style={{ borderRadius: '0px' }}>
-              <Loader2 className="animate-spin" size={20} />
+            <div className="flex items-center justify-center gap-3 font-medium p-4" style={{ borderRadius: '0px', backgroundColor: '#EEF2F5', border: '1px solid #B0BEC5', color: '#4A6572' }}>
+              <Loader2 className="animate-spin" size={20} style={{ color: '#4A6572' }} />
               Converting Excel to CSV and validating data...
             </div>
           )}
@@ -560,9 +668,9 @@ const ExcelChecker = () => {
                       </>
                     ) : (
                       <>
-                        <CheckCircle2 size={24} className="text-[#1A1A1A]" />
+                        <CheckCircle2 size={24} style={{ color: '#2E7D32' }} />
                         <div>
-                          <p className="font-bold text-[#1A1A1A]">All Checks Passed</p>
+                          <p className="font-bold" style={{ color: '#1B5E20' }}>All Checks Passed</p>
                           <p className="text-sm text-[#737373]">
                             File is ready for database upload
                           </p>
@@ -571,9 +679,9 @@ const ExcelChecker = () => {
                     )
                   ) : (
                     <>
-                      <AlertCircle size={24} className="text-[#1A1A1A]" />
+                      <AlertCircle size={24} style={{ color: '#B71C1C' }} />
                       <div>
-                        <p className="font-bold text-[#1A1A1A]">Validation Failed</p>
+                        <p className="font-bold" style={{ color: '#B71C1C' }}>Validation Failed</p>
                         <p className="text-sm text-[#737373]">
                           Fix errors in Excel before uploading
                         </p>

@@ -147,10 +147,45 @@ const HorizontalBar = ({ data, color = '#2E7D32' }) => {
   );
 };
 
+// ─── Cache helpers ────────────────────────────────────────
+const CACHE_KEY = 'tps_stats_cache';
+const CACHE_VERSION = 'v1';
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+const readCache = () => {
+  try {
+    const raw = sessionStorage.getItem(CACHE_KEY);
+    if (!raw) return null;
+    const { version, timestamp, data } = JSON.parse(raw);
+    if (version !== CACHE_VERSION) return null;
+    if (Date.now() - timestamp > CACHE_TTL_MS) return null;
+    return data;
+  } catch {
+    return null;
+  }
+};
+
+const writeCache = (data) => {
+  try {
+    sessionStorage.setItem(CACHE_KEY, JSON.stringify({
+      version: CACHE_VERSION,
+      timestamp: Date.now(),
+      data
+    }));
+  } catch {
+    // sessionStorage full or unavailable — ignore silently
+  }
+};
+
+const clearCache = () => {
+  try { sessionStorage.removeItem(CACHE_KEY); } catch {}
+};
+
 // ─── Main Component ───────────────────────────────────────
 const PopulationStatistics = () => {
   const [allData, setAllData] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadProgress, setLoadProgress] = useState(0);
   const [error, setError] = useState(null);
 
   const [districts, setDistricts] = useState([]);
@@ -177,28 +212,73 @@ const PopulationStatistics = () => {
   const [groupPage1, setGroupPage1] = useState(1);
   const [groupPage2, setGroupPage2] = useState(1);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      try {
-        const { data, error } = await supabase
-          .from('households')
-          .select('household_no, district, township, ward_village_group, ward_village_group_type, gender, date_of_birth, religious, nationality, resident_status');
+  const loadData = async (forceRefresh = false) => {
+    setLoading(true);
+    setError(null);
+    setLoadProgress(0);
 
-        if (error) throw error;
-        const normalized = (data || []).map(row => deepEnsureUnicode(row));
-        setAllData(normalized);
-
-        const uniqueDistricts = [...new Set(normalized.map(d => d.district).filter(Boolean))].sort();
+    // Try cache first (skip if force refresh)
+    if (!forceRefresh) {
+      const cached = readCache();
+      if (cached) {
+        setAllData(cached);
+        const uniqueDistricts = [...new Set(cached.map(d => d.district).filter(Boolean))].sort();
         setDistricts(uniqueDistricts);
-      } catch (err) {
-        setError(err.message);
-      } finally {
         setLoading(false);
+        setLoadProgress(100);
+        return;
       }
-    };
-    fetchData();
-  }, []);
+    }
+
+    // Paginated batch fetch to avoid single large response
+    const BATCH = 5000;
+    const COLS = 'household_no, district, township, ward_village_group, ward_village_group_type, gender, date_of_birth, religious, nationality, resident_status';
+    let allRows = [];
+    let from = 0;
+    let hasMore = true;
+
+    try {
+      // Get total count first for progress bar
+      const { count } = await supabase
+        .from('households')
+        .select('*', { count: 'exact', head: true });
+
+      const total = count || 0;
+
+      while (hasMore) {
+        const { data: batch, error: batchErr } = await supabase
+          .from('households')
+          .select(COLS)
+          .range(from, from + BATCH - 1);
+
+        if (batchErr) throw batchErr;
+        if (!batch || batch.length === 0) { hasMore = false; break; }
+
+        allRows = allRows.concat(batch);
+        from += BATCH;
+        hasMore = batch.length === BATCH;
+
+        // Update progress
+        if (total > 0) {
+          setLoadProgress(Math.min(99, Math.round((allRows.length / total) * 100)));
+        }
+      }
+
+      const normalized = allRows.map(row => deepEnsureUnicode(row));
+      writeCache(normalized);
+      setAllData(normalized);
+      setLoadProgress(100);
+
+      const uniqueDistricts = [...new Set(normalized.map(d => d.district).filter(Boolean))].sort();
+      setDistricts(uniqueDistricts);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { loadData(); }, []);
 
   useEffect(() => {
     if (selectedDistrict) {
@@ -318,7 +398,17 @@ const PopulationStatistics = () => {
     return (
       <div style={{ padding: '32px' }} className="max-w-7xl mx-auto">
         <SkeletonBar width="200px" height="22px" style={{ marginBottom: '8px' }} />
-        <SkeletonBar width="320px" height="12px" style={{ marginBottom: '32px' }} />
+        <SkeletonBar width="320px" height="12px" style={{ marginBottom: '24px' }} />
+        {loadProgress > 0 && loadProgress < 100 && (
+          <div style={{ marginBottom: '32px' }}>
+            <div style={{ fontSize: '11px', color: '#737373', marginBottom: '6px' }}>
+              Loading data... {loadProgress}%
+            </div>
+            <div style={{ height: '4px', backgroundColor: '#E5E7EB', borderRadius: '2px', overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${loadProgress}%`, backgroundColor: '#2E7D32', transition: 'width 0.3s ease' }} />
+            </div>
+          </div>
+        )}
         <SkeletonStatGrid />
         <SkeletonStatGrid />
       </div>
@@ -361,13 +451,22 @@ const PopulationStatistics = () => {
         }
       `}</style>
       {/* Header */}
-      <div style={{ marginBottom: '32px' }}>
-        <h2 style={{ fontSize: '20px', margin: '0 0 8px 0', color: colors.black, fontWeight: '500', letterSpacing: '0.02em' }}>
-          POPULATION STATISTICS
-        </h2>
-        <p style={{ margin: 0, color: '#737373', fontSize: '12px' }}>
-          ခရိုင်၊ မြို့နယ်၊ ရပ်ကွက်/ကျေးရွာအလိုက် လူဦးရေစာရင်းအင်းများကို ကြည့်ရှုပါ။
-        </p>
+      <div style={{ marginBottom: '32px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+        <div>
+          <h2 style={{ fontSize: '20px', margin: '0 0 8px 0', color: colors.black, fontWeight: '500', letterSpacing: '0.02em' }}>
+            POPULATION STATISTICS
+          </h2>
+          <p style={{ margin: 0, color: '#737373', fontSize: '12px' }}>
+            ခရိုင်၊ မြို့နယ်၊ ရပ်ကွက်/ကျေးရွာအလိုက် လူဦးရေစာရင်းအင်းများကို ကြည့်ရှုပါ။
+          </p>
+        </div>
+        <button
+          onClick={() => { clearCache(); loadData(true); }}
+          style={{ fontSize: '11px', border: '1px solid #E5E7EB', background: 'none', color: '#737373', padding: '6px 14px', cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}
+          title="Fetch latest data from database"
+        >
+          ↻ Refresh Data
+        </button>
       </div>
 
       {/* ─── Filter Section ────────────────────────────────── */}

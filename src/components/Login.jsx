@@ -31,8 +31,8 @@ const Login = ({ onLogin }) => {
     try {
       // 1. Sign in with Supabase Auth
       // Fix: If a password manager auto-fills the full email, don't append @tps.idtl twice
-      const finalEmail = formData.username.includes('@') 
-        ? formData.username 
+      const finalEmail = formData.username.includes('@')
+        ? formData.username
         : `${formData.username}@tps.idtl`;
 
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
@@ -119,10 +119,10 @@ const Login = ({ onLogin }) => {
             justifyContent: 'center',
             boxShadow: '0 0 0 4px rgba(255,255,255,0.1)'
           }}>
-            <img 
-              src={logo} 
-              alt="IDTL Logo" 
-              style={{ width: '80%', height: '80%', objectFit: 'contain' }} 
+            <img
+              src={logo}
+              alt="IDTL Logo"
+              style={{ width: '80%', height: '80%', objectFit: 'contain' }}
             />
           </div>
           <h1 style={{

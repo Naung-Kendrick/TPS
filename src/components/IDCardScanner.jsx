@@ -528,9 +528,9 @@ const IDCardScanner = () => {
 
       {/* Loading */}
       {loading && (
-        <div className="flex items-center gap-3 p-4 bg-[#F3F4F6] border border-[#E5E7EB] mb-4" style={{ borderRadius: '0px' }}>
-          <Loader2 size={18} className="animate-spin text-[#1A1A1A]" />
-          <span className="text-sm text-[#1A1A1A] font-medium">Looking up record in database...</span>
+        <div className="flex items-center gap-3 p-4 mb-4" style={{ borderRadius: '0px', backgroundColor: '#EEF2F5', border: '1px solid #B0BEC5' }}>
+          <Loader2 size={18} className="animate-spin" style={{ color: '#4A6572' }} />
+          <span className="text-sm font-medium" style={{ color: '#4A6572' }}>Looking up record in database...</span>
         </div>
       )}
 
@@ -669,8 +669,8 @@ const IDCardScanner = () => {
             <div style={{ overflowY: 'auto', overflowX: 'auto', flex: 1 }}>
               {familyLoading ? (
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', padding: '40px' }}>
-                  <Loader2 size={18} className="animate-spin" style={{ color: '#1A1A1A' }} />
-                  <span style={{ fontSize: '12px', color: '#737373' }}>Loading family members...</span>
+                  <Loader2 size={18} className="animate-spin" style={{ color: '#4A6572' }} />
+                  <span style={{ fontSize: '12px', color: '#4A6572' }}>Loading family members...</span>
                 </div>
               ) : familyMembers.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '40px', color: '#737373', fontSize: '12px' }}>No family members found.</div>

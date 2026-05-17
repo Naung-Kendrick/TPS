@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useOutletContext } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { cacheGet, cacheSet } from '../lib/offlineCache';
 import { SkeletonTable, SkeletonBar } from './Skeleton';
@@ -7,8 +8,10 @@ import EmptyState from './EmptyState';
 import { exportHouseholdExcel, printHouseholdPdf } from '../lib/householdPrint';
 import { deepEnsureUnicode } from './CsvUploader';
 import { buildExportFilename } from '../lib/exportFilename';
+import StatusBadge from './StatusBadge';
 
 const Reports = () => {
+  const { user } = useOutletContext();
   const [level, setLevel] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -94,7 +97,7 @@ const Reports = () => {
 
     try {
       if (level === 1) {
-        const { data, error } = await supabase.from('households').select('district');
+        const { data, error } = await supabase.from('households').select('district').eq('status', 'active');
         if (error) throw error;
         const unique = [...new Set(data.filter(d => d.district).map(d => d.district))].sort();
         const list = unique.map(name => ({ id: name, name }));
@@ -102,7 +105,7 @@ const Reports = () => {
         cacheSet(cacheKey, list);
       } 
       else if (level === 2) {
-        const { data, error } = await supabase.from('households').select('township').eq('district', path.district);
+        const { data, error } = await supabase.from('households').select('township').eq('district', path.district).eq('status', 'active');
         if (error) throw error;
         const unique = [...new Set(data.filter(d => d.township).map(d => d.township))].sort();
         const list = unique.map(name => ({ id: name, name }));
@@ -110,7 +113,7 @@ const Reports = () => {
         cacheSet(cacheKey, list);
       }
       else if (level === 3) {
-        const { data, error } = await supabase.from('households').select('ward_village_group').eq('township', path.township);
+        const { data, error } = await supabase.from('households').select('ward_village_group').eq('township', path.township).eq('status', 'active');
         if (error) throw error;
         const unique = [...new Set(data.filter(d => d.ward_village_group).map(d => d.ward_village_group))].sort();
         const list = unique.map(name => ({ id: name, name }));
@@ -122,6 +125,7 @@ const Reports = () => {
           .from('households')
           .select('id, name, household_no, gender, occupation, date_of_birth')
           .eq('ward_village_group', path.village)
+          .eq('status', 'active')
           .ilike('household_relationship', '%ဦးစီး%');
         if (error) throw error;
         setDataList(data || []);
@@ -131,7 +135,8 @@ const Reports = () => {
         const { data, error } = await supabase
           .from('households')
           .select('*')
-          .eq('household_no', path.householdNo);
+          .eq('household_no', path.householdNo)
+          .neq('status', 'inactive');
         if (error) throw error;
         
         const relationshipOrder = { 'ဦးစီး': 1, 'ဇနီး': 2, 'ခင်ပွန်း': 2, 'သား': 3, 'သမီး': 3 };
@@ -232,6 +237,7 @@ const Reports = () => {
       let query = supabase
         .from('households')
         .select('*')
+        .neq('status', 'inactive')
         .order('household_no', { ascending: true })
         .order('id', { ascending: true });
 
@@ -284,10 +290,15 @@ const Reports = () => {
   const saveEdit = async () => {
     setSaving(true);
     try {
-      const { id, created_at, ...fields } = editForm;
+      const { id, created_at, updated_at, ...fields } = editForm;
+      const updatePayload = {
+        ...fields,
+        updated_at: new Date().toISOString(),
+        updated_by: user?.username || 'unknown'
+      };
       const { error } = await supabase
         .from('households')
-        .update(fields)
+        .update(updatePayload)
         .eq('id', editingId);
       if (error) throw error;
       setFamilyMembers(prev =>
@@ -311,7 +322,11 @@ const Reports = () => {
     try {
       const { error } = await supabase
         .from('households')
-        .delete()
+        .update({
+          status: 'inactive',
+          updated_at: new Date().toISOString(),
+          updated_by: user?.username || 'unknown'
+        })
         .eq('id', deleteConfirmId);
       if (error) throw error;
       setFamilyMembers(prev => prev.filter(m => m.id !== deleteConfirmId));
@@ -562,8 +577,8 @@ const Reports = () => {
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px', tableLayout: 'auto' }}>
                     <thead>
                       <tr style={{ backgroundColor: '#FAFAFA' }}>
-                        {['No.','Name','Date of Birth','Gender',"Father's Name","Mother's Name",'Relationship','Occupation','Previous ID No.',"Ta'ang Land ID No.",'Nationality','Resident Status','Religious','Submission Date',''].map((h, i) => (
-                          <th key={i} style={{ padding: '8px 6px', fontSize: '9.5px', fontWeight: 600, color: '#737373', textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap', textAlign: i === 14 ? 'center' : 'left' }}>{h}</th>
+                        {['No.','Name','Status','Date of Birth','Gender',"Father's Name","Mother's Name",'Relationship','Occupation','Previous ID No.',"Ta'ang Land ID No.",'Nationality','Resident Status','Religious','Submission Date',''].map((h, i) => (
+                          <th key={i} style={{ padding: '8px 6px', fontSize: '9.5px', fontWeight: 600, color: '#737373', textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap', textAlign: i === 15 ? 'center' : 'left' }}>{h}</th>
                         ))}
                       </tr>
                     </thead>
@@ -584,6 +599,9 @@ const Reports = () => {
                                 {isEditing
                                   ? <input value={editForm.name || ''} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} style={{ ...inStyle, minWidth: '100px' }} />
                                   : <>{member.name}{member.household_relationship === 'ဦးစီး' && <span style={{ marginLeft: '4px', border: '1px solid #1A1A1A', padding: '0 3px', fontSize: '8px', fontWeight: 700 }}>HEAD</span>}</>}
+                              </td>
+                              <td style={{ padding: '7px 6px', whiteSpace: 'nowrap' }}>
+                                <StatusBadge status={member.status} />
                               </td>
                               <td style={{ padding: '7px 6px', whiteSpace: isEditing ? 'normal' : 'nowrap' }}>{cell('date_of_birth')}</td>
                               <td style={{ padding: '7px 6px', whiteSpace: isEditing ? 'normal' : 'nowrap' }}>{cell('gender')}</td>

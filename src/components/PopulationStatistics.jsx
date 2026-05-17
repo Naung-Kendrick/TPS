@@ -183,7 +183,8 @@ const PopulationStatistics = () => {
       try {
         const { data, error } = await supabase
           .from('households')
-          .select('household_no, district, township, ward_village_group, ward_village_group_type, gender, date_of_birth, religious, nationality, resident_status');
+          .select('household_no, district, township, ward_village_group, ward_village_group_type, gender, date_of_birth, religious, nationality, resident_status, status')
+          .eq('status', 'active');
 
         if (error) throw error;
         const normalized = (data || []).map(row => deepEnsureUnicode(row));

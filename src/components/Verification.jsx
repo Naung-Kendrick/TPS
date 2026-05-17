@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
+import { useOutletContext } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import StatusBadge from './StatusBadge';
 import { exportHouseholdExcel, printHouseholdPdf } from '../lib/householdPrint';
 import { Search, RotateCcw, AlertCircle, CheckCircle2, X, Loader2, Printer, FileSpreadsheet } from 'lucide-react';
 import EmptyState from './EmptyState';
@@ -29,6 +31,7 @@ const getAge = (dobStr) => {
 };
 
 const Verification = () => {
+  const { user } = useOutletContext();
   const [formData, setFormData] = useState({
     household_no: '',
     name: '',
@@ -92,6 +95,10 @@ const Verification = () => {
 
     try {
       let query = supabase.from('households').select('*');
+
+      // Default to active members, but allowing partial status matching if needed in future.
+      // For now, strict Phase 1 compliance: filter by active.
+      query = query.neq('status', 'inactive');
 
       if (formData.household_no.trim()) query = query.ilike('household_no', `%${formData.household_no.trim()}%`);
       if (formData.name.trim()) query = query.ilike('name', `%${formData.name.trim()}%`);
@@ -368,6 +375,7 @@ const Verification = () => {
                         <th className="px-4 py-3 text-gray-600 font-semibold uppercase letter-spacing-0.05">No.</th>
                         <th className="px-4 py-3 text-gray-600 font-semibold uppercase letter-spacing-0.05">Household No.</th>
                         <th className="px-4 py-3 text-gray-600 font-semibold uppercase letter-spacing-0.05">Name</th>
+                        <th className="px-4 py-3 text-gray-600 font-semibold uppercase letter-spacing-0.05">Status</th>
                         <th className="px-4 py-3 text-gray-600 font-semibold uppercase letter-spacing-0.05">Date of Birth</th>
                         <th className="px-4 py-3 text-gray-600 font-semibold uppercase letter-spacing-0.05">Gender</th>
                         <th className="px-4 py-3 text-gray-600 font-semibold uppercase letter-spacing-0.05">Father's Name</th>
@@ -394,6 +402,9 @@ const Verification = () => {
                             <td className="px-4 py-3 text-gray-500 font-mono">{index + 1}</td>
                             <td className="px-4 py-3 font-semibold text-gray-900 font-mono">{person.household_no}</td>
                             <td className="px-4 py-3 font-medium text-gray-900">{person.name}</td>
+                            <td className="px-4 py-3">
+                              <StatusBadge status={person.status} />
+                            </td>
                             <td className="px-4 py-3 text-gray-700 font-mono">{person.date_of_birth || '-'}</td>
                             <td className="px-4 py-3 text-gray-700">{person.gender || '-'}</td>
                             <td className="px-4 py-3 text-gray-700">{person.fathers_name || '-'}</td>
@@ -458,6 +469,7 @@ const Verification = () => {
                                                 <th className="px-4 py-2.5 text-gray-600 font-semibold uppercase letter-spacing-0.05">No.</th>
                                                 <th className="px-4 py-2.5 text-gray-600 font-semibold uppercase letter-spacing-0.05">Household No.</th>
                                                 <th className="px-4 py-2.5 text-gray-600 font-semibold uppercase letter-spacing-0.05">Name</th>
+                                                <th className="px-4 py-2.5 text-gray-600 font-semibold uppercase letter-spacing-0.05">Status</th>
                                                 <th className="px-4 py-2.5 text-gray-600 font-semibold uppercase letter-spacing-0.05">Date of Birth</th>
                                                 <th className="px-4 py-2.5 text-gray-600 font-semibold uppercase letter-spacing-0.05">Gender</th>
                                                 <th className="px-4 py-2.5 text-gray-600 font-semibold uppercase letter-spacing-0.05">Father's Name</th>
@@ -491,6 +503,9 @@ const Verification = () => {
                                                     {member.household_relationship === '\u1026\u1038\u1005\u102E\u1038' && (
                                                       <span className="ml-2 border border-gray-900 text-gray-900 px-1 py-0.5 text-[9px] font-bold uppercase">HEAD</span>
                                                     )}
+                                                  </td>
+                                                  <td className="px-4 py-2.5">
+                                                    <StatusBadge status={member.status} />
                                                   </td>
                                                   <td className="px-4 py-2.5 text-gray-700 font-mono">{member.date_of_birth || '-'}</td>
                                                   <td className="px-4 py-2.5 text-gray-700">{member.gender || '-'}</td>

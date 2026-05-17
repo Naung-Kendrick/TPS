@@ -26,9 +26,15 @@ const EditHouseholdModal = ({ household, isOpen, onClose, onUpdateSuccess }) => 
 
     const { id, created_at, updated_at, ...updateData } = formData;
 
+    // Add audit metadata
+    const finalUpdateData = {
+      ...updateData,
+      updated_at: new Date().toISOString()
+    };
+
     const { error: supabaseError } = await supabase
       .from('households')
-      .update(updateData)
+      .update(finalUpdateData)
       .eq('id', id);
 
     if (supabaseError) {

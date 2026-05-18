@@ -334,7 +334,7 @@ const IDCardScanner = () => {
             <button
               type="submit"
               disabled={loading || !inputValue.trim()}
-              className="flex items-center gap-2 px-5 py-2 bg-[#1A1A1A] text-white text-sm font-medium hover:bg-[#737373] transition-colors disabled:opacity-40"
+              className="flex items-center gap-2 px-4 py-2 bg-[#1A1A1A] text-white text-sm font-medium hover:bg-white hover:text-[#1A1A1A] border border-[#1A1A1A] transition-colors"
               style={{ borderRadius: '0px' }}
             >
               {loading ? <Loader2 size={16} className="animate-spin" /> : <Search size={16} />}
@@ -360,7 +360,7 @@ const IDCardScanner = () => {
               </div>
               <button
                 onClick={startCamera}
-                className="flex items-center gap-2 px-5 py-2 bg-[#1A1A1A] text-white text-sm font-medium hover:bg-[#737373] transition-colors"
+                className="flex items-center gap-2 px-5 py-2 bg-[#1A1A1A] text-white text-sm font-medium hover:bg-white hover:text-[#1A1A1A] border border-[#1A1A1A] transition-colors"
                 style={{ borderRadius: '0px' }}
               >
                 <Camera size={16} />

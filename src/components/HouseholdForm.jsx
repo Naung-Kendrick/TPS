@@ -767,10 +767,13 @@ const HouseholdForm = () => {
         <button
           type="button"
           onClick={openForm}
+          onMouseOver={e => { e.currentTarget.style.backgroundColor = '#FFFFFF'; e.currentTarget.style.color = '#1A1A1A'; }}
+          onMouseOut={e => { e.currentTarget.style.backgroundColor = '#1A1A1A'; e.currentTarget.style.color = '#FFFFFF'; }}
           style={{
             padding: '8px 20px', border: '1px solid #1A1A1A', backgroundColor: '#1A1A1A',
             color: '#FFFFFF', fontWeight: '500', fontSize: '12px', cursor: 'pointer',
-            textTransform: 'uppercase', letterSpacing: '0.05em', flexShrink: 0
+            textTransform: 'uppercase', letterSpacing: '0.05em', flexShrink: 0,
+            transition: 'background-color 120ms cubic-bezier(0.23,1,0.32,1), color 120ms cubic-bezier(0.23,1,0.32,1)',
           }}
         >
           + ADD MEMBER
@@ -858,10 +861,14 @@ const HouseholdForm = () => {
               }}>
                 {loading ? 'SAVING...' : 'ADD MEMBER'}
               </button>
-              <button type="button" onClick={clearForNewHousehold} style={{
-                padding: '8px 16px', border: '1px solid #1A1A1A', backgroundColor: '#1A1A1A',
-                color: '#FFFFFF', fontWeight: '500', fontSize: '12px',
-                cursor: 'pointer', textTransform: 'uppercase'
+              <button type="button" onClick={clearForNewHousehold}
+                onMouseOver={e => { e.currentTarget.style.backgroundColor = '#FFFFFF'; e.currentTarget.style.color = '#1A1A1A'; }}
+                onMouseOut={e => { e.currentTarget.style.backgroundColor = '#1A1A1A'; e.currentTarget.style.color = '#FFFFFF'; }}
+                style={{
+                  padding: '8px 16px', border: '1px solid #1A1A1A', backgroundColor: '#1A1A1A',
+                  color: '#FFFFFF', fontWeight: '500', fontSize: '12px',
+                  cursor: 'pointer', textTransform: 'uppercase',
+                  transition: 'background-color 120ms cubic-bezier(0.23,1,0.32,1), color 120ms cubic-bezier(0.23,1,0.32,1)',
               }}>
                 NEW HOUSEHOLD
               </button>

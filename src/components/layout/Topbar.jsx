@@ -157,7 +157,7 @@ const Topbar = () => {
                     No notifications yet
                   </div>
                 ) : (
-                  notifications.map((n) => {
+                  notifications.map((n, i) => {
                     const meta = TYPE_META[n.type] || TYPE_META[NOTIF_TYPES.INFO];
                     const Icon = meta.icon;
                     return (
@@ -165,6 +165,8 @@ const Topbar = () => {
                         display: 'flex', gap: '10px', padding: '10px 14px',
                         borderBottom: '1px solid #F3F4F6',
                         backgroundColor: n.read ? '#FFFFFF' : '#FAFAFA',
+                        opacity: 0,
+                        animation: `tps-page-in 180ms cubic-bezier(0.23,1,0.32,1) ${Math.min(i * 40, 200)}ms both`,
                       }}>
                         <div style={{ width: '28px', height: '28px', backgroundColor: meta.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                           <Icon size={13} color={meta.color} />
@@ -187,7 +189,7 @@ const Topbar = () => {
         <div style={{ width: '1px', height: '20px', backgroundColor: '#E5E7EB', margin: '0 4px' }} />
 
         {/* Profile */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', padding: '6px 8px', transition: 'background 0.1s' }}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', padding: '6px 8px', transition: 'background-color 120ms cubic-bezier(0.23,1,0.32,1)' }}
           onMouseOver={e => e.currentTarget.style.backgroundColor = '#F3F4F6'}
           onMouseOut={e => e.currentTarget.style.backgroundColor = 'transparent'}
         >

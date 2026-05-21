@@ -12,6 +12,11 @@
 @tailwind utilities;
 
 :root {
+  /* ── Custom Easing Curves (Emil Kowalski) ─────────────── */
+  --ease-out:     cubic-bezier(0.23, 1, 0.32, 1);      /* Strong ease-out for UI interactions */
+  --ease-in-out:  cubic-bezier(0.77, 0, 0.175, 1);     /* Strong ease-in-out for on-screen movement */
+  --ease-panel:   cubic-bezier(0.32, 0.72, 0, 1);      /* iOS-like panel/drawer curve */
+
   /* ── Architect Core Palette ───────────────────────────── */
   --n-bg:          #FFFFFF;
   --n-sidebar:     #FAFAFA;
@@ -158,16 +163,22 @@ button {
   font-weight: 500;
   font-family: 'Inter', sans-serif;
   cursor: pointer;
-  transition: background 0.1s, color 0.1s;
+  /* Specify exact properties — never use 'transition: all' */
+  transition: background-color 120ms var(--ease-out),
+              color 120ms var(--ease-out),
+              border-color 120ms var(--ease-out),
+              transform 100ms var(--ease-out);
 }
 
 .btn-primary {
   background-color: var(--n-text);
   color: #FFFFFF;
 }
-.btn-primary:hover {
-  background-color: #FFFFFF;
-  color: var(--n-text);
+@media (hover: hover) and (pointer: fine) {
+  .btn-primary:hover {
+    background-color: #FFFFFF;
+    color: var(--n-text);
+  }
 }
 
 .btn-secondary {
@@ -175,7 +186,9 @@ button {
   color: var(--n-text);
   border-color: var(--n-border);
 }
-.btn-secondary:hover { background-color: var(--n-hover); }
+@media (hover: hover) and (pointer: fine) {
+  .btn-secondary:hover { background-color: var(--n-hover); }
+}
 
 /* ── Inputs ───────────────────────────────────────────── */
 input, select, textarea {
@@ -188,7 +201,7 @@ input, select, textarea {
   box-sizing: border-box;
   color: var(--n-text);
   background-color: var(--n-bg);
-  transition: border-color 0.1s;
+  transition: border-color 120ms var(--ease-out);
 }
 
 input:focus, select:focus, textarea:focus {
@@ -206,24 +219,24 @@ input::placeholder, textarea::placeholder {
 ::-webkit-scrollbar-thumb { background: #C4C4C4; border-radius: 999px; border: 2px solid #F3F4F6; }
 ::-webkit-scrollbar-thumb:hover { background: #9CA3AF; }
 
-/* ── Purposeful Animations ─────────────────────────────── */
+/* ── Purposeful Animations (Emil Kowalski principles) ───── */
 
-/* 1. Page transition — subtle fade + slide up */
+/* 1. Page transition — fade + slide, under 200ms, strong ease-out */
 @keyframes tps-page-in {
-  from { opacity: 0; transform: translateY(8px); }
+  from { opacity: 0; transform: translateY(6px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 .tps-page-enter {
-  animation: tps-page-in 180ms ease-out both;
+  animation: tps-page-in 160ms var(--ease-out) both;
 }
 
-/* 2. Button press feedback */
+/* 2. Button press — scale(0.97), fast response, ease-out */
 button:active {
   transform: scale(0.97);
-  transition: transform 60ms ease-out;
+  transition: transform 100ms var(--ease-out);
 }
 
-/* 3. Error shake — for error/offline states */
+/* 3. Error shake */
 @keyframes tps-shake {
   0%, 100% { transform: translateX(0); }
   20%      { transform: translateX(-5px); }
@@ -232,24 +245,41 @@ button:active {
   80%      { transform: translateX(4px); }
 }
 .tps-shake {
-  animation: tps-shake 350ms ease-out both;
+  animation: tps-shake 300ms var(--ease-out) both;
 }
 
-/* 4. Success entrance — scale + fade in */
+/* 4. Success entrance — start from scale(0.97) not scale(0), under 300ms */
 @keyframes tps-success-in {
-  0%   { opacity: 0; transform: scale(0.98); }
-  50%  { opacity: 1; transform: scale(1.01); }
-  100% { opacity: 1; transform: scale(1); }
+  from { opacity: 0; transform: scale(0.97); }
+  to   { opacity: 1; transform: scale(1); }
 }
 .tps-success-enter {
-  animation: tps-success-in 400ms ease-out both;
+  animation: tps-success-in 220ms var(--ease-out) both;
 }
 
-/* 5. Panel slide-in — notification dropdown */
+/* 5. Panel/dropdown slide-in — 150ms, strong ease-out */
 @keyframes tps-panel-in {
-  from { opacity: 0; transform: translateY(-6px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; transform: translateY(-4px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 .tps-panel-enter {
-  animation: tps-panel-in 150ms ease-out both;
+  animation: tps-panel-in 150ms var(--ease-out) both;
+}
+
+/* 6. Stagger for list items entering together */
+.tps-stagger > *    { opacity: 0; transform: translateY(6px); animation: tps-page-in 200ms var(--ease-out) both; }
+.tps-stagger > *:nth-child(1) { animation-delay: 0ms; }
+.tps-stagger > *:nth-child(2) { animation-delay: 40ms; }
+.tps-stagger > *:nth-child(3) { animation-delay: 80ms; }
+.tps-stagger > *:nth-child(4) { animation-delay: 120ms; }
+.tps-stagger > *:nth-child(5) { animation-delay: 160ms; }
+.tps-stagger > *:nth-child(n+6) { animation-delay: 200ms; }
+
+/* 7. Reduced motion — keep opacity/color, remove movement */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

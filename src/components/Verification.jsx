@@ -374,7 +374,7 @@ const Verification = () => {
                 type="button" 
                 onClick={handleClear}
                 disabled={loading}
-                className="flex items-center gap-2 bg-white border border-gray-200 text-gray-900 hover:bg-gray-50 px-5 py-2 rounded-none font-medium transition-colors text-xs uppercase letter-spacing-0.05 disabled:opacity-50"
+                className="flex items-center gap-2 bg-white border border-gray-900 text-gray-900 px-5 py-2 rounded-none font-medium text-xs uppercase letter-spacing-0.05 disabled:opacity-50"
               >
                 Clear Filters
               </button>
@@ -411,7 +411,7 @@ const Verification = () => {
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="flex items-center gap-2 mb-2">
+              <div className="tps-success-enter flex items-center gap-2 mb-2">
                 <CheckCircle2 size={16} className="text-gray-900" />
                 <h3 className="font-semibold text-gray-900 text-sm uppercase">Verification Successful: {results.length} Match(es) Found</h3>
               </div>
@@ -445,7 +445,12 @@ const Verification = () => {
                     <tbody>
                       {results.map((person, index) => (
                         <React.Fragment key={person.id}>
-                          <tr className={`border-b border-gray-100 hover:bg-gray-50 transition-colors ${expandedHouseholdNo === person.household_no ? 'bg-gray-50' : ''}`}>
+                          <tr
+                            style={{
+                              opacity: 0,
+                              animation: `tps-page-in 200ms cubic-bezier(0.23,1,0.32,1) ${Math.min(index * 40, 200)}ms both`,
+                            }}
+                            className={`border-b border-gray-100 hover:bg-gray-50 transition-colors ${expandedHouseholdNo === person.household_no ? 'bg-gray-50' : ''}`}>
                             <td className="px-4 py-3 text-gray-500 font-mono">{index + 1}</td>
                             <td className="px-4 py-3 font-semibold text-gray-900 font-mono">{highlight(person.household_no, formData.household_no)}</td>
                             <td className="px-4 py-3 font-medium text-gray-900">{highlight(person.name, formData.name)}</td>
@@ -468,10 +473,10 @@ const Verification = () => {
                             <td className="px-4 py-3 text-center sticky right-0 bg-white border-l border-gray-200">
                               <button
                                 onClick={() => handleViewFamily(person.household_no)}
-                                className={`inline-flex items-center gap-1 px-3 py-1 border text-xs font-medium transition-all ${
+                                className={`inline-flex items-center gap-1 px-3 py-1 border text-xs font-medium transition-[background-color,color,border-color] duration-100 ${
                                   expandedHouseholdNo === person.household_no
                                     ? 'bg-gray-900 text-white border-transparent'
-                                    : 'bg-white text-gray-900 border-gray-900 hover:bg-gray-50'
+                                    : 'bg-white text-gray-900 border-gray-900'
                                 }`}
                               >
                                 {expandedHouseholdNo === person.household_no ? 'CLOSE' : 'VIEW FAMILY'}
@@ -483,7 +488,7 @@ const Verification = () => {
                           {expandedHouseholdNo === person.household_no && (
                             <tr>
                               <td colSpan="20" className="p-0 bg-gray-50 border-b border-gray-200">
-                                <div className="p-6">
+                                <div className="tps-panel-enter p-6">
                                   <div className="bg-white border border-gray-200 tps-responsive-table">
                                     <div className="px-6 py-3 border-b border-gray-200 flex items-center justify-between">
                                       <h3 className="font-semibold text-gray-900 flex items-center gap-2 text-xs uppercase letter-spacing-0.05">
@@ -533,8 +538,12 @@ const Verification = () => {
                                             </thead>
                                             <tbody>
                                               {familyMembers.map((member, i) => (
-                                                <tr 
-                                                  key={member.id} 
+                                                <tr
+                                                  key={member.id}
+                                                  style={{
+                                                    opacity: 0,
+                                                    animation: `tps-page-in 180ms cubic-bezier(0.23,1,0.32,1) ${Math.min(i * 40, 240)}ms both`,
+                                                  }}
                                                   className={`border-b border-gray-100 transition-colors hover:bg-gray-50 ${
                                                     member.household_relationship === '\u1026\u1038\u1005\u102E\u1038' ? 'bg-gray-50' : ''
                                                   }`}
@@ -593,7 +602,7 @@ const Verification = () => {
                                               <button
                                                 type="button"
                                                 onClick={() => handleExportExcel(expandedHouseholdNo, familyMembers)}
-                                                className="flex items-center gap-2 bg-white border border-gray-900 text-gray-900 hover:bg-gray-900 hover:text-white px-4 py-2 rounded-none font-medium transition-colors text-xs uppercase letter-spacing-0.05"
+                                                className="flex items-center gap-2 bg-white border border-gray-900 text-gray-900 px-4 py-2 rounded-none font-medium text-xs uppercase letter-spacing-0.05"
                                               >
                                                 <FileSpreadsheet size={14} />
                                                 Export Excel

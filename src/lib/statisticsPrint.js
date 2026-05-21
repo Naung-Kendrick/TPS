@@ -157,17 +157,11 @@ export const printStatistics = ({
       ? `${selectedDistrict} / ${selectedTownship}`
       : selectedDistrict || 'All Districts';
 
-  const PRINT_PAGE_ROWS = 40;
-
   // ── Helpers ──────────────────────────────────────────────────────────────────
-  const chunkArray = (arr, size) => {
-    const chunks = [];
-    for (let i = 0; i < arr.length; i += size) chunks.push(arr.slice(i, i + size));
-    return chunks.length ? chunks : [[]];
-  };
+  // Fit everything on one page - no chunking
 
   // ── Table 1: Population, Age, Religion ──────────────────────────────────────
-  const relThs = allReligions.map(r => `<th>${safeHtml(r)}</th>`).join('');
+  const relThs = allReligions.map(r => `<th class="vertical">${safeHtml(r)}</th>`).join('');
 
   const table1Header = `
     <thead>
@@ -233,21 +227,12 @@ export const printStatistics = ({
       <td class="num bold">${totalStats.nonLocal ? toMM(totalStats.nonLocal) : '-'}</td>
     </tr>`;
 
-  const table1Chunks = chunkArray(wardStats, PRINT_PAGE_ROWS);
-  const table1Html = table1Chunks.map((chunk, ci) => {
-    const isLast = ci === table1Chunks.length - 1;
-    const rows = chunk.map((w, i) => makeTable1Row(w, ci * PRINT_PAGE_ROWS + i)).join('');
-    return `
-      ${ci > 0 ? '<div class="page-break"></div>' : ''}
-      <div class="section-title">
-        Summary Table (1) — Population, Age &amp; Religion
-        ${table1Chunks.length > 1 ? `<span style="font-weight:400;font-size:8.5px;margin-left:8px">(${ci + 1} / ${table1Chunks.length})</span>` : ''}
-      </div>
-      <table>${table1Header}<tbody>${rows}${isLast ? table1TotalRow : ''}</tbody></table>`;
-  }).join('');
+  const table1Html = `
+    <div class="section-title">Summary Table (1) — Population, Age &amp; Religion</div>
+    <table>${table1Header}<tbody>${wardStats.map((w, i) => makeTable1Row(w, i)).join('')}${table1TotalRow}</tbody></table>`;
 
   // ── Table 2: Nationality ─────────────────────────────────────────────────────
-  const natThs = allNationalities.map(n => `<th>${safeHtml(n)}</th>`).join('');
+  const natThs = allNationalities.map(n => `<th class="vertical">${safeHtml(n)}</th>`).join('');
 
   const table2Header = `
     <thead>
@@ -286,18 +271,9 @@ export const printStatistics = ({
       <td class="num bold">${totalStats.nonLocal ? toMM(totalStats.nonLocal) : '-'}</td>
     </tr>`;
 
-  const table2Chunks = chunkArray(wardStats, PRINT_PAGE_ROWS);
-  const table2Html = table2Chunks.map((chunk, ci) => {
-    const isLast = ci === table2Chunks.length - 1;
-    const rows = chunk.map((w, i) => makeTable2Row(w, ci * PRINT_PAGE_ROWS + i)).join('');
-    return `
-      <div class="page-break"></div>
-      <div class="section-title">
-        Summary Table (2) — Nationality
-        ${table2Chunks.length > 1 ? `<span style="font-weight:400;font-size:8.5px;margin-left:8px">(${ci + 1} / ${table2Chunks.length})</span>` : ''}
-      </div>
-      <table>${table2Header}<tbody>${rows}${isLast ? table2TotalRow : ''}</tbody></table>`;
-  }).join('');
+  const table2Html = `
+    <div class="section-title">Summary Table (2) — Nationality</div>
+    <table>${table2Header}<tbody>${wardStats.map((w, i) => makeTable2Row(w, i)).join('')}${table2TotalRow}</tbody></table>`;
 
   const html = `<!DOCTYPE html>
 <html>
@@ -305,12 +281,12 @@ export const printStatistics = ({
   <meta charset="utf-8" />
   <title>Population Statistics — ${safeHtml(filterLine)}</title>
   <style>
-    @page { size: legal landscape; margin: 8mm 10mm; }
+    @page { size: legal landscape; margin: 5mm 6mm; }
     * { box-sizing: border-box; }
     html, body { margin: 0; padding: 0; }
     body {
       font-family: 'Padauk', 'Myanmar Text', 'Times New Roman', Times, serif;
-      font-size: 9.5px; color: #000; background: #fff;
+      font-size: 8.5px; color: #000; background: #fff;
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
     }
@@ -332,37 +308,38 @@ export const printStatistics = ({
     .watermark img { width: 38%; max-width: 380px; opacity: 0.055; }
 
     /* ── Page wrapper ── */
-    .page { position: relative; z-index: 1; padding: 4px 6px 6px; }
+    .page { position: relative; z-index: 1; padding: 2px 4px 4px; }
 
     /* ── Header ── */
-    .header { display: flex; align-items: center; padding-bottom: 5px; margin-bottom: 4px; }
-    .header .logo { width: 56px; flex: 0 0 56px; }
-    .header .logo img { width: 52px; height: auto; }
+    .header { display: flex; align-items: center; padding-bottom: 3px; margin-bottom: 2px; }
+    .header .logo { width: 44px; flex: 0 0 44px; }
+    .header .logo img { width: 40px; height: auto; }
     .header .center { flex: 1; text-align: center; }
-    .header .center .org { font-size: 13px; font-weight: 700; letter-spacing: 0.4px; }
-    .header .center .dept { font-size: 10px; margin-top: 1px; }
-    .header .center .doc-title { font-size: 10px; margin-top: 3px; font-style: italic; color: #333; }
-    .header .flag { width: 56px; flex: 0 0 56px; text-align: right; }
-    .header .flag img { width: 48px; height: auto; border: 1px solid #000; }
-    .rule { border-top: 1px solid #000; border-bottom: 1px solid #000; height: 3px; margin: 0 0 6px; }
+    .header .center .org { font-size: 11px; font-weight: 700; letter-spacing: 0.4px; }
+    .header .center .dept { font-size: 9px; margin-top: 1px; }
+    .header .center .doc-title { font-size: 9px; margin-top: 2px; font-style: italic; color: #333; }
+    .header .flag { width: 44px; flex: 0 0 44px; text-align: right; }
+    .header .flag img { width: 38px; height: auto; border: 1px solid #000; }
+    .rule { border-top: 1px solid #000; border-bottom: 1px solid #000; height: 2px; margin: 0 0 4px; }
 
     /* ── Filter line ── */
     .filter-bar {
-      font-size: 9px; margin-bottom: 6px;
+      font-size: 8px; margin-bottom: 4px;
       display: flex; justify-content: space-between; align-items: center;
-      border: 1px solid #ccc; padding: 3px 8px; background: #f9f9f9;
+      border: 1px solid #ccc; padding: 2px 6px; background: #f9f9f9;
       -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important;
     }
 
     /* ── Section title ── */
-    .section-title { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin: 10px 0 4px; border-bottom: 1px solid #000; padding-bottom: 2px; }
+    .section-title { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin: 6px 0 3px; border-bottom: 1px solid #000; padding-bottom: 2px; }
 
     /* ── Table ── */
-    table { width: 100%; border-collapse: collapse; margin-bottom: 4px; }
-    th, td { border: 1px solid #000; padding: 2.5px 3px; font-size: 8.5px; vertical-align: middle; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 3px; }
+    th, td { border: 1px solid #000; padding: 2px 3px; font-size: 8px; vertical-align: middle; line-height: 1.15; }
     thead th { background: #e8e8e8 !important; font-weight: 700; text-align: center;
       -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
     th.group-header { background: #d4d4d4 !important; }
+    th.vertical { writing-mode: vertical-rl; transform: rotate(180deg); white-space: nowrap; padding: 4px 2px; font-size: 7px; }
     td.num { text-align: center; font-family: 'Courier New', monospace; }
     td.name { text-align: left; font-weight: 500; }
     td.bold { font-weight: 700; }
@@ -371,10 +348,7 @@ export const printStatistics = ({
       -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
 
     /* ── Doc footer ── */
-    .doc-footer { margin-top: 10px; padding-top: 3px; border-top: 1px solid #000; display: flex; justify-content: space-between; font-size: 8px; color: #444; }
-
-    /* ── Page break ── */
-    .page-break { page-break-before: always; padding-top: 4px; }
+    .doc-footer { margin-top: 6px; padding-top: 2px; border-top: 1px solid #000; display: flex; justify-content: space-between; font-size: 7px; color: #444; }
   </style>
 </head>
 <body>

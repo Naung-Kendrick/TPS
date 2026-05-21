@@ -157,7 +157,7 @@ const Sidebar = ({ user }) => {
               border: isActive ? '1px solid #1A1A1A' : '1px solid transparent',
               backgroundColor: isActive ? '#FFFFFF' : 'transparent',
               color: '#1A1A1A', fontWeight: isActive ? '600' : '400',
-              textDecoration: 'none', fontSize: '12px', letterSpacing: '0.02em', transition: 'all 0.1s',
+              textDecoration: 'none', fontSize: '12px', letterSpacing: '0.02em', transition: 'background-color 100ms, color 100ms, border-color 100ms',
             })}
           >
             {({ isActive }) => (

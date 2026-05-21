@@ -119,7 +119,7 @@ const DashboardOverview = () => {
       </div>
 
       {/* Stats Cards */}
-      <div style={{ display: 'flex', gap: '1.5rem', marginBottom: '2rem', flexWrap: 'wrap' }}>
+      <div className="tps-stagger" style={{ display: 'flex', gap: '1.5rem', marginBottom: '2rem', flexWrap: 'wrap' }}>
         <StatCard 
           icon={Users}
           title="စုစုပေါင်း အိမ်ထောင်စုအရေအတွက်"

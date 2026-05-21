@@ -211,7 +211,7 @@ const UserManagement = () => {
                   <button 
                     type="submit" 
                     disabled={loading}
-                    className="w-full flex items-center justify-center gap-2 bg-gray-900 hover:bg-black text-white px-6 py-3 rounded-none font-bold transition-colors text-xs uppercase tracking-[0.2em] disabled:opacity-50"
+                    className="w-full flex items-center justify-center gap-2 bg-gray-900 hover:bg-white hover:text-gray-900 border border-gray-900 text-white px-6 py-3 rounded-none font-bold transition-colors text-xs uppercase tracking-[0.2em] disabled:opacity-50"
                   >
                     {loading ? (
                       <>

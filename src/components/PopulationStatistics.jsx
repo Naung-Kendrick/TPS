@@ -148,8 +148,8 @@ const HorizontalBar = ({ data, color = '#2E7D32' }) => {
 };
 
 // ─── Cache helpers ────────────────────────────────────────
-const CACHE_KEY = 'tps_stats_cache';
-const CACHE_VERSION = 'v1';
+const CACHE_KEY = 'tps_stats_cache_v2_rpc';
+const CACHE_VERSION = 'v2';
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 const readCache = () => {
@@ -183,17 +183,19 @@ const clearCache = () => {
 
 // ─── Main Component ───────────────────────────────────────
 const PopulationStatistics = () => {
-  const [allData, setAllData] = useState([]);
+  // RPC response data (replaces allData)
+  const [statsData, setStatsData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [loadProgress, setLoadProgress] = useState(0);
   const [error, setError] = useState(null);
 
+  // Location lists from RPCs
   const [districts, setDistricts] = useState([]);
   const [townships, setTownships] = useState([]);
   const [wards, setWards] = useState([]);
   const [villages, setVillages] = useState([]);
   const [groups, setGroups] = useState([]);
 
+  // Selected filters
   const [selectedDistrict, setSelectedDistrict] = useState('');
   const [selectedTownship, setSelectedTownship] = useState('');
   const [selectedWard, setSelectedWard] = useState('');
@@ -203,7 +205,7 @@ const PopulationStatistics = () => {
   const PAGE_SIZE = 25;
   const [page1, setPage1] = useState(1);
   const [page2, setPage2] = useState(1);
-  
+
   // Separate pagination for Ward/Village/Group tables
   const [wardPage1, setWardPage1] = useState(1);
   const [wardPage2, setWardPage2] = useState(1);
@@ -212,65 +214,90 @@ const PopulationStatistics = () => {
   const [groupPage1, setGroupPage1] = useState(1);
   const [groupPage2, setGroupPage2] = useState(1);
 
-  const loadData = async (forceRefresh = false) => {
+  // ─── Fetch districts via RPC ──────────────────────────────
+  const loadDistricts = async () => {
+    try {
+      const { data, error } = await supabase.rpc('stats_districts');
+      if (error) throw error;
+      setDistricts(data?.map(d => d.name) || []);
+    } catch (err) {
+      console.error('Failed to load districts:', err);
+      setError(err.message);
+    }
+  };
+
+  // ─── Fetch townships via RPC ──────────────────────────────
+  const loadTownships = async (district) => {
+    if (!district) {
+      setTownships([]);
+      return;
+    }
+    try {
+      const { data, error } = await supabase.rpc('stats_townships', { p_district: district });
+      if (error) throw error;
+      setTownships(data?.map(t => t.name) || []);
+    } catch (err) {
+      console.error('Failed to load townships:', err);
+      setTownships([]);
+    }
+  };
+
+  // ─── Fetch ward/village/group via RPC ─────────────────────
+  const loadLocations = async (district, township) => {
+    if (!district || !township) {
+      setWards([]);
+      setVillages([]);
+      setGroups([]);
+      return;
+    }
+    try {
+      const { data, error } = await supabase.rpc('stats_locations', {
+        p_district: district,
+        p_township: township
+      });
+      if (error) throw error;
+      const locations = data || [];
+      setWards(locations.filter(l => l.kind === 'ward').map(l => l.name));
+      setVillages(locations.filter(l => l.kind === 'village').map(l => l.name));
+      setGroups(locations.filter(l => l.kind === 'group').map(l => l.name));
+    } catch (err) {
+      console.error('Failed to load locations:', err);
+      setWards([]);
+      setVillages([]);
+      setGroups([]);
+    }
+  };
+
+  // ─── Main stats fetch via RPC ───────────────────────────
+  const loadStats = async (forceRefresh = false) => {
     setLoading(true);
     setError(null);
-    setLoadProgress(0);
+
+    // Build cache key from current filters
+    const cacheKey = `${selectedDistrict || 'all'}_${selectedTownship || 'all'}_${selectedWard || 'all'}_${selectedVillage || 'all'}_${selectedGroup || 'all'}`;
 
     // Try cache first (skip if force refresh)
     if (!forceRefresh) {
       const cached = readCache();
-      if (cached) {
-        setAllData(cached);
-        const uniqueDistricts = [...new Set(cached.map(d => d.district).filter(Boolean))].sort();
-        setDistricts(uniqueDistricts);
+      if (cached && cached.key === cacheKey) {
+        setStatsData(cached.data);
         setLoading(false);
-        setLoadProgress(100);
         return;
       }
     }
 
-    // Paginated batch fetch to avoid single large response
-    const BATCH = 5000;
-    const COLS = 'household_no, district, township, ward_village_group, ward_village_group_type, gender, date_of_birth, religious, nationality, resident_status';
-    let allRows = [];
-    let from = 0;
-    let hasMore = true;
-
     try {
-      // Get total count first for progress bar
-      const { count } = await supabase
-        .from('households')
-        .select('*', { count: 'exact', head: true });
+      const { data, error } = await supabase.rpc('stats_breakdown', {
+        p_district: selectedDistrict || null,
+        p_township: selectedTownship || null,
+        p_ward: selectedWard || null,
+        p_village: selectedVillage || null,
+        p_group: selectedGroup || null
+      });
+      if (error) throw error;
 
-      const total = count || 0;
-
-      while (hasMore) {
-        const { data: batch, error: batchErr } = await supabase
-          .from('households')
-          .select(COLS)
-          .range(from, from + BATCH - 1);
-
-        if (batchErr) throw batchErr;
-        if (!batch || batch.length === 0) { hasMore = false; break; }
-
-        allRows = allRows.concat(batch);
-        from += BATCH;
-        hasMore = batch.length === BATCH;
-
-        // Update progress
-        if (total > 0) {
-          setLoadProgress(Math.min(99, Math.round((allRows.length / total) * 100)));
-        }
-      }
-
-      const normalized = allRows.map(row => deepEnsureUnicode(row));
-      writeCache(normalized);
-      setAllData(normalized);
-      setLoadProgress(100);
-
-      const uniqueDistricts = [...new Set(normalized.map(d => d.district).filter(Boolean))].sort();
-      setDistricts(uniqueDistricts);
+      setStatsData(data);
+      writeCache({ key: cacheKey, data });
     } catch (err) {
       setError(err.message);
     } finally {
@@ -278,102 +305,70 @@ const PopulationStatistics = () => {
     }
   };
 
-  useEffect(() => { loadData(); }, []);
-
+  // Initial load: districts and stats
   useEffect(() => {
-    if (selectedDistrict) {
-      const filtered = allData.filter(d => d.district === selectedDistrict);
-      const uniqueTownships = [...new Set(filtered.map(d => d.township).filter(Boolean))].sort();
-      setTownships(uniqueTownships);
-    } else {
-      setTownships([]);
-    }
+    loadDistricts();
+    loadStats();
+  }, []);
+
+  // Reload stats when filters change
+  useEffect(() => {
+    loadStats();
+  }, [selectedDistrict, selectedTownship, selectedWard, selectedVillage, selectedGroup]);
+
+  // Load townships when district changes
+  useEffect(() => {
+    loadTownships(selectedDistrict);
     setSelectedTownship('');
     setSelectedWard('');
     setSelectedVillage('');
     setSelectedGroup('');
     setPage1(1);
     setPage2(1);
-    // Reset ward/village/group pagination
     setWardPage1(1); setWardPage2(1);
     setVillagePage1(1); setVillagePage2(1);
     setGroupPage1(1); setGroupPage2(1);
-  }, [selectedDistrict, allData]);
+  }, [selectedDistrict]);
 
+  // Load locations when township changes
   useEffect(() => {
-    if (selectedTownship) {
-      const filtered = allData.filter(d => d.district === selectedDistrict && d.township === selectedTownship);
-
-      const wardSet = new Set();
-      const villageSet = new Set();
-      const groupSet = new Set();
-
-      filtered.forEach(record => {
-        getWardVillageGroupEntries(record.ward_village_group).forEach(({ name, type }) => {
-          if (type === 'ward') wardSet.add(name);
-          if (type === 'village') villageSet.add(name);
-          if (type === 'group') groupSet.add(name);
-        });
-      });
-
-      setWards([...wardSet].sort());
-      setVillages([...villageSet].sort());
-      setGroups([...groupSet].sort());
-    } else {
-      setWards([]);
-      setVillages([]);
-      setGroups([]);
-    }
+    loadLocations(selectedDistrict, selectedTownship);
     setSelectedWard('');
     setSelectedVillage('');
     setSelectedGroup('');
     setPage1(1);
     setPage2(1);
-    // Reset ward/village/group pagination
     setWardPage1(1); setWardPage2(1);
     setVillagePage1(1); setVillagePage2(1);
     setGroupPage1(1); setGroupPage2(1);
-  }, [selectedTownship, selectedDistrict, allData]);
+  }, [selectedTownship]);
 
-  const filteredData = useCallback(() => {
-    let data = allData;
-    if (selectedDistrict) data = data.filter(d => d.district === selectedDistrict);
-    if (selectedTownship) data = data.filter(d => d.township === selectedTownship);
-    if (selectedWard) data = data.filter(d => recordMatchesLocation(d, selectedWard, 'ward'));
-    if (selectedVillage) data = data.filter(d => recordMatchesLocation(d, selectedVillage, 'village'));
-    if (selectedGroup) data = data.filter(d => recordMatchesLocation(d, selectedGroup, 'group'));
-    return data;
-  }, [allData, selectedDistrict, selectedTownship, selectedWard, selectedVillage, selectedGroup]);
+  // ─── Derived stats from RPC response ─────────────────────
+  const totalStats = statsData?.totalStats || {};
+  const groupStats = statsData?.groupStats || [];
+  const allReligions = statsData?.allReligions || [];
+  const allNationalities = statsData?.allNationalities || [];
 
-  const currentData = filteredData();
+  const totalPopulation = totalStats.total || 0;
+  const totalMale = totalStats.male || 0;
+  const totalFemale = totalStats.female || 0;
 
-  const totalPopulation = currentData.length;
-  const totalMale = currentData.filter(d => d.gender && (d.gender === 'ကျား' || d.gender === 'က')).length;
-  const totalFemale = currentData.filter(d => d.gender && d.gender === 'မ').length;
+  const under16 = (totalStats.u16m || 0) + (totalStats.u16f || 0);
+  const between16and60 = (totalStats.b1660m || 0) + (totalStats.b1660f || 0);
+  const above60 = (totalStats.a60m || 0) + (totalStats.a60f || 0);
+  const unknownAge = totalStats.unknownAge || 0;
 
-  const ages = currentData.map(d => calculateAge(d.date_of_birth)).filter(a => a !== null);
-  const under16 = ages.filter(a => a < 16).length;
-  const between16and60 = ages.filter(a => a >= 16 && a <= 60).length;
-  const above60 = ages.filter(a => a > 60).length;
-  const unknownAge = currentData.length - ages.length;
+  // Religious data for bar chart
+  const religiousData = allReligions.map(r => ({
+    label: r,
+    count: totalStats.relCounts?.[r] || 0
+  })).sort((a, b) => b.count - a.count);
 
-  const religiousMap = {};
-  currentData.forEach(d => {
-    const key = d.religious || 'အခြား';
-    religiousMap[key] = (religiousMap[key] || 0) + 1;
-  });
-  const religiousData = Object.entries(religiousMap)
-    .map(([label, count]) => ({ label, count }))
-    .sort((a, b) => b.count - a.count);
-
-  const nationalityMap = {};
-  currentData.forEach(d => {
-    const key = d.nationality || 'အခြား';
-    nationalityMap[key] = (nationalityMap[key] || 0) + 1;
-  });
-  const nationalityData = Object.entries(nationalityMap)
-    .map(([label, count]) => ({ label, count }))
-    .sort((a, b) => b.count - a.count);
+  // Nationality data for bar chart
+  const nationalityData = allNationalities.map(n => ({
+    label: n,
+    count: totalStats.natCounts?.[n] || 0
+  })).sort((a, b) => b.count - a.count);
 
   const selectStyle = {
     width: '100%', padding: '8px 12px', borderRadius: '0px',
@@ -399,16 +394,6 @@ const PopulationStatistics = () => {
       <div style={{ padding: '32px' }} className="max-w-7xl mx-auto">
         <SkeletonBar width="200px" height="22px" style={{ marginBottom: '8px' }} />
         <SkeletonBar width="320px" height="12px" style={{ marginBottom: '24px' }} />
-        {loadProgress > 0 && loadProgress < 100 && (
-          <div style={{ marginBottom: '32px' }}>
-            <div style={{ fontSize: '11px', color: '#737373', marginBottom: '6px' }}>
-              Loading data... {loadProgress}%
-            </div>
-            <div style={{ height: '4px', backgroundColor: '#E5E7EB', borderRadius: '2px', overflow: 'hidden' }}>
-              <div style={{ height: '100%', width: `${loadProgress}%`, backgroundColor: '#2E7D32', transition: 'width 0.3s ease' }} />
-            </div>
-          </div>
-        )}
         <SkeletonStatGrid />
         <SkeletonStatGrid />
       </div>
@@ -461,7 +446,7 @@ const PopulationStatistics = () => {
           </p>
         </div>
         <button
-          onClick={() => { clearCache(); loadData(true); }}
+          onClick={() => { clearCache(); loadDistricts(); loadStats(true); }}
           style={{ fontSize: '11px', border: '1px solid #E5E7EB', background: 'none', color: '#737373', padding: '6px 14px', cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}
           title="Fetch latest data from database"
         >
@@ -571,7 +556,7 @@ const PopulationStatistics = () => {
         <StatCard label="Total Population" value={totalPopulation} icon={Users} color={colors.forestGreen} />
         <StatCard label="Male" value={totalMale} icon={User} color={colors.slateGray} />
         <StatCard label="Female" value={totalFemale} icon={User} color={colors.mutedClay} />
-        <StatCard label="Households" value={new Set(currentData.map(d => d.household_no).filter(Boolean)).size} icon={Home} color={colors.earthyBrown} />
+        <StatCard label="Households" value={totalStats.households || 0} icon={Home} color={colors.earthyBrown} />
       </div>
 
       {/* ─── Age Distribution ──────────────────────────────── */}
@@ -626,119 +611,46 @@ const PopulationStatistics = () => {
 
       {/* ─── Comprehensive Summary Tables ─────────────────────── */}
       {(() => {
-        const isMale = (g) => g && (g === 'ကျား' || g === 'က');
-        const isFemale = (g) => g && g === 'မ';
-
-        // Group by the appropriate level based on active filters
-        const groupKey = selectedTownship
-          ? 'ward_village_group'
-          : selectedDistrict
-            ? 'township'
-            : 'district';
-
+        // Group label based on filter level
         const groupLabel = selectedTownship
           ? 'ရပ်ကွက်/အုပ်စု'
           : selectedDistrict
             ? 'မြို့နယ်'
             : 'ခရိုင်';
 
-        const activeLocationName = selectedWard || selectedVillage || selectedGroup;
-        const activeLocationType = selectedWard ? 'ward' : selectedVillage ? 'village' : selectedGroup ? 'group' : '';
+        // RPC returns pre-computed groupStats; split by kind when at ward/village/group level
+        const isAtWardLevel = statsData?.groupKey === 'wvg';
 
-        const wardGroups = {};
-        currentData.forEach(d => {
-          if (groupKey === 'ward_village_group') {
-            const entries = getWardVillageGroupEntries(d.ward_village_group);
-            const relevantEntries = activeLocationName
-              ? entries.filter(entry => entry.name === activeLocationName && entry.type === activeLocationType)
-              : entries;
+        let wardStatsList = [];
+        let villageStatsList = [];
+        let groupStatsList = [];
 
-            if (relevantEntries.length === 0) {
-              const fallback = d[groupKey] || 'အခြား';
-              if (!wardGroups[fallback]) wardGroups[fallback] = [];
-              wardGroups[fallback].push(d);
-              return;
-            }
-
-            relevantEntries.forEach(({ name }) => {
-              if (!wardGroups[name]) wardGroups[name] = [];
-              wardGroups[name].push(d);
-            });
-            return;
-          }
-
-          const ward = d[groupKey] || 'အခြား';
-          if (!wardGroups[ward]) wardGroups[ward] = [];
-          wardGroups[ward].push(d);
-        });
-        const wardNames = Object.keys(wardGroups).sort();
-
-        const allReligions = [...new Set(currentData.map(d => d.religious).filter(Boolean))].sort();
-        const allNationalities = [...new Set(currentData.map(d => d.nationality).filter(Boolean))].sort();
-
-        const computeStats = (records) => {
-          const male = records.filter(r => isMale(r.gender)).length;
-          const female = records.filter(r => isFemale(r.gender)).length;
-          const total = records.length;
-          const households = new Set(records.map(r => r.household_no).filter(Boolean)).size;
-
-          const agesWithGender = records.map(r => ({ age: calculateAge(r.date_of_birth), gender: r.gender }));
-
-          const u16m = agesWithGender.filter(r => r.age !== null && r.age < 16 && isMale(r.gender)).length;
-          const u16f = agesWithGender.filter(r => r.age !== null && r.age < 16 && isFemale(r.gender)).length;
-          const b1660m = agesWithGender.filter(r => r.age !== null && r.age >= 16 && r.age <= 60 && isMale(r.gender)).length;
-          const b1660f = agesWithGender.filter(r => r.age !== null && r.age >= 16 && r.age <= 60 && isFemale(r.gender)).length;
-          const a60m = agesWithGender.filter(r => r.age !== null && r.age > 60 && isMale(r.gender)).length;
-          const a60f = agesWithGender.filter(r => r.age !== null && r.age > 60 && isFemale(r.gender)).length;
-
-          const relCounts = {};
-          allReligions.forEach(rel => { relCounts[rel] = records.filter(r => r.religious === rel).length; });
-
-          const natCounts = {};
-          allNationalities.forEach(nat => { natCounts[nat] = records.filter(r => r.nationality === nat).length; });
-
-          const nonLocal = records.filter(r => r.resident_status === 'ပြည်နယ်ခြားသား').length;
-
-          return { male, female, total, households, u16m, u16f, b1660m, b1660f, a60m, a60f, relCounts, natCounts, nonLocal };
-        };
-
-        // Split stats by type when at ward_village_group level
-        const isAtWardLevel = groupKey === 'ward_village_group';
-        
-        let wardStats = [];
-        let villageStats = [];
-        let groupStats = [];
-        
         if (isAtWardLevel) {
-          // Split into 3 separate arrays by type
-          wardNames.forEach(w => {
-            const type = classifyWardVillageGroup(w);
-            const stats = { name: w, type, ...computeStats(wardGroups[w]) };
-            if (type === 'ward') wardStats.push(stats);
-            else if (type === 'village') villageStats.push(stats);
-            else if (type === 'group') groupStats.push(stats);
-            else wardStats.push(stats); // Unknown goes to ward
+          // Split groupStats by kind
+          (groupStats || []).forEach(g => {
+            if (g.kind === 'ward') wardStatsList.push(g);
+            else if (g.kind === 'village') villageStatsList.push(g);
+            else if (g.kind === 'group') groupStatsList.push(g);
+            else wardStatsList.push(g); // Unknown goes to ward
           });
         } else {
-          // Keep combined view for district/township level
-          wardStats = wardNames.map(w => ({ name: w, type: 'unknown', ...computeStats(wardGroups[w]) }));
+          // Use groupStats directly for district/township level
+          wardStatsList = groupStats || [];
         }
-        
-        const totalStats = computeStats(currentData);
 
         // Pagination for combined view
-        const totalPages1 = Math.max(1, Math.ceil(wardStats.length / PAGE_SIZE));
-        const totalPages2 = Math.max(1, Math.ceil(wardStats.length / PAGE_SIZE));
-        const pagedStats1 = wardStats.slice((page1 - 1) * PAGE_SIZE, page1 * PAGE_SIZE);
-        const pagedStats2 = wardStats.slice((page2 - 1) * PAGE_SIZE, page2 * PAGE_SIZE);
-        
+        const totalPages1 = Math.max(1, Math.ceil(wardStatsList.length / PAGE_SIZE));
+        const totalPages2 = Math.max(1, Math.ceil(wardStatsList.length / PAGE_SIZE));
+        const pagedStats1 = wardStatsList.slice((page1 - 1) * PAGE_SIZE, page1 * PAGE_SIZE);
+        const pagedStats2 = wardStatsList.slice((page2 - 1) * PAGE_SIZE, page2 * PAGE_SIZE);
+
         // Pagination for separate views
-        const wardPages1 = Math.max(1, Math.ceil(wardStats.length / PAGE_SIZE));
-        const wardPages2 = Math.max(1, Math.ceil(wardStats.length / PAGE_SIZE));
-        const villagePages1 = Math.max(1, Math.ceil(villageStats.length / PAGE_SIZE));
-        const villagePages2 = Math.max(1, Math.ceil(villageStats.length / PAGE_SIZE));
-        const groupPages1 = Math.max(1, Math.ceil(groupStats.length / PAGE_SIZE));
-        const groupPages2 = Math.max(1, Math.ceil(groupStats.length / PAGE_SIZE));
+        const wardPages1 = Math.max(1, Math.ceil(wardStatsList.length / PAGE_SIZE));
+        const wardPages2 = Math.max(1, Math.ceil(wardStatsList.length / PAGE_SIZE));
+        const villagePages1 = Math.max(1, Math.ceil(villageStatsList.length / PAGE_SIZE));
+        const villagePages2 = Math.max(1, Math.ceil(villageStatsList.length / PAGE_SIZE));
+        const groupPages1 = Math.max(1, Math.ceil(groupStatsList.length / PAGE_SIZE));
+        const groupPages2 = Math.max(1, Math.ceil(groupStatsList.length / PAGE_SIZE));
 
         const thS = { padding: '12px 8px', fontSize: '10px', fontWeight: '600', color: '#737373', borderBottom: '1px solid #E5E7EB', borderRight: '1px solid #E5E7EB', textAlign: 'center', whiteSpace: 'nowrap', textTransform: 'uppercase', letterSpacing: '0.05em', backgroundColor: '#FAFAFA' };
         const tdS = { padding: '10px 8px', fontSize: '12px', textAlign: 'center', borderBottom: '1px solid #E5E7EB', borderRight: '1px solid #E5E7EB', color: '#1A1A1A' };
@@ -746,7 +658,7 @@ const PopulationStatistics = () => {
         const tdBold = { ...tdMonoS, fontWeight: '600', backgroundColor: '#FAFAFA' };
 
         const printArgs = {
-          groupLabel, wardStats, totalStats, allReligions, allNationalities,
+          groupLabel, wardStats: wardStatsList, totalStats, allReligions, allNationalities,
           selectedDistrict, selectedTownship, selectedWard,
         };
 
@@ -922,45 +834,15 @@ const PopulationStatistics = () => {
 
         return (
           <>
-            {/* ── Print / Export toolbar ─────────────────────── */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginBottom: '12px' }}>
-              <button
-                type="button"
-                onClick={() => exportStatisticsExcel(printArgs)}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: '6px',
-                  padding: '7px 16px', border: '1px solid #1A1A1A', backgroundColor: '#FFFFFF',
-                  color: '#1A1A1A', fontSize: '11px', fontWeight: '500', cursor: 'pointer',
-                  textTransform: 'uppercase', letterSpacing: '0.05em',
-                }}
-              >
-                <FileSpreadsheet size={13} />
-                Export Excel
-              </button>
-              <button
-                type="button"
-                onClick={() => printStatistics(printArgs)}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: '6px',
-                  padding: '7px 16px', border: '1px solid #1A1A1A', backgroundColor: '#1A1A1A',
-                  color: '#FFFFFF', fontSize: '11px', fontWeight: '500', cursor: 'pointer',
-                  textTransform: 'uppercase', letterSpacing: '0.05em',
-                }}
-              >
-                <Printer size={13} />
-                Print (Legal)
-              </button>
-            </div>
-
             {/* ── Table 1: Population + Age + Religious ─────── */}
             {isAtWardLevel ? (
               <>
                 {/* WARD TABLE */}
-                {renderTable1('Table 1 — WARD (ရပ်) Statistics', wardStats, wardPage1, setWardPage1, wardPages1)}
+                {renderTable1('Table 1 — WARD (ရပ်) Statistics', wardStatsList, wardPage1, setWardPage1, wardPages1)}
                 {/* VILLAGE TABLE */}
-                {renderTable1('Table 1 — VILLAGE (ရွာ) Statistics', villageStats, villagePage1, setVillagePage1, villagePages1)}
+                {renderTable1('Table 1 — VILLAGE (ရွာ) Statistics', villageStatsList, villagePage1, setVillagePage1, villagePages1)}
                 {/* GROUP TABLE */}
-                {renderTable1('Table 1 — GROUP (အုပ်စု) Statistics', groupStats, groupPage1, setGroupPage1, groupPages1)}
+                {renderTable1('Table 1 — GROUP (အုပ်စု) Statistics', groupStatsList, groupPage1, setGroupPage1, groupPages1)}
               </>
             ) : (
               <div style={sectionCardStyle}>
@@ -989,7 +871,7 @@ const PopulationStatistics = () => {
                   </thead>
                   <tbody>
                     {pagedStats1.map((w, i) => (
-                      <tr key={w.name} style={{ backgroundColor: '#FFFFFF' }}>
+                      <tr key={w.name || i} style={{ backgroundColor: '#FFFFFF' }}>
                         <td style={tdMonoS}>{toMyanmarNum((page1 - 1) * PAGE_SIZE + i + 1)}</td>
                         <td style={{ ...tdS, textAlign: 'left', fontWeight: '500' }}>{w.name}</td>
                         <td style={tdMonoS}>{toMyanmarNum(w.households)}</td>
@@ -1032,10 +914,10 @@ const PopulationStatistics = () => {
                   </tbody>
                 </table>
               </div>
-              {wardStats.length > PAGE_SIZE && (
+              {wardStatsList.length > PAGE_SIZE && (
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0 4px', borderTop: '1px solid #E5E7EB', marginTop: '4px' }}>
                   <span style={{ fontSize: '11px', color: '#737373' }}>
-                    {toMyanmarNum((page1 - 1) * PAGE_SIZE + 1)}–{toMyanmarNum(Math.min(page1 * PAGE_SIZE, wardStats.length))} / {toMyanmarNum(wardStats.length)} rows
+                    {toMyanmarNum((page1 - 1) * PAGE_SIZE + 1)}–{toMyanmarNum(Math.min(page1 * PAGE_SIZE, wardStatsList.length))} / {toMyanmarNum(wardStatsList.length)} rows
                   </span>
                   <div style={{ display: 'flex', gap: '6px' }}>
                     <button onClick={() => setPage1(p => Math.max(1, p - 1))} disabled={page1 === 1}
@@ -1059,11 +941,11 @@ const PopulationStatistics = () => {
             {isAtWardLevel ? (
               <>
                 {/* WARD TABLE 2 */}
-                {renderTable2('Table 2 — WARD (ရပ်) Nationality', wardStats, wardPage2, setWardPage2, wardPages2)}
+                {renderTable2('Table 2 — WARD (ရပ်) Statistics', wardStatsList, wardPage2, setWardPage2, wardPages2)}
                 {/* VILLAGE TABLE 2 */}
-                {renderTable2('Table 2 — VILLAGE (ရွာ) Nationality', villageStats, villagePage2, setVillagePage2, villagePages2)}
+                {renderTable2('Table 2 — VILLAGE (ရွာ) Statistics', villageStatsList, villagePage2, setVillagePage2, villagePages2)}
                 {/* GROUP TABLE 2 */}
-                {renderTable2('Table 2 — GROUP (အုပ်စု) Nationality', groupStats, groupPage2, setGroupPage2, groupPages2)}
+                {renderTable2('Table 2 — GROUP (အုပ်စု) Statistics', groupStatsList, groupPage2, setGroupPage2, groupPages2)}
               </>
             ) : (
             <div style={sectionCardStyle}>
@@ -1085,7 +967,7 @@ const PopulationStatistics = () => {
                   </thead>
                   <tbody>
                     {pagedStats2.map((w, i) => (
-                      <tr key={w.name} style={{ backgroundColor: '#FFFFFF' }}>
+                      <tr key={w.name || i} style={{ backgroundColor: '#FFFFFF' }}>
                         <td style={tdMonoS}>{toMyanmarNum((page2 - 1) * PAGE_SIZE + i + 1)}</td>
                         <td style={{ ...tdS, textAlign: 'left', fontWeight: '500' }}>{w.name}</td>
                         <td style={tdMonoS}>{toMyanmarNum(w.male)}</td>
@@ -1108,10 +990,10 @@ const PopulationStatistics = () => {
                   </tbody>
                 </table>
               </div>
-              {wardStats.length > PAGE_SIZE && (
+              {wardStatsList.length > PAGE_SIZE && (
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0 4px', borderTop: '1px solid #E5E7EB', marginTop: '4px' }}>
                   <span style={{ fontSize: '11px', color: '#737373' }}>
-                    {toMyanmarNum((page2 - 1) * PAGE_SIZE + 1)}–{toMyanmarNum(Math.min(page2 * PAGE_SIZE, wardStats.length))} / {toMyanmarNum(wardStats.length)} rows
+                    {toMyanmarNum((page2 - 1) * PAGE_SIZE + 1)}–{toMyanmarNum(Math.min(page2 * PAGE_SIZE, wardStatsList.length))} / {toMyanmarNum(wardStatsList.length)} rows
                   </span>
                   <div style={{ display: 'flex', gap: '6px' }}>
                     <button onClick={() => setPage2(p => Math.max(1, p - 1))} disabled={page2 === 1}
@@ -1130,6 +1012,39 @@ const PopulationStatistics = () => {
               )}
             </div>
             )}
+
+            {/* ── Print / Export toolbar ─────────────────────── */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '24px', paddingTop: '16px', borderTop: '1px solid #E5E7EB' }}>
+              <button
+                type="button"
+                onClick={() => exportStatisticsExcel(printArgs)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '6px',
+                  padding: '7px 16px', border: '1px solid #1A1A1A', backgroundColor: '#FFFFFF',
+                  color: '#1A1A1A', fontSize: '11px', fontWeight: '500', cursor: 'pointer',
+                  textTransform: 'uppercase', letterSpacing: '0.05em',
+                }}
+              >
+                <FileSpreadsheet size={13} />
+                Export Excel
+              </button>
+              <button
+                type="button"
+                onClick={() => printStatistics(printArgs)}
+                onMouseOver={e => { e.currentTarget.style.backgroundColor = '#FFFFFF'; e.currentTarget.style.color = '#1A1A1A'; }}
+                onMouseOut={e => { e.currentTarget.style.backgroundColor = '#1A1A1A'; e.currentTarget.style.color = '#FFFFFF'; }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '6px',
+                  padding: '7px 16px', border: '1px solid #1A1A1A', backgroundColor: '#1A1A1A',
+                  color: '#FFFFFF', fontSize: '11px', fontWeight: '500', cursor: 'pointer',
+                  textTransform: 'uppercase', letterSpacing: '0.05em',
+                  transition: 'background-color 120ms cubic-bezier(0.23,1,0.32,1), color 120ms cubic-bezier(0.23,1,0.32,1)',
+                }}
+              >
+                <Printer size={13} />
+                Print (Legal)
+              </button>
+            </div>
           </>
         );
       })()}

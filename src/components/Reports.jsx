@@ -94,26 +94,26 @@ const Reports = () => {
 
     try {
       if (level === 1) {
-        const { data, error } = await supabase.from('households').select('district');
+        // Use RPC for distinct districts - fast and no pagination needed
+        const { data, error } = await supabase.rpc('report_districts');
         if (error) throw error;
-        const unique = [...new Set(data.filter(d => d.district).map(d => d.district))].sort();
-        const list = unique.map(name => ({ id: name, name }));
+        const list = (data || []).map(d => ({ id: d.district, name: d.district }));
         setDataList(list);
         cacheSet(cacheKey, list);
       } 
       else if (level === 2) {
-        const { data, error } = await supabase.from('households').select('township').eq('district', path.district);
+        // Use RPC for distinct townships - fast and no pagination needed
+        const { data, error } = await supabase.rpc('report_townships', { p_district: path.district });
         if (error) throw error;
-        const unique = [...new Set(data.filter(d => d.township).map(d => d.township))].sort();
-        const list = unique.map(name => ({ id: name, name }));
+        const list = (data || []).map(d => ({ id: d.township, name: d.township }));
         setDataList(list);
         cacheSet(cacheKey, list);
       }
       else if (level === 3) {
-        const { data, error } = await supabase.from('households').select('ward_village_group').eq('township', path.township);
+        // Use RPC for distinct villages - fast and no pagination needed
+        const { data, error } = await supabase.rpc('report_villages', { p_township: path.township });
         if (error) throw error;
-        const unique = [...new Set(data.filter(d => d.ward_village_group).map(d => d.ward_village_group))].sort();
-        const list = unique.map(name => ({ id: name, name }));
+        const list = (data || []).map(d => ({ id: d.village, name: d.village }));
         setDataList(list);
         cacheSet(cacheKey, list);
       }
@@ -152,7 +152,14 @@ const Reports = () => {
   };
 
   const handleNavigate = (newLevel, payload) => {
-    setPath(prev => ({ ...prev, ...payload }));
+    setPath(prev => {
+      // When navigating, reset child states based on new level
+      const newPath = { ...prev, ...payload };
+      if (newLevel <= 2) { newPath.township = null; newPath.village = null; newPath.householdNo = null; newPath.headName = null; }
+      if (newLevel <= 3) { newPath.village = null; newPath.householdNo = null; newPath.headName = null; }
+      if (newLevel <= 4) { newPath.householdNo = null; newPath.headName = null; }
+      return newPath;
+    });
     setLevel(newLevel);
   };
 
@@ -422,7 +429,7 @@ const Reports = () => {
       {/* CONTROLS */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-6">
         {level > 1 ? (
-          <button onClick={goBack} className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-900 hover:bg-gray-50 transition-colors font-medium text-xs uppercase letter-spacing-0.05">
+          <button onClick={goBack} className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-900 text-gray-900 font-medium text-xs uppercase letter-spacing-0.05">
             <ArrowLeft size={14} /> Back
           </button>
         ) : <div />}
@@ -467,7 +474,7 @@ const Reports = () => {
                         if (level === 2) handleNavigate(3, { township: item.name });
                         if (level === 3) handleNavigate(4, { village: item.name });
                       }}
-                      className="bg-white p-5 border border-gray-200 hover:border-gray-900 cursor-pointer transition-all flex items-center justify-between group"
+                      className="bg-white p-5 border border-gray-200 hover:border-gray-900 cursor-pointer transition-[border-color] duration-100 flex items-center justify-between group"
                     >
                       <div className="flex items-center gap-3">
                         <div className="text-gray-900">
@@ -510,7 +517,7 @@ const Reports = () => {
                           <td style={{ ...tdStyle, textAlign: 'right' }}>
                             <button 
                               onClick={() => handleNavigate(5, { headName: head.name, householdNo: head.household_no })}
-                              className="inline-flex items-center gap-1 bg-white border border-gray-900 text-gray-900 px-3 py-1 text-xs font-medium hover:bg-gray-50 transition-colors uppercase"
+                              className="inline-flex items-center gap-1 bg-white border border-gray-900 text-gray-900 px-3 py-1 text-xs font-medium uppercase"
                             >
                               View Family <ChevronRight size={14} />
                             </button>
@@ -533,7 +540,7 @@ const Reports = () => {
                       <p className="text-sm font-semibold text-gray-900 mb-2">Delete Member?</p>
                       <p className="text-xs text-gray-500 mb-6">This will permanently remove this record from the database. This action cannot be undone.</p>
                       <div className="flex gap-3 justify-end">
-                        <button onClick={cancelDelete} disabled={deleting} className="px-4 py-2 text-xs border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors">
+                        <button onClick={cancelDelete} disabled={deleting} className="px-4 py-2 text-xs border border-gray-900 text-gray-900">
                           Cancel
                         </button>
                         <button onClick={doDelete} disabled={deleting} className="px-4 py-2 text-xs bg-red-600 text-white hover:bg-red-700 transition-colors flex items-center gap-2">
@@ -641,7 +648,7 @@ const Reports = () => {
                     <button
                       type="button"
                       onClick={() => printHouseholdPdf(path.householdNo, familyMembers)}
-                      className="flex items-center gap-2 bg-gray-900 hover:bg-white hover:text-gray-900 border border-gray-900 text-white px-4 py-2 rounded-none font-medium transition-colors text-xs uppercase letter-spacing-0.05"
+                      className="flex items-center gap-2 bg-gray-900 hover:bg-white hover:text-gray-900 hover:border-gray-900 border border-gray-900 text-white px-4 py-2 rounded-none font-medium transition-colors text-xs uppercase letter-spacing-0.05"
                     >
                       <Printer size={14} />
                       Print PDF
@@ -649,7 +656,7 @@ const Reports = () => {
                     <button
                       type="button"
                       onClick={() => exportHouseholdExcel(path.householdNo, familyMembers)}
-                      className="flex items-center gap-2 bg-white border border-gray-900 text-gray-900 hover:bg-gray-900 hover:text-white px-4 py-2 rounded-none font-medium transition-colors text-xs uppercase letter-spacing-0.05"
+                      className="flex items-center gap-2 bg-white border border-gray-900 text-gray-900 px-4 py-2 rounded-none font-medium text-xs uppercase letter-spacing-0.05"
                     >
                       <FileSpreadsheet size={14} />
                       Export Excel
@@ -657,7 +664,7 @@ const Reports = () => {
                     <button
                       type="button"
                       onClick={exportHouseholdJson}
-                      className="flex items-center gap-2 bg-white border border-gray-900 text-gray-900 hover:bg-gray-900 hover:text-white px-4 py-2 rounded-none font-medium transition-colors text-xs uppercase letter-spacing-0.05"
+                      className="flex items-center gap-2 bg-white border border-gray-900 text-gray-900 px-4 py-2 rounded-none font-medium text-xs uppercase letter-spacing-0.05"
                     >
                       <Download size={14} />
                       Export JSON

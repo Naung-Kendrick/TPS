@@ -335,36 +335,72 @@ const processAndUpload = async (formattedData, setValidationErrors, setShowModal
   let duplicateCount = 0;
   let dbErrors = [];
 
-  // Upload the processed data with types array
-  for (let i = 0; i < processedData.length; i++) {
-    const rowData = processedData[i];
-    const { data: existing } = await supabase
+  // ── Phase 1 Optimization: bulk duplicate check + batched insert ──
+  // Fields used to identify a duplicate row (must stay in sync with fingerprint below)
+  const DUP_FIELDS = [
+    'household_no', 'name', 'date_of_birth', 'gender',
+    'fathers_name', 'mothers_name', 'household_relationship', 'occupation',
+    'previous_id_no', 'taang_land_id_no', 'nationality', 'resident_status',
+    'religious', 'house_no', 'ward_village_group', 'township', 'district',
+  ];
+  const fingerprint = (row) => DUP_FIELDS.map(f => row[f] || '').join('\u0001');
+
+  // 1. Collect unique household numbers in the upload (narrows the DB scan)
+  const uniqueHouseholdNos = [...new Set(
+    processedData.map(r => r.household_no || '').filter(Boolean)
+  )];
+
+  // 2. Fetch existing rows from DB in chunks (Postgres IN() handles ~1000 items fine,
+  //    but chunk to 500 to keep URL length safe)
+  const existingFingerprints = new Set();
+  const SELECT_CHUNK = 500;
+  for (let i = 0; i < uniqueHouseholdNos.length; i += SELECT_CHUNK) {
+    const slice = uniqueHouseholdNos.slice(i, i + SELECT_CHUNK);
+    const { data: existingRows, error: selErr } = await supabase
       .from('households')
-      .select('id')
-      .eq('household_no', rowData.household_no || '')
-      .eq('name', rowData.name || '')
-      .eq('date_of_birth', rowData.date_of_birth || '')
-      .eq('gender', rowData.gender || '')
-      .eq('fathers_name', rowData.fathers_name || '')
-      .eq('mothers_name', rowData.mothers_name || '')
-      .eq('household_relationship', rowData.household_relationship || '')
-      .eq('occupation', rowData.occupation || '')
-      .eq('previous_id_no', rowData.previous_id_no || '')
-      .eq('taang_land_id_no', rowData.taang_land_id_no || '')
-      .eq('nationality', rowData.nationality || '')
-      .eq('resident_status', rowData.resident_status || '')
-      .eq('religious', rowData.religious || '')
-      .eq('house_no', rowData.house_no || '')
-      .eq('ward_village_group', rowData.ward_village_group || '')
-      .eq('township', rowData.township || '')
-      .eq('district', rowData.district || '')
-      .limit(1);
+      .select(DUP_FIELDS.join(','))
+      .in('household_no', slice);
+    if (selErr) {
+      dbErrors.push(`Duplicate check failed: ${selErr.message}`);
+      continue;
+    }
+    (existingRows || []).forEach(r => existingFingerprints.add(fingerprint(r)));
+  }
 
-    if (existing && existing.length > 0) { duplicateCount++; continue; }
+  // 3. Partition: new rows go to insert queue, duplicates are counted
+  const rowsToInsert = [];
+  const insertSourceIndex = []; // maps batch index → original row index for error reporting
+  for (let i = 0; i < processedData.length; i++) {
+    const fp = fingerprint(processedData[i]);
+    if (existingFingerprints.has(fp)) {
+      duplicateCount++;
+    } else {
+      rowsToInsert.push(processedData[i]);
+      insertSourceIndex.push(i);
+      // Also add to set so duplicates *within* the same CSV are skipped
+      existingFingerprints.add(fp);
+    }
+  }
 
-    const { error: supabaseError } = await supabase.from('households').insert(rowData);
-    if (supabaseError) dbErrors.push(`Row ${i + 2}: ${supabaseError.message}`);
-    else successCount++;
+  // 4. Insert in batches; on batch failure, retry per-row to attribute errors
+  const INSERT_BATCH = 200;
+  for (let i = 0; i < rowsToInsert.length; i += INSERT_BATCH) {
+    const batch = rowsToInsert.slice(i, i + INSERT_BATCH);
+    const { error: batchErr } = await supabase.from('households').insert(batch);
+    if (!batchErr) {
+      successCount += batch.length;
+    } else {
+      // Batch failed — fall back to per-row inserts so we can identify which row(s) broke
+      for (let j = 0; j < batch.length; j++) {
+        const { error: rowErr } = await supabase.from('households').insert(batch[j]);
+        if (rowErr) {
+          const originalIdx = insertSourceIndex[i + j];
+          dbErrors.push(`Row ${originalIdx + 2}: ${rowErr.message}`);
+        } else {
+          successCount++;
+        }
+      }
+    }
   }
 
   const parts = [];

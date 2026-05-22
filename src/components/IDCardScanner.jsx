@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import jsQR from 'jsqr';
+import { BrowserMultiFormatReader } from '@zxing/browser';
+import { NotFoundException } from '@zxing/library';
 import { supabase } from '../lib/supabase';
 import { pushNotification, NOTIF_TYPES } from '../lib/notifications';
 import {
@@ -43,6 +44,7 @@ const IDCardScanner = () => {
   const rafRef = useRef(null);
   const trackRef = useRef(null);
   const inputRef = useRef(null);
+  const zxingReaderRef = useRef(null);
   // Extract the core numeric part from any format:
   // "No - 01003821959002978", "No-01003821959002978", "01003821959002978", etc.
   const extractNumericID = (raw) => {
@@ -124,10 +126,18 @@ const IDCardScanner = () => {
   };
 
   const stopCamera = useCallback(() => {
-    if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
+    // Stop ZXing reader
+    if (zxingReaderRef.current) {
+      try { zxingReaderRef.current.reset(); } catch (_) {}
+      zxingReaderRef.current = null;
+    }
+    // Stop stream tracks
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(t => t.stop());
       streamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
     }
     trackRef.current = null;
     setScanning(false);
@@ -140,47 +150,40 @@ const IDCardScanner = () => {
     setResult(null);
     setScanning(true);
     try {
+      // Get camera stream (rear camera, high res)
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }
       });
       streamRef.current = stream;
-      const track = stream.getVideoTracks()[0];
-      trackRef.current = track;
+      trackRef.current = stream.getVideoTracks()[0];
 
-      // Always allow CSS zoom 1–4x; also enable hardware zoom if supported
       setZoomRange({ min: 1, max: 4 });
       setZoom(1);
 
+      // Attach stream to video element
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         await videoRef.current.play();
       }
 
-      // Start QR decode loop
-      const canvas = canvasRef.current;
-      const ctx = canvas.getContext('2d');
-      const tick = () => {
-        const video = videoRef.current;
-        if (!video || video.readyState !== video.HAVE_ENOUGH_DATA) {
-          rafRef.current = requestAnimationFrame(tick);
-          return;
-        }
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: 'dontInvert' });
-        if (code?.data) {
+      // Start ZXing continuous decode on the video element
+      const reader = new BrowserMultiFormatReader();
+      zxingReaderRef.current = reader;
+
+      reader.decodeFromVideoElement(videoRef.current, (result, err) => {
+        if (result) {
+          const qrData = result.getText();
           setScanFlash(true);
           setTimeout(() => setScanFlash(false), 400);
           stopCamera();
-          setInputValue(code.data);
-          lookupID(code.data);
-          return;
+          setInputValue(qrData);
+          lookupID(qrData);
         }
-        rafRef.current = requestAnimationFrame(tick);
-      };
-      rafRef.current = requestAnimationFrame(tick);
+        // NotFoundException is thrown every frame when no QR found — ignore it
+        if (err && !(err instanceof NotFoundException)) {
+          console.warn('ZXing decode error:', err);
+        }
+      });
     } catch (err) {
       setScanning(false);
       setError('Camera error: ' + (err?.message || 'Could not access camera.'));

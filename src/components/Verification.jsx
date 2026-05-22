@@ -122,8 +122,14 @@ const Verification = () => {
       let query = supabase.from('households').select('*');
 
       if (formData.household_no.trim()) {
-        const hnSearch = normalizeHouseholdSearch(formData.household_no);
-        query = query.ilike('household_no', `%${hnSearch}%`);
+        const raw = formData.household_no.trim();
+        const normalized = raw.replace(/\s*-\s*/g, '-');       // "ကောင်းတပ်-၁"
+        const spaced    = raw.replace(/\s*-\s*/g, ' - ');      // "ကောင်းတပ် - ၁"
+        if (normalized === spaced) {
+          query = query.ilike('household_no', `%${normalized}%`);
+        } else {
+          query = query.or(`household_no.ilike.%${normalized}%,household_no.ilike.%${spaced}%`);
+        }
       }
       if (formData.name.trim()) query = query.ilike('name', `%${formData.name.trim()}%`);
       if (formData.fathers_name.trim()) query = query.ilike('fathers_name', `%${formData.fathers_name.trim()}%`);
@@ -228,7 +234,8 @@ const Verification = () => {
                   value={formData.household_no} 
                   onChange={handleChange}
                   className="w-full px-3 py-2 bg-white border border-gray-200 rounded-none focus:outline-none focus:border-gray-900 transition-colors text-sm font-mono"
-                  placeholder="Enter Household Number (e.g., HH-001)"
+                  placeholder="Enter Household Number"
+                  autoComplete="off"
                 />
               </div>
               <div>
@@ -240,6 +247,7 @@ const Verification = () => {
                   onChange={handleChange}
                   className="w-full px-3 py-2 bg-white border border-gray-200 rounded-none focus:outline-none focus:border-gray-900 transition-colors text-sm"
                   placeholder="Enter name"
+                  autoComplete="off"
                 />
               </div>
               <div>
@@ -251,6 +259,7 @@ const Verification = () => {
                   onChange={handleChange}
                   className="w-full px-3 py-2 bg-white border border-gray-200 rounded-none focus:outline-none focus:border-gray-900 transition-colors text-sm"
                   placeholder="Enter father's name"
+                  autoComplete="off"
                 />
               </div>
               <div>
@@ -262,6 +271,7 @@ const Verification = () => {
                   onChange={handleChange}
                   className="w-full px-3 py-2 bg-white border border-gray-200 rounded-none focus:outline-none focus:border-gray-900 transition-colors text-sm"
                   placeholder="Enter ward name"
+                  autoComplete="off"
                 />
               </div>
               <div>
@@ -273,6 +283,7 @@ const Verification = () => {
                   onChange={handleChange}
                   className="w-full px-3 py-2 bg-white border border-gray-200 rounded-none focus:outline-none focus:border-gray-900 transition-colors text-sm"
                   placeholder="Enter village name"
+                  autoComplete="off"
                 />
               </div>
               <div>
@@ -284,6 +295,7 @@ const Verification = () => {
                   onChange={handleChange}
                   className="w-full px-3 py-2 bg-white border border-gray-200 rounded-none focus:outline-none focus:border-gray-900 transition-colors text-sm"
                   placeholder="Enter group name"
+                  autoComplete="off"
                 />
               </div>
               <div>
@@ -295,6 +307,7 @@ const Verification = () => {
                   onChange={handleChange}
                   className="w-full px-3 py-2 bg-white border border-gray-200 rounded-none focus:outline-none focus:border-gray-900 transition-colors text-sm"
                   placeholder="Enter township name"
+                  autoComplete="off"
                 />
               </div>
               <div>
@@ -306,6 +319,7 @@ const Verification = () => {
                   onChange={handleChange}
                   className="w-full px-3 py-2 bg-white border border-gray-200 rounded-none focus:outline-none focus:border-gray-900 transition-colors text-sm"
                   placeholder="Enter district name"
+                  autoComplete="off"
                 />
               </div>
             </div>

@@ -636,62 +636,42 @@ const Reports = () => {
             {/* LEVEL 4: WARD HOUSEHOLD HEADS or GROUP VILLAGES */}
             {level === 4 && (
               path.locationType === 'ward' ? (
-                // Ward path: show household heads — mobile-card / desktop-table
-                <>
-                  {/* Mobile card list */}
-                  <div className="block sm:hidden divide-y divide-gray-100">
-                    {filteredData.length === 0 ? (
-                      <EmptyState type="no-results" message={search ? `No results for "${search}".` : 'No household heads found.'} compact />
-                    ) : filteredData.map(head => (
-                      <div key={head.id}
-                        onClick={() => handleNavigate(6, { headName: head.name, householdNo: head.household_no })}
-                        className="flex items-center justify-between px-4 py-3 active:bg-gray-50 cursor-pointer"
-                      >
-                        <div>
-                          <p className="text-xs font-semibold text-gray-900">{head.name}</p>
-                          <p className="text-[11px] text-gray-500 font-mono mt-0.5">{head.household_no} · {head.gender || '—'}</p>
-                        </div>
-                        <ChevronRight size={14} className="text-gray-300 flex-shrink-0" />
-                      </div>
-                    ))}
-                  </div>
-                  {/* Desktop table */}
-                  <div className="hidden sm:block overflow-x-auto">
-                    <table className="w-full text-left border-collapse">
-                      <thead>
-                        <tr>
-                          <th style={thStyle}>Household Head</th>
-                          <th style={thStyle}>Household No.</th>
-                          <th style={thStyle}>Gender</th>
-                          <th style={thStyle}>Occupation</th>
-                          <th style={{ ...thStyle, textAlign: 'right' }}>Action</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {filteredData.length === 0 ? (
-                          <tr><td colSpan={5}><EmptyState type="no-results" message={search ? `No household heads match "${search}".` : 'No household heads found in this ward.'} compact /></td></tr>
-                        ) : (
-                          filteredData.map(head => (
-                            <tr key={head.id} className="hover:bg-gray-50 transition-colors">
-                              <td style={tdStyle} className="font-medium">{head.name}</td>
-                              <td style={tdStyle} className="font-mono">{head.household_no}</td>
-                              <td style={tdStyle}>{head.gender}</td>
-                              <td style={tdStyle}>{head.occupation || '-'}</td>
-                              <td style={{ ...tdStyle, textAlign: 'right' }}>
-                                <button
-                                  onClick={() => handleNavigate(6, { headName: head.name, householdNo: head.household_no })}
-                                  className="inline-flex items-center gap-1 bg-white border border-gray-900 text-gray-900 px-3 py-1 text-xs font-medium uppercase"
-                                >
-                                  View Family <ChevronRight size={13} />
-                                </button>
-                              </td>
-                            </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </>
+                // Ward path: show household heads — always table
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr>
+                        <th style={thStyle}>Household Head (ဦးစီး)</th>
+                        <th style={thStyle}>Household No.</th>
+                        <th style={thStyle}>Gender</th>
+                        <th style={thStyle}>Occupation</th>
+                        <th style={{ ...thStyle, textAlign: 'right' }}>Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredData.length === 0 ? (
+                        <tr><td colSpan={5}><EmptyState type="no-results" message={search ? `No household heads match "${search}".` : 'No household heads found in this ward.'} compact /></td></tr>
+                      ) : (
+                        filteredData.map(head => (
+                          <tr key={head.id} className="hover:bg-gray-50 transition-colors">
+                            <td style={tdStyle} className="font-medium">{head.name}</td>
+                            <td style={{ ...tdStyle, fontFamily: 'monospace' }}>{head.household_no}</td>
+                            <td style={tdStyle}>{head.gender || '—'}</td>
+                            <td style={tdStyle}>{head.occupation || '-'}</td>
+                            <td style={{ ...tdStyle, textAlign: 'right' }}>
+                              <button
+                                onClick={() => handleNavigate(6, { headName: head.name, householdNo: head.household_no })}
+                                className="inline-flex items-center gap-1 bg-white border border-gray-900 text-gray-900 px-3 py-1 text-xs font-medium uppercase"
+                              >
+                                View Family <ChevronRight size={13} />
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               ) : (
                 // Group path: show villages as cards
                 <div className="p-3 sm:p-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 bg-white min-h-[300px]">
@@ -720,61 +700,41 @@ const Reports = () => {
 
             {/* LEVEL 5: VILLAGE HOUSEHOLD HEADS (group path only) */}
             {level === 5 && path.locationType === 'group' && (
-              <>
-                {/* Mobile card list */}
-                <div className="block sm:hidden divide-y divide-gray-100">
-                  {filteredData.length === 0 ? (
-                    <EmptyState type="no-results" message={search ? `No results for "${search}".` : 'No household heads found.'} compact />
-                  ) : filteredData.map(head => (
-                    <div key={head.id}
-                      onClick={() => handleNavigate(6, { headName: head.name, householdNo: head.household_no })}
-                      className="flex items-center justify-between px-4 py-3 active:bg-gray-50 cursor-pointer"
-                    >
-                      <div>
-                        <p className="text-xs font-semibold text-gray-900">{head.name}</p>
-                        <p className="text-[11px] text-gray-500 font-mono mt-0.5">{head.household_no} · {head.gender || '—'}</p>
-                      </div>
-                      <ChevronRight size={14} className="text-gray-300 flex-shrink-0" />
-                    </div>
-                  ))}
-                </div>
-                {/* Desktop table */}
-                <div className="hidden sm:block overflow-x-auto">
-                  <table className="w-full text-left border-collapse">
-                    <thead>
-                      <tr>
-                        <th style={thStyle}>Household Head</th>
-                        <th style={thStyle}>Household No.</th>
-                        <th style={thStyle}>Gender</th>
-                        <th style={thStyle}>Occupation</th>
-                        <th style={{ ...thStyle, textAlign: 'right' }}>Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredData.length === 0 ? (
-                        <tr><td colSpan={5}><EmptyState type="no-results" message={search ? `No household heads match "${search}".` : 'No household heads found in this village.'} compact /></td></tr>
-                      ) : (
-                        filteredData.map(head => (
-                          <tr key={head.id} className="hover:bg-gray-50 transition-colors">
-                            <td style={tdStyle} className="font-medium">{head.name}</td>
-                            <td style={tdStyle} className="font-mono">{head.household_no}</td>
-                            <td style={tdStyle}>{head.gender}</td>
-                            <td style={tdStyle}>{head.occupation || '-'}</td>
-                            <td style={{ ...tdStyle, textAlign: 'right' }}>
-                              <button
-                                onClick={() => handleNavigate(6, { headName: head.name, householdNo: head.household_no })}
-                                className="inline-flex items-center gap-1 bg-white border border-gray-900 text-gray-900 px-3 py-1 text-xs font-medium uppercase"
-                              >
-                                View Family <ChevronRight size={13} />
-                              </button>
-                            </td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr>
+                      <th style={thStyle}>Household Head (ဦးစီး)</th>
+                      <th style={thStyle}>Household No.</th>
+                      <th style={thStyle}>Gender</th>
+                      <th style={thStyle}>Occupation</th>
+                      <th style={{ ...thStyle, textAlign: 'right' }}>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredData.length === 0 ? (
+                      <tr><td colSpan={5}><EmptyState type="no-results" message={search ? `No household heads match "${search}".` : 'No household heads found in this village.'} compact /></td></tr>
+                    ) : (
+                      filteredData.map(head => (
+                        <tr key={head.id} className="hover:bg-gray-50 transition-colors">
+                          <td style={tdStyle} className="font-medium">{head.name}</td>
+                          <td style={{ ...tdStyle, fontFamily: 'monospace' }}>{head.household_no}</td>
+                          <td style={tdStyle}>{head.gender || '—'}</td>
+                          <td style={tdStyle}>{head.occupation || '-'}</td>
+                          <td style={{ ...tdStyle, textAlign: 'right' }}>
+                            <button
+                              onClick={() => handleNavigate(6, { headName: head.name, householdNo: head.household_no })}
+                              className="inline-flex items-center gap-1 bg-white border border-gray-900 text-gray-900 px-3 py-1 text-xs font-medium uppercase"
+                            >
+                              View Family <ChevronRight size={13} />
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
             )}
 
             {/* LEVEL 6: FAMILY MEMBERS TABLE (for both ward and group/village paths) */}

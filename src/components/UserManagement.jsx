@@ -6,7 +6,6 @@ const UserManagement = ({ user }) => {
   const [formData, setFormData] = useState({
     username: '',
     password: '',
-    displayName: '',
     role: 'field'
   });
   const [loading, setLoading] = useState(false);
@@ -75,7 +74,10 @@ const UserManagement = ({ user }) => {
     try {
       // Invoke the Supabase Edge Function
       const { data, error } = await supabase.functions.invoke('create-user', {
-        body: formData,
+        body: {
+          ...formData,
+          displayName: formData.username // Fallback to username for backend display name
+        },
       });
 
       if (error) throw error;
@@ -89,7 +91,6 @@ const UserManagement = ({ user }) => {
       setFormData({
         username: '',
         password: '',
-        displayName: '',
         role: 'field'
       });
     } catch (err) {
@@ -356,18 +357,7 @@ const UserManagement = ({ user }) => {
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase tracking-wider">Display Name (Myanmar/English)</label>
-                  <input 
-                    type="text" 
-                    name="displayName" 
-                    required
-                    value={formData.displayName}
-                    onChange={handleChange}
-                    className="w-full px-3 py-2 bg-white border border-gray-200 focus:outline-none focus:border-gray-900 transition-colors text-sm"
-                    placeholder="e.g. ဦးကျော်ဇေယျ"
-                  />
-                </div>
+                {/* Display Name field removed */}
 
                 <div className="grid grid-cols-1 gap-4">
                   <div>

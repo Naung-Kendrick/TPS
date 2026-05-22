@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { ShieldAlert, Lock, Loader2, ChevronRight, AlertCircle } from 'lucide-react';
+import { ShieldAlert, Loader2, ChevronRight, AlertCircle } from 'lucide-react';
 import logo from '../assets/fonts/IDTL_logo.png';
 
 const TpsAuthenticator = ({ onPassed }) => {
@@ -165,24 +165,12 @@ const TpsAuthenticator = ({ onPassed }) => {
         </div>
 
         {/* Body */}
-        <div style={{ padding: '28px 32px 32px' }}>
-
-          <div style={{ marginBottom: '24px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-              <Lock size={13} style={{ color: '#737373' }} />
-              <span style={{ fontSize: '10px', fontWeight: '700', color: '#1A1A1A', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                Weekly Access Code
-              </span>
-            </div>
-            <p style={{ fontSize: '11px', color: '#737373', margin: 0, lineHeight: 1.6 }}>
-              Enter the 6-digit access code issued by your system administrator. This code rotates weekly.
-            </p>
-          </div>
+        <div style={{ padding: '32px' }}>
 
           {/* 6-digit input boxes */}
           <div
             className={shake ? 'tps-auth-shake' : ''}
-            style={{ display: 'flex', gap: '8px', justifyContent: 'center', marginBottom: '20px' }}
+            style={{ display: 'flex', gap: '8px', justifyContent: 'center', marginBottom: '24px' }}
             onPaste={handlePaste}
           >
             {digits.map((d, i) => (

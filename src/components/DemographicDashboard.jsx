@@ -75,6 +75,205 @@ const TileGrid = ({ data, color = '#2E7D32' }) => {
   );
 };
 
+// ─── Circle Stat Chart (premium multi-segment circular donut chart) ───
+const CircleStatChart = ({ data, colorsPalette = [] }) => {
+  const [hoveredItem, setHoveredItem] = useState(null);
+
+  if (!data || data.length === 0) return (
+    <div style={{ padding: '16px 0', color: '#9CA3AF', textAlign: 'center', fontSize: '12px' }}>
+      အချက်အလက်မရှိပါ
+    </div>
+  );
+
+  const total = data.reduce((s, d) => s + d.count, 0) || 1;
+  const r = 50;
+  const strokeWidth = 12;
+  const circ = 2 * Math.PI * r;
+
+  let cumulativePct = 0;
+  const processedData = data.map((item, index) => {
+    const pct = (item.count / total) * 100;
+    const startPct = cumulativePct;
+    cumulativePct += pct;
+    const color = colorsPalette[index % colorsPalette.length] || '#E0E0E0';
+    return {
+      ...item,
+      pct,
+      startPct,
+      color
+    };
+  });
+
+  return (
+    <div className="flex flex-col sm:flex-row items-center gap-6 xl:gap-8" style={{ width: '100%' }}>
+      {/* Donut Container */}
+      <div style={{ position: 'relative', width: '136px', height: '136px', flexShrink: 0 }}>
+        <svg width="136" height="136" viewBox="0 0 120 120" style={{ transform: 'rotate(-90deg)' }}>
+          {/* Base empty/track ring */}
+          <circle cx="60" cy="60" r={r} fill="none" stroke="#F3F4F6" strokeWidth={strokeWidth} />
+          {/* Segment rings */}
+          {processedData.map((item) => {
+            const isHovered = hoveredItem?.label === item.label;
+            const dashArray = `${(item.pct / 100) * circ} ${circ - (item.pct / 100) * circ}`;
+            const dashOffset = -((item.startPct / 100) * circ);
+            return (
+              <circle
+                key={item.label}
+                cx="60"
+                cy="60"
+                r={r}
+                fill="none"
+                stroke={item.color}
+                strokeWidth={isHovered ? strokeWidth + 3 : strokeWidth}
+                strokeDasharray={dashArray}
+                strokeDashoffset={dashOffset}
+                strokeLinecap="butt"
+                style={{
+                  cursor: 'pointer',
+                  transition: 'stroke-width 0.2s cubic-bezier(0.23, 1, 0.32, 1), opacity 0.2s ease-out',
+                  opacity: hoveredItem && !isHovered ? 0.45 : 1
+                }}
+                onMouseEnter={() => setHoveredItem(item)}
+                onMouseLeave={() => setHoveredItem(null)}
+              />
+            );
+          })}
+        </svg>
+        {/* Center display for Total or Hovered Category */}
+        <div style={{
+          position: 'absolute',
+          inset: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          textAlign: 'center',
+          pointerEvents: 'none',
+          padding: '10px'
+        }}>
+          {hoveredItem ? (
+            <>
+              <span style={{
+                fontSize: '9px',
+                fontWeight: '700',
+                color: hoveredItem.color,
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+                lineHeight: 1.2,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                maxWidth: '90px'
+              }} title={hoveredItem.label}>
+                {hoveredItem.label}
+              </span>
+              <span style={{
+                fontSize: '15px',
+                fontWeight: '700',
+                color: '#1A1A1A',
+                fontFamily: 'var(--font-mono)',
+                marginTop: '1px',
+                lineHeight: 1
+              }}>
+                {hoveredItem.pct.toFixed(1)}%
+              </span>
+              <span style={{
+                fontSize: '9px',
+                color: '#737373',
+                fontFamily: 'var(--font-mono)',
+                marginTop: '2px',
+                lineHeight: 1
+              }}>
+                {hoveredItem.count.toLocaleString()}
+              </span>
+            </>
+          ) : (
+            <>
+              <span style={{ fontSize: '9px', fontWeight: '600', color: '#737373', textTransform: 'uppercase', letterSpacing: '0.05em', lineHeight: 1.2 }}>
+                TOTAL
+              </span>
+              <span style={{ fontSize: '15px', fontWeight: '700', color: '#1A1A1A', fontFamily: 'var(--font-mono)', marginTop: '2px', lineHeight: 1 }}>
+                {total.toLocaleString()}
+              </span>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Systematic Legend List */}
+      <div style={{ flex: 1, width: '100%' }}>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-x-6 gap-y-2">
+          {processedData.map((item) => {
+            const isHovered = hoveredItem?.label === item.label;
+            return (
+              <div
+                key={item.label}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '6px 8px',
+                  borderBottom: '1px solid #F3F4F6',
+                  cursor: 'pointer',
+                  backgroundColor: isHovered ? '#F9FAFB' : 'transparent',
+                  transition: 'background-color 0.15s ease-out, opacity 0.15s ease-out',
+                  opacity: hoveredItem && !isHovered ? 0.5 : 1
+                }}
+                onMouseEnter={() => setHoveredItem(item)}
+                onMouseLeave={() => setHoveredItem(null)}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
+                  {/* Color Dot */}
+                  <div
+                    style={{
+                      width: '8px',
+                      height: '8px',
+                      backgroundColor: item.color,
+                      flexShrink: 0,
+                    }}
+                  />
+                  {/* Category Label */}
+                  <span
+                    style={{
+                      fontSize: '11px',
+                      fontWeight: isHovered ? '700' : '600',
+                      color: '#1A1A1A',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.02em',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                    }}
+                    title={item.label}
+                  >
+                    {item.label || '—'}
+                  </span>
+                </div>
+
+                {/* Counts & Percentages */}
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'baseline',
+                    gap: '6px',
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: '11px',
+                    flexShrink: 0,
+                    marginLeft: '12px'
+                  }}
+                >
+                  <span style={{ fontWeight: '700', color: '#1A1A1A' }}>{item.count.toLocaleString()}</span>
+                  <span style={{ color: '#9CA3AF', fontSize: '10px' }}>({item.pct.toFixed(1)}%)</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ─── Gender Split Bar ───────────────────────────────────────
 const GenderSplit = ({ male, female }) => {
   const total = male + female || 1;
@@ -154,12 +353,12 @@ const IDCardCoverage = ({ withId, total }) => {
 
 // ─── Age Pyramid ───────────────────────────────────────────
 const AGE_GROUPS = [
-  { key: '0_4',   mKey: 'ag0_4m',   fKey: 'ag0_4f',   label: '၀–၄',   labelEn: '0–4',   useCase: 'ကာကွယ်ဆေးထိုးနှင့် အာဟာရ',          color: '#5C8A6B' },
-  { key: '5_13',  mKey: 'ag5_13m',  fKey: 'ag5_13f',  label: '၅–၁၃',  labelEn: '5–13',  useCase: 'မူလ/အလယ်တန်း ပညာရေး',              color: '#4A7C8E' },
-  { key: '14_17', mKey: 'ag14_17m', fKey: 'ag14_17f', label: '၁၄–၁၇', labelEn: '14–17', useCase: 'အထက်တန်းပညာနှင့် လူငယ်ဖွံ့ဖြိုး',    color: '#6B7FA8' },
-  { key: '18_25', mKey: 'ag18_25m', fKey: 'ag18_25f', label: '၁၈–၂၅', labelEn: '18–25', useCase: 'တက္ကသိုလ်နှင့် သက်မွေးဝမ်းကျောင်း',  color: '#8E6B9E' },
-  { key: '26_59', mKey: 'ag26_59m', fKey: 'ag26_59f', label: '၂၆–၅၉', labelEn: '26–59', useCase: 'ဒေသတွင်း စီးပွားရေး/အလုပ်အကိုင်',     color: '#2E7D32' },
-  { key: '60p',   mKey: 'ag60pm',   fKey: 'ag60pf',   label: '၆၀+',   labelEn: '60+',   useCase: 'ကျန်းမာရေးစောင့်ရှောက်မှု/လူမှုဖေးမ', color: '#8D6E63' },
+  { key: '0_4',   mKey: 'ag0_4m',   fKey: 'ag0_4f',   label: '၀–၄',   labelEn: '0–4',   color: '#5C8A6B' },
+  { key: '5_13',  mKey: 'ag5_13m',  fKey: 'ag5_13f',  label: '၅–၁၃',  labelEn: '5–13',  color: '#4A7C8E' },
+  { key: '14_17', mKey: 'ag14_17m', fKey: 'ag14_17f', label: '၁၄–၁၇', labelEn: '14–17', color: '#6B7FA8' },
+  { key: '18_25', mKey: 'ag18_25m', fKey: 'ag18_25f', label: '၁၈–၂၅', labelEn: '18–25', color: '#8E6B9E' },
+  { key: '26_59', mKey: 'ag26_59m', fKey: 'ag26_59f', label: '၂၆–၅၉', labelEn: '26–59', color: '#2E7D32' },
+  { key: '60p',   mKey: 'ag60pm',   fKey: 'ag60pf',   label: '၆၀+',   labelEn: '60+',   color: '#8D6E63' },
 ];
 
 const AgePyramid = ({ stats }) => {
@@ -222,8 +421,7 @@ const AgePyramid = ({ stats }) => {
 
               {/* Use-case annotation + total */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '2px', paddingLeft: 'calc(50% - 36px)', paddingBottom: '4px', borderBottom: '1px dashed #F3F4F6' }}>
-                <span style={{ fontSize: '9px', color: '#9CA3AF' }}>ပေါင်း {row.t.toLocaleString()} ({tPct}%)</span>
-                <span style={{ fontSize: '9px', color: row.color, fontStyle: 'italic' }}>· {row.useCase}</span>
+                <span style={{ fontSize: '9px', color: '#9CA3AF' }}>Total {row.t.toLocaleString()} ({tPct}%)</span>
               </div>
             </div>
           );
@@ -264,6 +462,26 @@ const colors = {
   slateGray:   '#4A6572',
   tealDusk:    '#00695C',
   black:       '#1A1A1A',
+  
+  // Custom high-contrast multi-segment palettes
+  nationalityPalette: [
+    '#2E7D32', // Forest Green (Primary)
+    '#1565C0', // Cobalt Blue
+    '#D84315', // Earthy Rust/Orange
+    '#6A1B9A', // Plum Purple
+    '#00838F', // Dark Cyan
+    '#C2185B', // Crimson Rose
+    '#F9A825'  // Golden Ochre
+  ],
+  occupationPalette: [
+    '#00695C', // Teal Dusk (Primary)
+    '#AD1457', // Crimson Pink
+    '#283593', // Indigo Blue
+    '#EF6C00', // Amber Orange
+    '#558B2F', // Olive Green
+    '#6D4C41', // Warm Brown
+    '#37474F'  // Slate Charcoal
+  ]
 };
 
 const sectionCardStyle = {
@@ -633,7 +851,7 @@ const DemographicDashboard = () => {
               <div style={sectionTitleStyle}>
                 <Globe size={13} color={colors.black} /> NATIONALITY STATISTICS
               </div>
-              <TileGrid data={nationalityData} color={colors.forestGreen} />
+              <CircleStatChart data={nationalityData} colorsPalette={colors.nationalityPalette} />
             </div>
 
           </div>
@@ -641,7 +859,7 @@ const DemographicDashboard = () => {
           {/* ── Age Pyramid ────────────────────────────────── */}
           <div style={{ ...sectionCardStyle, marginBottom: '16px' }}>
             <div style={sectionTitleStyle}>
-              <Users size={13} color={colors.black} /> လူမှုဘဝကဏ္ဍအလိုက် ခွဲခြားခြင်း (FUNCTIONAL AGE GROUPS)
+              <Users size={13} color={colors.black} /> FUNCTIONAL AGE GROUPS
             </div>
             <AgePyramid stats={totalStats} />
           </div>
@@ -651,7 +869,7 @@ const DemographicDashboard = () => {
             <div style={sectionTitleStyle}>
               <Briefcase size={13} color={colors.black} /> OCCUPATION STATISTICS
             </div>
-            <TileGrid data={occupationData} color={colors.tealDusk} />
+            <CircleStatChart data={occupationData} colorsPalette={colors.occupationPalette} />
           </div>
         </>
       )}

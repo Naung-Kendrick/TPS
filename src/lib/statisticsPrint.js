@@ -749,7 +749,7 @@ export const printDemographicDashboard = ({
     </div>
 
     <!-- ── Age Pyramid ── -->
-    <div class="section-title">လူမှုဘဝကဏ္ဍအလိုက် ခွဲခြားခြင်း — FUNCTIONAL AGE GROUPS</div>
+    <div class="section-title">FUNCTIONAL AGE GROUPS</div>
     <div class="legend">
       <span><span class="legend-swatch" style="background:#4A6572"></span>Male</span>
       <span><span class="legend-swatch" style="background:#A1887F"></span>Female</span>

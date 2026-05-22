@@ -12,6 +12,54 @@ const Sidebar = ({ user, onLogout }) => {
   const touchStartX = useRef(null);
   const touchStartY = useRef(null);
 
+  const getRoleLabel = (role) => {
+    const roles = {
+      field: 'Field Staff',
+      ops: 'Operations',
+      regional: 'Regional Admin',
+      system: 'System Admin',
+      admin: 'Admin',
+      master: 'Master Admin',
+    };
+    return roles[role] || (role ? role.charAt(0).toUpperCase() + role.slice(1) : 'User');
+  };
+
+  const getRoleBgColor = (role) => {
+    const colors = {
+      field: '#E6FDF5',      // Soft Emerald Green
+      ops: '#EFF6FF',        // Soft Sky Blue
+      regional: '#F5F3FF',   // Soft Lavender Purple
+      system: '#FEF2F2',     // Soft Coral Red
+      admin: '#FDF2F8',      // Soft Rose Pink
+      master: '#FFFBEB',     // Soft Amber Gold
+    };
+    return colors[role] || '#FAFAFA';
+  };
+
+  const getRoleBorderColor = (role) => {
+    const colors = {
+      field: '#A7F3D0',      // Emerald Green border
+      ops: '#BFDBFE',        // Sky Blue border
+      regional: '#DDD6FE',   // Lavender Purple border
+      system: '#FECACA',     // Coral Red border
+      admin: '#FBCFE8',      // Rose Pink border
+      master: '#FDE68A',     // Amber Gold border
+    };
+    return colors[role] || '#E5E7EB';
+  };
+
+  const getRoleTextColor = (role) => {
+    const colors = {
+      field: '#065F46',      // Dark Emerald Green
+      ops: '#1E40AF',        // Dark Sky Blue
+      regional: '#5B21B6',   // Dark Lavender Purple
+      system: '#991B1B',     // Dark Coral Red
+      admin: '#9D174D',      // Dark Rose Pink
+      master: '#92400E',     // Dark Amber Gold
+    };
+    return colors[role] || '#1A1A1A'; // Fallback to main theme text color
+  };
+
   // Close drawer/more on route change (mobile)
   useEffect(() => { setOpen(false); setMoreOpen(false); }, [location.pathname]);
 
@@ -177,11 +225,12 @@ const Sidebar = ({ user, onLogout }) => {
         <div style={{
           display: 'flex', alignItems: 'center', gap: '8px',
           padding: '8px 12px', marginBottom: '4px',
-          backgroundColor: '#1A1A1A',
+          backgroundColor: getRoleBgColor(user?.role || user?.profile?.role),
+          border: `1px solid ${getRoleBorderColor(user?.role || user?.profile?.role)}`,
         }}>
-          <CircleUserRound size={14} style={{ color: '#FFFFFF', flexShrink: 0 }} />
-          <span style={{ fontSize: '11px', fontWeight: '600', color: '#FFFFFF', letterSpacing: '0.04em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {user?.profile?.username || user?.email?.replace('@tps.idtl', '') || 'User'}
+          <CircleUserRound size={14} style={{ color: getRoleTextColor(user?.role || user?.profile?.role), flexShrink: 0 }} />
+          <span style={{ fontSize: '11px', fontWeight: '700', color: '#1A1A1A', letterSpacing: '0.04em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {getRoleLabel(user?.role || user?.profile?.role)}
           </span>
         </div>
         {/* Sign Out button */}

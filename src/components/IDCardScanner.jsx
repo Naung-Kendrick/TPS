@@ -1,12 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { BrowserMultiFormatReader } from '@zxing/browser';
-import { NotFoundException } from '@zxing/library';
+import jsQR from 'jsqr';
 import { supabase } from '../lib/supabase';
 import { pushNotification, NOTIF_TYPES } from '../lib/notifications';
 import {
   ScanLine, Search, X, CheckCircle2, AlertCircle, Loader2,
   User, Home, MapPin, CreditCard, Hash, Camera, Keyboard,
-  ZoomIn, ZoomOut, Users
+  ZoomIn, Users
 } from 'lucide-react';
 
 const IDCardScanner = () => {
@@ -44,7 +43,6 @@ const IDCardScanner = () => {
   const rafRef = useRef(null);
   const trackRef = useRef(null);
   const inputRef = useRef(null);
-  const zxingReaderRef = useRef(null);
   // Extract the core numeric part from any format:
   // "No - 01003821959002978", "No-01003821959002978", "01003821959002978", etc.
   const extractNumericID = (raw) => {
@@ -126,18 +124,10 @@ const IDCardScanner = () => {
   };
 
   const stopCamera = useCallback(() => {
-    // Stop ZXing reader
-    if (zxingReaderRef.current) {
-      try { zxingReaderRef.current.reset(); } catch (_) {}
-      zxingReaderRef.current = null;
-    }
-    // Stop stream tracks
+    if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(t => t.stop());
       streamRef.current = null;
-    }
-    if (videoRef.current) {
-      videoRef.current.srcObject = null;
     }
     trackRef.current = null;
     setScanning(false);
@@ -150,40 +140,79 @@ const IDCardScanner = () => {
     setResult(null);
     setScanning(true);
     try {
-      // Get camera stream (rear camera, high res)
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }
       });
       streamRef.current = stream;
-      trackRef.current = stream.getVideoTracks()[0];
+      const track = stream.getVideoTracks()[0];
+      trackRef.current = track;
 
+      // Always allow CSS zoom 1–4x; also enable hardware zoom if supported
       setZoomRange({ min: 1, max: 4 });
       setZoom(1);
 
-      // Attach stream to video element
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         await videoRef.current.play();
       }
 
-      // Start ZXing continuous decode on the video element
-      const reader = new BrowserMultiFormatReader();
-      zxingReaderRef.current = reader;
+      // Start QR decode loop — tries 0°, 90°, 180°, 270° for any-angle scanning
+      const canvas = canvasRef.current;
+      const rotCanvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      const rotCtx = rotCanvas.getContext('2d');
 
-      reader.decodeFromVideoElement(videoRef.current, (result, err) => {
-        if (result) {
-          const qrData = result.getText();
+      const tryDecode = (imgData, w, h) =>
+        jsQR(imgData.data, w, h, { inversionAttempts: 'attemptBoth' })?.data || null;
+
+      const tick = () => {
+        const video = videoRef.current;
+        if (!video || video.readyState !== video.HAVE_ENOUGH_DATA) {
+          rafRef.current = requestAnimationFrame(tick);
+          return;
+        }
+        const W = video.videoWidth, H = video.videoHeight;
+        canvas.width = W; canvas.height = H;
+        ctx.drawImage(video, 0, 0, W, H);
+
+        // 0° — normal
+        let qrData = tryDecode(ctx.getImageData(0, 0, W, H), W, H);
+
+        // 90° clockwise
+        if (!qrData) {
+          rotCanvas.width = H; rotCanvas.height = W;
+          rotCtx.save(); rotCtx.translate(H, 0); rotCtx.rotate(Math.PI / 2);
+          rotCtx.drawImage(canvas, 0, 0); rotCtx.restore();
+          qrData = tryDecode(rotCtx.getImageData(0, 0, H, W), H, W);
+        }
+
+        // 180°
+        if (!qrData) {
+          rotCanvas.width = W; rotCanvas.height = H;
+          rotCtx.save(); rotCtx.translate(W, H); rotCtx.rotate(Math.PI);
+          rotCtx.drawImage(canvas, 0, 0); rotCtx.restore();
+          qrData = tryDecode(rotCtx.getImageData(0, 0, W, H), W, H);
+        }
+
+        // 270° clockwise
+        if (!qrData) {
+          rotCanvas.width = H; rotCanvas.height = W;
+          rotCtx.save(); rotCtx.translate(0, W); rotCtx.rotate(-Math.PI / 2);
+          rotCtx.drawImage(canvas, 0, 0); rotCtx.restore();
+          qrData = tryDecode(rotCtx.getImageData(0, 0, H, W), H, W);
+        }
+
+        if (qrData) {
           setScanFlash(true);
           setTimeout(() => setScanFlash(false), 400);
           stopCamera();
           setInputValue(qrData);
           lookupID(qrData);
+          return;
         }
-        // NotFoundException is thrown every frame when no QR found — ignore it
-        if (err && !(err instanceof NotFoundException)) {
-          console.warn('ZXing decode error:', err);
-        }
-      });
+        rafRef.current = requestAnimationFrame(tick);
+      };
+      rafRef.current = requestAnimationFrame(tick);
     } catch (err) {
       setScanning(false);
       setError('Camera error: ' + (err?.message || 'Could not access camera.'));
@@ -479,40 +508,32 @@ const IDCardScanner = () => {
                 </p>
               </div>
 
-              {/* Bottom bar — zoom */}
+              {/* Bottom bar — tap-to-zoom button */}
               <div style={{
                 position: 'absolute', bottom: 0, left: 0, right: 0,
                 paddingTop: '20px',
-                paddingLeft: '24px',
-                paddingRight: '24px',
-                paddingBottom: 'calc(72px + env(safe-area-inset-bottom, 0px))',
+                paddingBottom: 'calc(40px + env(safe-area-inset-bottom, 0px))',
                 background: 'linear-gradient(to top, rgba(0,0,0,0.85) 60%, transparent)',
-                display: 'flex', alignItems: 'center', gap: '16px',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}>
-                {/* Zoom level badge */}
-                <span style={{ color: '#4FC3F7', fontSize: '11px', fontWeight: '700', minWidth: '32px', textAlign: 'center', letterSpacing: '0.03em' }}>
+                <button
+                  onClick={() => {
+                    const steps = [1, 1.5, 2, 2.5, 3];
+                    const idx = steps.indexOf(zoom);
+                    const next = steps[(idx + 1) % steps.length];
+                    handleZoomChange(next);
+                  }}
+                  style={{
+                    background: 'rgba(255,255,255,0.18)', border: '1.5px solid rgba(255,255,255,0.4)',
+                    borderRadius: '50px', cursor: 'pointer', padding: '10px 22px',
+                    display: 'flex', alignItems: 'center', gap: '8px',
+                    color: '#fff', fontSize: '15px', fontWeight: '700', letterSpacing: '0.04em',
+                    backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)',
+                    userSelect: 'none', WebkitUserSelect: 'none',
+                  }}
+                >
+                  <ZoomIn size={18} color="#4FC3F7" />
                   {parseFloat(zoom).toFixed(1)}×
-                </span>
-                <button
-                  onClick={() => handleZoomChange(Math.max(zoomRange.min, zoom - 0.5))}
-                  style={{ background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '50%', cursor: 'pointer', padding: 0, width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
-                >
-                  <ZoomOut size={22} color="#fff" />
-                </button>
-                <input
-                  type="range"
-                  min={zoomRange.min}
-                  max={zoomRange.max}
-                  step={0.1}
-                  value={zoom}
-                  onChange={(e) => handleZoomChange(e.target.value)}
-                  style={{ flex: 1, accentColor: '#4FC3F7', cursor: 'pointer', height: '6px', touchAction: 'none' }}
-                />
-                <button
-                  onClick={() => handleZoomChange(Math.min(zoomRange.max, zoom + 0.5))}
-                  style={{ background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '50%', cursor: 'pointer', padding: 0, width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
-                >
-                  <ZoomIn size={22} color="#fff" />
                 </button>
               </div>
 

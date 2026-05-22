@@ -43,9 +43,6 @@ const IDCardScanner = () => {
   const rafRef = useRef(null);
   const trackRef = useRef(null);
   const inputRef = useRef(null);
-  const noQrFramesRef = useRef(0);   // frames elapsed without a QR hit
-  const autoZoomRef = useRef(1);     // current auto-zoom level (mirrors zoom state)
-
   // Extract the core numeric part from any format:
   // "No - 01003821959002978", "No-01003821959002978", "01003821959002978", etc.
   const extractNumericID = (raw) => {
@@ -133,8 +130,6 @@ const IDCardScanner = () => {
       streamRef.current = null;
     }
     trackRef.current = null;
-    noQrFramesRef.current = 0;
-    autoZoomRef.current = 1;
     setScanning(false);
     setZoom(1);
     setZoomRange({ min: 1, max: 4 });
@@ -161,43 +156,9 @@ const IDCardScanner = () => {
         await videoRef.current.play();
       }
 
-      // ── QR decode helpers ───────────────────────────────
-      // Scan a specific region of the canvas; returns QR data or null
-      const scanRegion = (ctx, x, y, w, h) => {
-        const imageData = ctx.getImageData(x, y, w, h);
-        const code = jsQR(imageData.data, imageData.width, imageData.height, {
-          inversionAttempts: 'attemptBoth',
-        });
-        return code?.data || null;
-      };
-
-      // Apply zoom (CSS + hardware if available)
-      const applyZoom = async (z) => {
-        autoZoomRef.current = z;
-        setZoom(z);
-        if (videoRef.current) {
-          videoRef.current.style.transform = `scale(${z})`;
-          videoRef.current.style.transformOrigin = 'center center';
-        }
-        if (trackRef.current) {
-          try {
-            const caps = trackRef.current.getCapabilities?.() || {};
-            if (caps.zoom) {
-              const hw = caps.zoom.min + (z - 1) * (caps.zoom.max - caps.zoom.min) / 3;
-              await trackRef.current.applyConstraints({ advanced: [{ zoom: hw }] });
-            }
-          } catch (_) {}
-        }
-      };
-
-      // Auto-zoom config
-      const AUTO_ZOOM_STEPS   = [1, 1.5, 2, 2.5, 3];  // zoom levels to cycle through
-      const FRAMES_PER_STEP   = 45;                     // ~1.5s at 30fps before stepping up
-      const FRAMES_FULL_CYCLE = AUTO_ZOOM_STEPS.length * FRAMES_PER_STEP;
-
       // Start QR decode loop
       const canvas = canvasRef.current;
-      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      const ctx = canvas.getContext('2d');
       const tick = () => {
         const video = videoRef.current;
         if (!video || video.readyState !== video.HAVE_ENOUGH_DATA) {
@@ -207,47 +168,16 @@ const IDCardScanner = () => {
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-        const W = canvas.width;
-        const H = canvas.height;
-
-        // Strategy 1: full frame
-        let qrData = scanRegion(ctx, 0, 0, W, H);
-
-        // Strategy 2: center 60% crop (QR more likely in center of frame)
-        if (!qrData) {
-          const cx = Math.floor(W * 0.2), cy = Math.floor(H * 0.2);
-          const cw = Math.floor(W * 0.6), ch = Math.floor(H * 0.6);
-          qrData = scanRegion(ctx, cx, cy, cw, ch);
-        }
-
-        // Strategy 3: center 35% crop (very close / zoomed in)
-        if (!qrData) {
-          const cx = Math.floor(W * 0.325), cy = Math.floor(H * 0.325);
-          const cw = Math.floor(W * 0.35),  ch = Math.floor(H * 0.35);
-          qrData = scanRegion(ctx, cx, cy, cw, ch);
-        }
-
-        if (qrData) {
-          // Found — flash, reset auto-zoom, stop, lookup
-          noQrFramesRef.current = 0;
-          applyZoom(1);
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: 'dontInvert' });
+        if (code?.data) {
           setScanFlash(true);
           setTimeout(() => setScanFlash(false), 400);
           stopCamera();
-          setInputValue(qrData);
-          lookupID(qrData);
+          setInputValue(code.data);
+          lookupID(code.data);
           return;
         }
-
-        // Not found — increment frame counter and auto-zoom if needed
-        noQrFramesRef.current += 1;
-        const stepIndex = Math.floor((noQrFramesRef.current % FRAMES_FULL_CYCLE) / FRAMES_PER_STEP);
-        const targetZoom = AUTO_ZOOM_STEPS[stepIndex];
-        if (targetZoom !== autoZoomRef.current) {
-          applyZoom(targetZoom);
-        }
-
         rafRef.current = requestAnimationFrame(tick);
       };
       rafRef.current = requestAnimationFrame(tick);
@@ -542,7 +472,7 @@ const IDCardScanner = () => {
                 marginTop: '8px',
               }}>
                 <p style={{ color: 'rgba(255,255,255,0.8)', fontSize: '12px', margin: 0 }}>
-                  Hold steady — camera will auto-zoom to find the QR code
+                  Align the ID card within the frame to scan QR code
                 </p>
               </div>
 

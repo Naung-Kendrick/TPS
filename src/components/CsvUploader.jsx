@@ -81,6 +81,38 @@ const validateMyanmarText = (text) => {
   return issues.length > 0 ? issues.join('; ') : null;
 };
 
+// Auto-correct District by adding space before "ခရိုင်" suffix if missing
+// Handles: "တာ့တိုးခရိုင်" → "တာ့တိုး ခရိုင်", "နမ့်ခမ်းခရိုင်" → "နမ့်ခမ်း ခရိုင်"
+const autoCorrectDistrict = (value) => {
+  if (!value || typeof value !== 'string') return value;
+  const str = value.trim();
+  if (str === '') return str;
+  
+  // Check for missing space before "ခရိုင်" (District)
+  const districtMatch = str.match(/^(.+?)ခရိုင်$/);
+  if (districtMatch && !str.includes(' ခရိုင်')) {
+    return `${districtMatch[1].trim()} ခရိုင်`;
+  }
+  
+  return str;
+};
+
+// Auto-correct Township: ensure space before "မြို့နယ်" suffix
+// Handles: "နမ့်ခမ်းမြို့နယ်" → "နမ့်ခမ်း မြို့နယ်"
+const autoCorrectTownship = (value) => {
+  if (!value || typeof value !== 'string') return value;
+  const str = value.trim();
+  if (str === '') return str;
+  
+  // Check for missing space before "မြို့နယ်" (Township)
+  const townshipMatch = str.match(/^(.+?)မြို့နယ်$/);
+  if (townshipMatch && !str.includes(' မြို့နယ်')) {
+    return `${townshipMatch[1].trim()} မြို့နယ်`;
+  }
+  
+  return str;
+};
+
 // Auto-correct Ward/Village/Group by adding space before suffix if missing
 // Handles: "ကောင်းတပ်ရပ်ကွက်" → "ကောင်းတပ် ရပ်ကွက်"
 const autoCorrectWardVillageGroup = (value) => {
@@ -108,24 +140,6 @@ const autoCorrectWardVillageGroup = (value) => {
     return `${groupMatch[1].trim()} အုပ်စု`;
   }
   
-  return str;
-};
-
-// Auto-correct Township: ensure space before "မြို့နယ်" suffix
-const autoCorrectTownship = (value) => {
-  if (!value || value.trim() === '') return value;
-  const str = value.trim();
-  const match = str.match(/^(.+?)မြို့နယ်$/);
-  if (match && !str.includes(' မြို့နယ်')) return `${match[1].trim()} မြို့နယ်`;
-  return str;
-};
-
-// Auto-correct District: ensure space before "ခရိုင်" suffix
-const autoCorrectDistrict = (value) => {
-  if (!value || value.trim() === '') return value;
-  const str = value.trim();
-  const match = str.match(/^(.+?)ခရိုင်$/);
-  if (match && !str.includes(' ခရိုင်')) return `${match[1].trim()} ခရိုင်`;
   return str;
 };
 
@@ -311,6 +325,16 @@ const processAndUpload = async (formattedData, setValidationErrors, setShowModal
     // Add ward/village/group format error if present
     if (wardVillageError) {
       spellingIssues.push(`Ward/Village/Group: ${wardVillageError}`);
+    }
+
+    // District must end with " ခရိုင်"
+    if (parsedRow.district && !parsedRow.district.endsWith(' ခရိုင်')) {
+      spellingIssues.push(`ခရိုင် (District): "${parsedRow.district}" — " ခရိုင်" ဟူသောစကားလုံးဖြင့် အဆုံးသတ်ရမည်။ ဥပမာ — "မန်တုံ ခရိုင်"`);
+    }
+
+    // Township must end with " မြို့နယ်"
+    if (parsedRow.township && !parsedRow.township.endsWith(' မြို့နယ်')) {
+      spellingIssues.push(`မြို့နယ် (Township): "${parsedRow.township}" — " မြို့နယ်" ဟူသောစကားလုံးဖြင့် အဆုံးသတ်ရမည်။ ဥပမာ — "နမ္မတူ မြို့နယ်"`);
     }
 
     if (missingFields.length > 0 || spellingIssues.length > 0) {
@@ -619,6 +643,20 @@ const CsvUploader = ({ onUploadSuccess }) => {
               spellingIssues.push(`Ward/Village/Group: ${wardVillageError}`);
             }
 
+            // 2d. District must end with " ခရိုင်" (space + suffix required)
+            if (parsedRow.district) {
+              if (!parsedRow.district.endsWith(' ခရိုင်')) {
+                spellingIssues.push(`ခရိုင် (District): "${parsedRow.district}" — " ခရိုင်" ဟူသောစကားလုံးဖြင့် အဆုံးသတ်ရမည်။ ဥပမာ — "မန်တုံ ခရိုင်"`);
+              }
+            }
+
+            // 2e. Township must end with " မြို့နယ်" (space + suffix required)
+            if (parsedRow.township) {
+              if (!parsedRow.township.endsWith(' မြို့နယ်')) {
+                spellingIssues.push(`မြို့နယ် (Township): "${parsedRow.township}" — " မြို့နယ်" ဟူသောစကားလုံးဖြင့် အဆုံးသတ်ရမည်။ ဥပမာ — "နမ္မတူ မြို့နယ်"`);
+              }
+            }
+
             // 3. Error Tracking
             if (missingFields.length > 0 || spellingIssues.length > 0) {
               errorsFound.push({
@@ -683,8 +721,8 @@ const CsvUploader = ({ onUploadSuccess }) => {
   };
 
   return (
-    <div className="bg-white p-6 border border-[#E5E7EB] mb-8" style={{ borderRadius: '0px' }}>
-      <div className="flex items-center gap-3 mb-4">
+    <div className="bg-white p-6 xl:p-8 border border-[#E5E7EB] mb-8" style={{ borderRadius: '0px' }}>
+      <div className="flex items-center gap-3 mb-4 xl:mb-6">
         <div className="bg-[#F3F4F6] text-[#1A1A1A] p-2" style={{ borderRadius: '0px' }}>
           <Upload size={24} />
         </div>

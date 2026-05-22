@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { SkeletonStatGrid, SkeletonBar } from './Skeleton';
 import { supabase } from '../lib/supabase';
-import { Users, User, Home, Search, BarChart2, MapPin, Globe, Printer, FileSpreadsheet } from 'lucide-react';
+import { Users, User, Home, Search, BarChart2, Printer, FileSpreadsheet } from 'lucide-react';
 import EmptyState from './EmptyState';
 import { printStatistics, exportStatisticsExcel } from '../lib/statisticsPrint';
 
@@ -121,31 +121,6 @@ const StatCard = ({ label, value, icon: Icon, color = '#1A1A1A' }) => (
     </div>
   </div>
 );
-
-// ─── Bar Chart ────────────────────────────────────────────
-const HorizontalBar = ({ data, color = '#2E7D32' }) => {
-  if (!data || data.length === 0) return <div style={{ padding: '1rem', color: '#737373', textAlign: 'center', fontSize: '12px' }}>အချက်အလက်မရှိပါ</div>;
-  const maxVal = Math.max(...data.map(d => d.count), 1);
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-      {data.map((item) => (
-        <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div style={{ width: '120px', fontSize: '11px', fontWeight: '500', color: '#1A1A1A', textAlign: 'right', flexShrink: 0 }}>{item.label || '—'}</div>
-          <div style={{ flex: 1, height: '16px', backgroundColor: '#FAFAFA', border: '1px solid #E5E7EB', overflow: 'hidden', position: 'relative' }}>
-            <div style={{
-              height: '100%',
-              backgroundColor: color,
-              width: `${Math.max((item.count / maxVal) * 100, 1)}%`,
-              transition: 'width 0.5s ease-out',
-            }}>
-            </div>
-          </div>
-          <div style={{ width: '50px', fontSize: '11px', fontWeight: '500', color: '#737373', flexShrink: 0, fontFamily: 'var(--font-mono)' }}>{toMyanmarNum(item.count)}</div>
-        </div>
-      ))}
-    </div>
-  );
-};
 
 // ─── Cache helpers ────────────────────────────────────────
 const CACHE_KEY = 'tps_stats_cache_v2_rpc';
@@ -402,7 +377,6 @@ const PopulationStatistics = () => {
   const groupStats = statsData?.groupStats || [];
   const allReligions = statsData?.allReligions || [];
   const allNationalities = statsData?.allNationalities || [];
-
   const totalPopulation = totalStats.total || 0;
   const totalMale = totalStats.male || 0;
   const totalFemale = totalStats.female || 0;
@@ -450,7 +424,7 @@ const PopulationStatistics = () => {
 
   if (loading) {
     return (
-      <div style={{ padding: '32px' }} className="max-w-7xl mx-auto">
+      <div style={{ padding: '32px' }} className="max-w-7xl xl:max-w-[1440px] mx-auto">
         <SkeletonBar width="200px" height="22px" style={{ marginBottom: '8px' }} />
         <SkeletonBar width="320px" height="12px" style={{ marginBottom: '24px' }} />
         <SkeletonStatGrid />
@@ -461,7 +435,7 @@ const PopulationStatistics = () => {
 
   if (error) {
     return (
-      <div style={{ padding: '32px' }} className="max-w-7xl mx-auto">
+      <div style={{ padding: '32px' }} className="max-w-7xl xl:max-w-[1440px] mx-auto">
         <div style={{ border: '1px solid #E5E7EB' }}>
           <EmptyState
             type={!navigator.onLine ? 'offline' : 'error'}
@@ -488,7 +462,7 @@ const PopulationStatistics = () => {
   };
 
   return (
-    <div className="px-4 py-5 sm:p-8 max-w-7xl mx-auto bg-white">
+    <div className="px-4 py-5 sm:p-8 xl:p-10 max-w-7xl xl:max-w-[1440px] mx-auto bg-white">
       <style>{`
         .tps-stats-toolbar { display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; padding-top: 16px; border-top: 1px solid #E5E7EB; }
         @media (max-width: 639px) {
@@ -519,7 +493,7 @@ const PopulationStatistics = () => {
         <div style={sectionTitleStyle}>
           <Search size={14} color={colors.black} /> FILTER BY LOCATION
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 xl:gap-5">
           {/* District */}
           <div>
             <label style={{ fontSize: '11px', fontWeight: '500', color: '#737373', display: 'block', letterSpacing: '0.02em' }}>
@@ -612,7 +586,7 @@ const PopulationStatistics = () => {
       </div>
 
       {/* ─── Summary Cards ─────────────────────────────────── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 xl:gap-5 mb-4 sm:mb-6">
         <StatCard label="Total Population" value={totalPopulation} icon={Users} color={colors.forestGreen} />
         <StatCard label="Male" value={totalMale} icon={User} color={colors.slateGray} />
         <StatCard label="Female" value={totalFemale} icon={User} color={colors.mutedClay} />
@@ -624,7 +598,7 @@ const PopulationStatistics = () => {
         <div style={sectionTitleStyle}>
           <BarChart2 size={14} color={colors.black} /> AGE DISTRIBUTION
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4 xl:gap-5">
           <div style={{ padding: '24px', border: `1px solid ${colors.oliveGreen}`, textAlign: 'center' }}>
             <div style={{ fontSize: '10px', color: '#737373', fontWeight: '600', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Under 16</div>
             <div style={{ fontSize: '11px', color: '#737373', marginBottom: '12px' }}>အသက် ၁၆ နှစ်အောက်</div>
@@ -647,25 +621,6 @@ const PopulationStatistics = () => {
               <div style={{ fontSize: '32px', fontWeight: '400', color: colors.stoneGray, fontFamily: 'var(--font-mono)' }}>{toMyanmarNum(unknownAge)}</div>
             </div>
           )}
-        </div>
-      </div>
-
-      {/* ─── Breakdown Section ──────────────────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4 sm:mb-6">
-        {/* ─── Religious Statistics ───────────────────────── */}
-        <div style={sectionCardStyle}>
-          <div style={sectionTitleStyle}>
-            <MapPin size={14} color={colors.black} /> RELIGIOUS STATISTICS
-          </div>
-          <HorizontalBar data={religiousData} color={colors.earthyBrown} />
-        </div>
-
-        {/* ─── Nationality Statistics ────────────────────── */}
-        <div style={sectionCardStyle}>
-          <div style={sectionTitleStyle}>
-            <Globe size={14} color={colors.black} /> NATIONALITY STATISTICS
-          </div>
-          <HorizontalBar data={nationalityData} color={colors.forestGreen} />
         </div>
       </div>
 

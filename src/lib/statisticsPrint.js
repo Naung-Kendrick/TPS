@@ -501,3 +501,358 @@ export const printStatistics = ({
   w.document.write(html);
   w.document.close();
 };
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PRINT — Demographic Dashboard (legal landscape)
+// ─────────────────────────────────────────────────────────────────────────────
+export const printDemographicDashboard = ({
+  totalStats, allReligions, allNationalities, allOccupations,
+  selectedDistrict, selectedTownship, selectedWard, selectedGroup, selectedVillage,
+}) => {
+  const flagUrl = new URL(taangFlag,  window.location.href).href;
+  const logoUrl = new URL(taangLogo, window.location.href).href;
+  const now     = new Date();
+  const dateStr = now.toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: '2-digit' });
+
+  const parts = [];
+  if (selectedDistrict) parts.push(selectedDistrict);
+  if (selectedTownship) parts.push(selectedTownship);
+  if (selectedWard)     parts.push(selectedWard);
+  if (selectedGroup)    parts.push(selectedGroup);
+  if (selectedVillage)  parts.push(selectedVillage);
+  const filterLine = parts.length > 0 ? parts.join(' / ') : 'All Districts';
+
+  const total  = totalStats.total  || 0;
+  const male   = totalStats.male   || 0;
+  const female = totalStats.female || 0;
+  const withId = totalStats.withId || 0;
+  const idPct  = total > 0 ? ((withId / total) * 100).toFixed(1) : '0.0';
+
+  // ── Age group rows ────────────────────────────────────────────────────────
+  const AGE_GROUPS = [
+    { labelEn: '0–4',   mKey: 'ag0_4m',   fKey: 'ag0_4f'   },
+    { labelEn: '5–13',  mKey: 'ag5_13m',  fKey: 'ag5_13f'  },
+    { labelEn: '14–17', mKey: 'ag14_17m', fKey: 'ag14_17f' },
+    { labelEn: '18–25', mKey: 'ag18_25m', fKey: 'ag18_25f' },
+    { labelEn: '26–59', mKey: 'ag26_59m', fKey: 'ag26_59f' },
+    { labelEn: '60+',   mKey: 'ag60pm',   fKey: 'ag60pf'   },
+  ];
+
+  const maxSide = Math.max(...AGE_GROUPS.map(x => Math.max(totalStats[x.mKey] || 0, totalStats[x.fKey] || 0)), 1);
+
+  const ageRows = [...AGE_GROUPS].reverse().map(g => {
+    const m    = totalStats[g.mKey] || 0;
+    const f    = totalStats[g.fKey] || 0;
+    const t    = m + f;
+    const tPct = total > 0 ? ((t / total) * 100).toFixed(1) : '0.0';
+    const mW   = ((m / maxSide) * 100).toFixed(1);
+    const fW   = ((f / maxSide) * 100).toFixed(1);
+    return `
+      <tr>
+        <td class="num">${m.toLocaleString()}</td>
+        <td class="bar-male">
+          <div style="display:flex;justify-content:flex-end;height:10px;">
+            <div style="width:${mW}%;height:10px;background:#4A6572 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact;"></div>
+          </div>
+        </td>
+        <td class="age-label-cell">${safeHtml(g.labelEn)}</td>
+        <td class="bar-female">
+          <div style="display:flex;justify-content:flex-start;height:10px;">
+            <div style="width:${fW}%;height:10px;background:#A1887F !important;-webkit-print-color-adjust:exact;print-color-adjust:exact;"></div>
+          </div>
+        </td>
+        <td class="num">${f.toLocaleString()}</td>
+        <td class="num bold green">${t.toLocaleString()}</td>
+        <td class="num">${tPct}%</td>
+      </tr>`;
+  }).join('');
+
+  // ── Stat row builder (bars scaled to section max, not % of total) ─────────
+  const makeStatRows = (data, color) => {
+    const sorted = [...data].sort((a, b) => b.c - a.c);
+    const maxC   = sorted[0]?.c || 1;
+    return sorted.map(({ label, c }) => {
+      const barW = ((c / maxC) * 100).toFixed(1);
+      const pct  = total > 0 ? ((c / total) * 100).toFixed(1) : '0.0';
+      return `
+        <tr style="page-break-inside:avoid">
+          <td class="name">${safeHtml(label)}</td>
+          <td class="bar-cell-simple">
+            <div class="simple-bar" style="width:${barW}%;background:${color} !important;-webkit-print-color-adjust:exact;print-color-adjust:exact"></div>
+          </td>
+          <td class="num bold">${c.toLocaleString()}</td>
+          <td class="num">${pct}%</td>
+        </tr>`;
+    }).join('');
+  };
+
+  const relData  = allReligions    .map(r => ({ label: r, c: totalStats.relCounts?.[r] || 0 }));
+  const natData  = allNationalities.map(n => ({ label: n, c: totalStats.natCounts?.[n] || 0 }));
+  const occData  = allOccupations  .map(o => ({ label: o, c: totalStats.occCounts?.[o] || 0 }));
+
+  const relRows  = makeStatRows(relData,  '#8D6E63');
+  const natRows  = makeStatRows(natData,  '#2E7D32');
+  const occRows  = makeStatRows(occData,  '#00695C');
+
+  // Side-by-side only when both sections are small enough to fit two columns
+  const sideBySide = relData.length <= 12 && natData.length <= 12;
+
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Demographic Dashboard — ${safeHtml(filterLine)}</title>
+  <style>
+    @page { size: legal landscape; margin: 5mm 6mm; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      font-family: 'Padauk', 'Myanmar Text', 'Times New Roman', Times, serif;
+      font-size: 8.5px; color: #000; background: #fff;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+
+    /* ── Toolbar ── */
+    .toolbar {
+      position: sticky; top: 0; z-index: 10;
+      background: #f4f4f4; border-bottom: 1px solid #ccc;
+      padding: 7px 14px; display: flex; justify-content: space-between; align-items: center;
+      font-family: 'Segoe UI', Arial, sans-serif;
+    }
+    .toolbar h1 { margin: 0; font-size: 12px; letter-spacing: 1px; text-transform: uppercase; color: #333; font-weight: 600; }
+    .toolbar .btns button { background: #fff; color: #111; border: 1px solid #111; padding: 5px 14px; font-size: 11px; cursor: pointer; margin-left: 6px; }
+    .toolbar .btns button.primary { background: #111; color: #fff; }
+    @media print { .toolbar { display: none !important; } }
+
+    /* ── Watermark ── */
+    .watermark { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; z-index: 0; }
+    .watermark img { width: 38%; max-width: 380px; opacity: 0.055; }
+
+    /* ── Page ── */
+    .page { position: relative; z-index: 1; padding: 2px 4px 4px; }
+
+    /* ── Document header ── */
+    .header { display: flex; align-items: center; padding-bottom: 3px; margin-bottom: 2px; }
+    .header .logo { width: 44px; flex: 0 0 44px; }
+    .header .logo img { width: 40px; height: auto; }
+    .header .center { flex: 1; text-align: center; }
+    .header .center .org  { font-size: 11px; font-weight: 700; letter-spacing: 0.4px; }
+    .header .center .dept { font-size: 9px; margin-top: 1px; }
+    .header .center .doc-title { font-size: 9px; margin-top: 2px; font-style: italic; color: #333; }
+    .header .flag { width: 44px; flex: 0 0 44px; text-align: right; }
+    .header .flag img { width: 38px; height: auto; border: 1px solid #000; }
+    .rule { border-top: 1px solid #000; border-bottom: 1px solid #000; height: 2px; margin: 0 0 4px; }
+
+    /* ── Filter bar ── */
+    .filter-bar {
+      font-size: 8px; margin-bottom: 5px;
+      display: flex; justify-content: space-between; align-items: center;
+      border: 1px solid #ccc; padding: 2px 6px; background: #f9f9f9;
+      -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important;
+    }
+
+    /* ── Summary strip ── */
+    .summary-strip { display: flex; gap: 4px; margin-bottom: 5px; }
+    .summary-card {
+      flex: 1; border: 1px solid #ccc; padding: 4px 7px;
+      -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important;
+    }
+    .summary-card .s-label { font-size: 7px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #555; margin-bottom: 2px; }
+    .summary-card .s-val   { font-size: 16px; font-weight: 700; color: #000; font-family: 'Courier New', monospace; line-height: 1; }
+    .sc-green  { border-top: 3px solid #2E7D32 !important; }
+    .sc-blue   { border-top: 3px solid #4A6572 !important; }
+    .sc-brown  { border-top: 3px solid #A1887F !important; }
+
+    /* ── Section title ── */
+    .section-title { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin: 6px 0 2px; border-bottom: 1px solid #000; padding-bottom: 2px; }
+
+    /* ── Two-column layout ── */
+    .two-col { display: flex; gap: 6px; margin-bottom: 5px; }
+    .two-col .col { flex: 1; }
+
+    /* ── Stat table (religion / nationality / occupation) ── */
+    .stat-table { width: 100%; border-collapse: collapse; }
+    .stat-table td { border: 1px solid #ddd; padding: 2px 4px; font-size: 8px; vertical-align: middle; line-height: 1.2; }
+    .stat-table td.name { font-weight: 500; min-width: 60px; max-width: 120px; word-break: break-word; }
+    .stat-table td.num  { text-align: center; font-family: 'Courier New', monospace; white-space: nowrap; width: 36px; }
+    .stat-table td.bold { font-weight: 700; }
+    .stat-table td.green { color: #2E7D32; }
+    .stat-table td.bar-cell-simple { width: 120px; padding: 2px 4px; }
+    .simple-bar { height: 8px; min-width: 1px;
+      -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+
+    /* ── Age Pyramid table ── */
+    .pyramid-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+    .pyramid-table td { border: 1px solid #ddd; padding: 2px 4px; font-size: 8px; vertical-align: middle; line-height: 1.2; }
+    .pyramid-table td.num          { text-align: center; font-family: 'Courier New', monospace; width: 32px; white-space: nowrap; }
+    .pyramid-table td.bold         { font-weight: 700; }
+    .pyramid-table td.green        { color: #2E7D32; }
+    .pyramid-table td.bar-male     { width: 28%; padding: 2px 4px; overflow: hidden; }
+    .pyramid-table td.bar-female   { width: 28%; padding: 2px 4px; overflow: hidden; }
+    .pyramid-table td.age-label-cell { font-size: 7.5px; font-weight: 700; text-align: center; width: 58px; white-space: nowrap; color: #333; }
+
+    /* ── Legend ── */
+    .legend { display: flex; gap: 10px; font-size: 7px; color: #555; margin-bottom: 2px; align-items: center; }
+    .legend-swatch { display: inline-block; width: 16px; height: 7px; margin-right: 3px; vertical-align: middle;
+      -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+
+    /* ── Footer ── */
+    .doc-footer { margin-top: 5px; padding-top: 2px; border-top: 1px solid #000; display: flex; justify-content: space-between; font-size: 7px; color: #444; }
+  </style>
+</head>
+<body>
+  <div class="toolbar">
+    <h1>Demographic Dashboard — Print Preview</h1>
+    <div class="btns">
+      <button class="primary" onclick="window.print()">Print / Save as PDF</button>
+      <button onclick="window.close()">Close</button>
+    </div>
+  </div>
+
+  <div class="watermark"><img src="${logoUrl}" alt="" /></div>
+
+  <div class="page">
+    <!-- ── Document Header ── -->
+    <div class="header">
+      <div class="logo"><img src="${logoUrl}" alt="IDTL Logo" /></div>
+      <div class="center">
+        <div class="org">Ta'ang Land Government</div>
+        <div class="dept">Ta'ang Land Immigration Department (IDTL)</div>
+        <div class="doc-title">Demographic Dashboard Report — လူဦးရေဆိုင်ရာ အစီရင်ခံစာ</div>
+      </div>
+      <div class="flag"><img src="${flagUrl}" alt="Ta'ang Flag" /></div>
+    </div>
+    <div class="rule"></div>
+
+    <!-- ── Filter bar ── -->
+    <div class="filter-bar">
+      <span><b>Location Filter:</b> ${safeHtml(filterLine)}</span>
+      <span><b>Printed:</b> ${safeHtml(dateStr)}</span>
+    </div>
+
+    <!-- ── Summary strip ── -->
+    <div class="summary-strip">
+      <div class="summary-card sc-green">
+        <div class="s-label">Total Population · လူဦးရေပေါင်း</div>
+        <div class="s-val">${total.toLocaleString()}</div>
+      </div>
+      <div class="summary-card sc-blue">
+        <div class="s-label">Male · ကျား</div>
+        <div class="s-val">${male.toLocaleString()}</div>
+      </div>
+      <div class="summary-card sc-brown">
+        <div class="s-label">Female · မ</div>
+        <div class="s-val">${female.toLocaleString()}</div>
+      </div>
+    </div>
+
+    <!-- ── Age Pyramid ── -->
+    <div class="section-title">လူမှုဘဝကဏ္ဍအလိုက် ခွဲခြားခြင်း — FUNCTIONAL AGE GROUPS</div>
+    <div class="legend">
+      <span><span class="legend-swatch" style="background:#4A6572"></span>Male</span>
+      <span><span class="legend-swatch" style="background:#A1887F"></span>Female</span>
+      <span style="color:#999">— Bars scaled to largest single-side count; oldest age group at top</span>
+    </div>
+    <table class="pyramid-table">
+      <thead>
+        <tr>
+          <th style="width:32px">Male</th>
+          <th style="width:28%;text-align:right;padding:2px 6px;">← Male</th>
+          <th style="width:58px;text-align:center">Age Group</th>
+          <th style="width:28%;text-align:left;padding:2px 6px;">Female →</th>
+          <th style="width:32px">Female</th>
+          <th style="width:36px">Total</th>
+          <th style="width:32px">%</th>
+        </tr>
+      </thead>
+      <tbody>${ageRows}</tbody>
+    </table>
+
+    <!-- ── Religion + Nationality ── -->
+    ${sideBySide ? `<div class="two-col">
+      <div class="col">
+        <div class="section-title">RELIGIOUS STATISTICS</div>
+        <table class="stat-table" style="page-break-inside:auto">
+          <thead><tr>
+            <th style="text-align:left;padding:2px 4px">Religion</th>
+            <th>Bar (scaled to largest)</th>
+            <th style="width:42px">Count</th>
+            <th style="width:36px">%</th>
+          </tr></thead>
+          <tbody>${relRows || '<tr><td colspan="4" style="text-align:center;color:#999">No data</td></tr>'}</tbody>
+        </table>
+      </div>
+      <div class="col">
+        <div class="section-title">NATIONALITY STATISTICS</div>
+        <table class="stat-table" style="page-break-inside:auto">
+          <thead><tr>
+            <th style="text-align:left;padding:2px 4px">Nationality</th>
+            <th>Bar (scaled to largest)</th>
+            <th style="width:42px">Count</th>
+            <th style="width:36px">%</th>
+          </tr></thead>
+          <tbody>${natRows || '<tr><td colspan="4" style="text-align:center;color:#999">No data</td></tr>'}</tbody>
+        </table>
+      </div>
+    </div>` : `
+    <div class="section-title">RELIGIOUS STATISTICS</div>
+    <table class="stat-table" style="page-break-inside:auto">
+      <thead><tr>
+        <th style="text-align:left;padding:2px 4px">Religion</th>
+        <th>Bar (scaled to largest)</th>
+        <th style="width:42px">Count</th>
+        <th style="width:36px">%</th>
+      </tr></thead>
+      <tbody>${relRows || '<tr><td colspan="4" style="text-align:center;color:#999">No data</td></tr>'}</tbody>
+    </table>
+    <div class="section-title">NATIONALITY STATISTICS</div>
+    <table class="stat-table" style="page-break-inside:auto">
+      <thead><tr>
+        <th style="text-align:left;padding:2px 4px">Nationality</th>
+        <th>Bar (scaled to largest)</th>
+        <th style="width:42px">Count</th>
+        <th style="width:36px">%</th>
+      </tr></thead>
+      <tbody>${natRows || '<tr><td colspan="4" style="text-align:center;color:#999">No data</td></tr>'}</tbody>
+    </table>`}
+
+    <!-- ── Occupation ── -->
+    <div class="section-title">OCCUPATION STATISTICS</div>
+    <table class="stat-table" style="page-break-inside:auto">
+      <thead><tr>
+        <th style="text-align:left;padding:2px 4px">Occupation</th>
+        <th>Bar (scaled to largest)</th>
+        <th style="width:42px">Count</th>
+        <th style="width:36px">%</th>
+      </tr></thead>
+      <tbody>${occRows || '<tr><td colspan="4" style="text-align:center;color:#999">No data</td></tr>'}</tbody>
+    </table>
+
+    <div class="doc-footer">
+      <span>Ta'ang Land Immigration Department &mdash; Confidential</span>
+      <span>Printed: ${safeHtml(dateStr)}</span>
+    </div>
+  </div>
+
+  <script>
+    (function(){
+      var imgs = document.images, loaded = 0;
+      function tryPrint(){ if(++loaded >= imgs.length){ setTimeout(function(){ window.focus(); window.print(); }, 300); } }
+      if(imgs.length === 0){ setTimeout(function(){ window.focus(); window.print(); }, 300); return; }
+      for(var i=0;i<imgs.length;i++){
+        if(imgs[i].complete) tryPrint();
+        else { imgs[i].addEventListener('load', tryPrint); imgs[i].addEventListener('error', tryPrint); }
+      }
+    })();
+  </script>
+</body>
+</html>`;
+
+  const w = window.open('', '_blank', 'width=1300,height=860');
+  if (!w) { alert('Please allow popups to print the demographic dashboard report.'); return; }
+  w.document.open();
+  w.document.write(html);
+  w.document.close();
+};

@@ -203,7 +203,7 @@ const Verification = () => {
   };
 
   return (
-    <div className="flex flex-col gap-8 p-8 max-w-7xl mx-auto">
+    <div className="flex flex-col gap-8 p-6 sm:p-8 xl:p-10 max-w-7xl xl:max-w-[1440px] mx-auto">
       
       {/* Header */}
       <div>
@@ -217,15 +217,15 @@ const Verification = () => {
 
       {/* VERIFICATION FORM */}
       <div className="bg-white border border-gray-200">
-        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+        <div className="px-6 xl:px-8 py-4 border-b border-gray-200 flex items-center justify-between">
           <h3 className="text-xs font-semibold text-gray-900 flex items-center gap-2 uppercase letter-spacing-0.05">
             <Search size={14} className="text-gray-900" /> 
             Verification Parameters
           </h3>
         </div>
-        <div className="p-6">
+        <div className="p-6 xl:p-8">
           <form onSubmit={handleVerify}>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 xl:gap-5 mb-8">
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1 uppercase letter-spacing-0.02">HOUSEHOLD NO.</label>
                 <input 

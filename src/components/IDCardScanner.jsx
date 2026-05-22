@@ -297,7 +297,7 @@ const IDCardScanner = () => {
   };
 
   return (
-    <div style={{ padding: '24px 16px', maxWidth: '768px', margin: '0 auto', boxSizing: 'border-box' }} className="scanner-page">
+    <div style={{ padding: '24px 16px', maxWidth: '768px', margin: '0 auto', boxSizing: 'border-box' }} className="scanner-page xl:max-w-3xl xl:px-10">
       {/* Page Header */}
       <div className="mb-8">
         <h2 style={{ fontSize: '20px', margin: '0 0 8px 0', color: '#1A1A1A', fontWeight: '500', letterSpacing: '0.02em' }}>

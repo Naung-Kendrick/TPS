@@ -8,11 +8,13 @@ const CsvUploader        = lazy(() => import('./components/CsvUploader'))
 const ExcelChecker       = lazy(() => import('./components/ExcelChecker'))
 const Verification       = lazy(() => import('./components/Verification'))
 const Reports            = lazy(() => import('./components/Reports'))
-const PopulationStatistics = lazy(() => import('./components/PopulationStatistics'))
+const PopulationStatistics  = lazy(() => import('./components/PopulationStatistics'))
+const DemographicDashboard  = lazy(() => import('./components/DemographicDashboard'))
 const HouseholdForm      = lazy(() => import('./components/HouseholdForm'))
 const IDCardScanner      = lazy(() => import('./components/IDCardScanner'))
 const Login              = lazy(() => import('./components/Login'))
 const UserManagement     = lazy(() => import('./components/UserManagement'))
+const TpsAuthenticator   = lazy(() => import('./components/TpsAuthenticator'))
 
 const PageFallback = () => (
   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
@@ -29,7 +31,7 @@ const PageFallback = () => (
 )
 
 const UploadPage = () => (
-  <div className="p-8 max-w-5xl mx-auto space-y-8">
+  <div className="p-6 sm:p-8 xl:p-10 max-w-5xl xl:max-w-6xl 2xl:max-w-7xl mx-auto space-y-8">
     <div>
       <h2 style={{ fontSize: '20px', margin: '0 0 8px 0', color: '#1A1A1A', fontWeight: '500', letterSpacing: '0.02em' }}>DATA UPLOAD</h2>
       <p style={{ margin: '0 0 32px 0', color: '#737373', fontSize: '12px' }}>Bulk import household records from CSV, JSON, or Excel files.</p>
@@ -48,11 +50,36 @@ const Placeholder = ({ title }) => (
 
 function App() {
   const [user, setUser] = useState(null);
+  const [authPassed, setAuthPassed] = useState(() => {
+    // Persist gate pass for the browser session only
+    return sessionStorage.getItem('tps_auth_passed') === '1';
+  });
+
+  const handleAuthPassed = () => {
+    sessionStorage.setItem('tps_auth_passed', '1');
+    setAuthPassed(true);
+  };
 
   const handleLogin = (data) => {
     setUser(data);
   };
 
+  const handleLogout = () => {
+    setUser(null);
+    // Do NOT clear authPassed on logout — user already proved they know the weekly code.
+    // Only clear when the browser session ends (sessionStorage is tab-scoped).
+  };
+
+  // Gate 1: TPS Authenticator (weekly code)
+  if (!authPassed) {
+    return (
+      <Suspense fallback={<PageFallback />}>
+        <TpsAuthenticator onPassed={handleAuthPassed} />
+      </Suspense>
+    );
+  }
+
+  // Gate 2: Username + PIN login
   if (!user) {
     return (
       <Suspense fallback={<PageFallback />}>
@@ -66,15 +93,16 @@ function App() {
 
   return (
     <Routes>
-      <Route path="/" element={<Layout user={user} />}>
+      <Route path="/" element={<Layout user={user} onLogout={handleLogout} />}>
         <Route index element={<Navigate to="/verification" replace />} />
         <Route path="verification" element={<Suspense fallback={<PageFallback />}><Verification /></Suspense>} />
         <Route path="upload" element={<Suspense fallback={<PageFallback />}><UploadPage /></Suspense>} />
         <Route path="scanner" element={<Suspense fallback={<PageFallback />}><IDCardScanner /></Suspense>} />
         <Route path="central-database" element={<Suspense fallback={<PageFallback />}><Reports /></Suspense>} />
         <Route path="statistics" element={<Suspense fallback={<PageFallback />}><PopulationStatistics /></Suspense>} />
+        <Route path="demographics" element={<Suspense fallback={<PageFallback />}><DemographicDashboard /></Suspense>} />
         <Route path="registration" element={<Suspense fallback={<PageFallback />}><HouseholdForm /></Suspense>} />
-        <Route path="users" element={<Suspense fallback={<PageFallback />}><UserManagement /></Suspense>} />
+        <Route path="users" element={<Suspense fallback={<PageFallback />}><UserManagement user={user} /></Suspense>} />
         <Route path="settings" element={<Placeholder title="Settings" />} />
         <Route path="*" element={<Navigate to="/verification" replace />} />
       </Route>

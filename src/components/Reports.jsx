@@ -478,7 +478,7 @@ const Reports = () => {
   };
 
   return (
-    <div className="px-4 py-5 sm:p-8 max-w-7xl mx-auto min-h-screen bg-white">
+    <div className="px-4 py-5 sm:p-8 xl:p-10 max-w-7xl xl:max-w-[1440px] mx-auto min-h-screen bg-white">
       
       {/* HEADER & BREADCRUMBS */}
       <div className="mb-5 sm:mb-8">
@@ -594,7 +594,7 @@ const Reports = () => {
           <>
             {/* LEVELS 1, 2, 3: CARDS GRID */}
             {level <= 3 && (
-              <div className="p-3 sm:p-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 bg-white min-h-[300px]">
+              <div className="p-3 sm:p-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 xl:gap-4 bg-white min-h-[300px]">
                 {filteredData.length === 0 ? (
                   <div className="col-span-full">
                     <EmptyState type="no-results" message={search ? `No results for "${search}".` : 'No records available at this level.'} compact />
@@ -674,7 +674,7 @@ const Reports = () => {
                 </div>
               ) : (
                 // Group path: show villages as cards
-                <div className="p-3 sm:p-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 bg-white min-h-[300px]">
+                <div className="p-3 sm:p-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 xl:gap-4 bg-white min-h-[300px]">
                   {filteredData.length === 0 ? (
                     <div className="col-span-full">
                       <EmptyState type="no-results" message={search ? `No results for "${search}".` : 'No villages found in this group.'} compact />

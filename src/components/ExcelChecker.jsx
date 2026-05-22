@@ -586,9 +586,9 @@ const ExcelChecker = () => {
   );
 
   return (
-    <div className="bg-white p-6 border border-[#E5E7EB] mb-8" style={{ borderRadius: '0px' }}>
+    <div className="bg-white p-6 xl:p-8 border border-[#E5E7EB] mb-8" style={{ borderRadius: '0px' }}>
       {/* Header */}
-      <div className="flex items-center gap-3 mb-6">
+      <div className="flex items-center gap-3 mb-6 xl:mb-8">
         <div className="bg-[#F3F4F6] text-[#1A1A1A] p-2" style={{ borderRadius: '0px' }}>
           <ClipboardCheck size={24} />
         </div>
@@ -691,7 +691,7 @@ const ExcelChecker = () => {
                 </div>
 
                 {/* Checklist Items */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
                   <ChecklistItem
                     icon={Table}
                     label="Total Rows"

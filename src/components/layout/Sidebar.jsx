@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { Users, UserPlus, LineChart, FileText, Settings, Upload, ScanLine, Menu, X, MoreHorizontal } from 'lucide-react';
+import { Users, UserPlus, LineChart, PieChart, FileText, Settings, Upload, ScanLine, Menu, X, MoreHorizontal, LogOut, CircleUserRound } from 'lucide-react';
 import logo from '../../assets/fonts/IDTL_logo.png';
 
-const Sidebar = ({ user }) => {
+const Sidebar = ({ user, onLogout }) => {
   const [open, setOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const location = useLocation();
@@ -67,6 +67,7 @@ const Sidebar = ({ user }) => {
     { id: 'upload',           path: '/upload',           label: 'Data Upload',            icon: Upload         },
     { id: 'scanner',          path: '/scanner',          label: 'ID Card Scanner',        icon: ScanLine       },
     { id: 'statistics',       path: '/statistics',       label: 'Population Statistics',  icon: LineChart      },
+    { id: 'demographics',     path: '/demographics',     label: 'Demographic Dashboard',  icon: PieChart       },
     { id: 'registration',     path: '/registration',     label: 'Household Registration', icon: UserPlus       },
     { id: 'central-database', path: '/central-database', label: 'Central Database',       icon: FileText       },
     { id: 'users',            path: '/users',            label: 'User Management',        icon: Users          },
@@ -168,6 +169,37 @@ const Sidebar = ({ user }) => {
             )}
           </NavLink>
         ))}
+      </div>
+
+      {/* User + Logout */}
+      <div style={{ borderTop: '1px solid #E5E7EB', padding: '10px 8px 12px' }}>
+        {/* Signed-in user row */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: '8px',
+          padding: '8px 12px', marginBottom: '4px',
+          backgroundColor: '#1A1A1A',
+        }}>
+          <CircleUserRound size={14} style={{ color: '#FFFFFF', flexShrink: 0 }} />
+          <span style={{ fontSize: '11px', fontWeight: '600', color: '#FFFFFF', letterSpacing: '0.04em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {user?.profile?.username || user?.email?.replace('@tps.idtl', '') || 'User'}
+          </span>
+        </div>
+        {/* Sign Out button */}
+        <button
+          onClick={onLogout}
+          style={{
+            width: '100%', display: 'flex', alignItems: 'center', gap: '8px',
+            padding: '8px 12px', background: 'none', border: '1px solid transparent',
+            cursor: 'pointer', color: '#B71C1C', fontSize: '11px', fontWeight: '500',
+            letterSpacing: '0.04em', textAlign: 'left',
+            transition: 'border-color 100ms, background-color 100ms',
+          }}
+          onMouseEnter={e => { e.currentTarget.style.borderColor = '#B71C1C'; e.currentTarget.style.backgroundColor = '#FDF2F2'; }}
+          onMouseLeave={e => { e.currentTarget.style.borderColor = 'transparent'; e.currentTarget.style.backgroundColor = 'transparent'; }}
+        >
+          <LogOut size={13} style={{ flexShrink: 0 }} />
+          Sign Out
+        </button>
       </div>
 
     </div>

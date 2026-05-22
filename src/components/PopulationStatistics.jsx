@@ -2,11 +2,11 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { SkeletonStatGrid, SkeletonBar } from './Skeleton';
 import { supabase } from '../lib/supabase';
 import { Users, User, Home, Search, BarChart2, MapPin, Globe, Printer, FileSpreadsheet } from 'lucide-react';
-import { deepEnsureUnicode } from './CsvUploader';
 import EmptyState from './EmptyState';
 import { printStatistics, exportStatisticsExcel } from '../lib/statisticsPrint';
 
 const toMyanmarNum = (num) => {
+  if (num === null || num === undefined) return '';
   const myanmarNumbers = ['၀', '၁', '၂', '၃', '၄', '၅', '၆', '၇', '၈', '၉'];
   return num.toString().split('').map(digit => myanmarNumbers[parseInt(digit)] || digit).join('');
 };
@@ -194,6 +194,7 @@ const PopulationStatistics = () => {
   const [wards, setWards] = useState([]);
   const [villages, setVillages] = useState([]);
   const [groups, setGroups] = useState([]);
+  const [filteredVillages, setFilteredVillages] = useState([]);
 
   // Selected filters
   const [selectedDistrict, setSelectedDistrict] = useState('');
@@ -248,6 +249,7 @@ const PopulationStatistics = () => {
       setWards([]);
       setVillages([]);
       setGroups([]);
+      setFilteredVillages([]);
       return;
     }
     try {
@@ -260,16 +262,48 @@ const PopulationStatistics = () => {
       setWards(locations.filter(l => l.kind === 'ward').map(l => l.name));
       setVillages(locations.filter(l => l.kind === 'village').map(l => l.name));
       setGroups(locations.filter(l => l.kind === 'group').map(l => l.name));
+      setFilteredVillages([]);
     } catch (err) {
       console.error('Failed to load locations:', err);
       setWards([]);
       setVillages([]);
       setGroups([]);
+      setFilteredVillages([]);
+    }
+  };
+
+  // ─── Fetch villages that belong to a specific group ────────
+  const loadVillagesForGroup = async (district, township, group) => {
+    if (!district || !township || !group) {
+      setFilteredVillages([]);
+      return;
+    }
+    try {
+      const { data, error } = await supabase
+        .from('households')
+        .select('ward_village_group')
+        .eq('district', district)
+        .eq('township', township)
+        .ilike('ward_village_group', `%${group}%`);
+      if (error) throw error;
+      const villageSet = new Set();
+      (data || []).forEach(row => {
+        const parts = (row.ward_village_group || '').split(/[,၊]/).map(p => p.trim()).filter(Boolean);
+        parts.forEach(p => {
+          if (p.includes('ရွာ') && !p.includes('အုပ်စု') && !p.includes('ရပ်ကွက်')) {
+            villageSet.add(p);
+          }
+        });
+      });
+      setFilteredVillages([...villageSet].sort());
+    } catch (err) {
+      console.error('Failed to load villages for group:', err);
+      setFilteredVillages([]);
     }
   };
 
   // ─── Main stats fetch via RPC ───────────────────────────
-  const loadStats = async (forceRefresh = false) => {
+  const loadStats = useCallback(async (forceRefresh = false) => {
     setLoading(true);
     setError(null);
 
@@ -303,7 +337,7 @@ const PopulationStatistics = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedDistrict, selectedTownship, selectedWard, selectedVillage, selectedGroup]);
 
   // Initial load: districts and stats
   useEffect(() => {
@@ -314,7 +348,7 @@ const PopulationStatistics = () => {
   // Reload stats when filters change
   useEffect(() => {
     loadStats();
-  }, [selectedDistrict, selectedTownship, selectedWard, selectedVillage, selectedGroup]);
+  }, [loadStats]);
 
   // Load townships when district changes
   useEffect(() => {
@@ -342,6 +376,26 @@ const PopulationStatistics = () => {
     setVillagePage1(1); setVillagePage2(1);
     setGroupPage1(1); setGroupPage2(1);
   }, [selectedTownship]);
+
+  // Reset village and load filtered villages when group changes
+  useEffect(() => {
+    setSelectedVillage('');
+    setVillagePage1(1); setVillagePage2(1);
+    if (selectedGroup) {
+      loadVillagesForGroup(selectedDistrict, selectedTownship, selectedGroup);
+    } else {
+      setFilteredVillages([]);
+    }
+  }, [selectedGroup]);
+
+  // Reset group and village when ward is selected
+  useEffect(() => {
+    if (selectedWard) {
+      setSelectedGroup('');
+      setSelectedVillage('');
+      setFilteredVillages([]);
+    }
+  }, [selectedWard]);
 
   // ─── Derived stats from RPC response ─────────────────────
   const totalStats = statsData?.totalStats || {};
@@ -371,16 +425,21 @@ const PopulationStatistics = () => {
   })).sort((a, b) => b.count - a.count);
 
   const selectStyle = {
-    width: '100%', padding: '8px 12px', borderRadius: '0px',
-    border: '1px solid #E5E7EB', fontSize: '12px', fontFamily: 'Inter, sans-serif',
+    width: '100%', padding: '6px 28px 6px 10px', borderRadius: '0px',
+    border: '1px solid #E5E7EB', fontSize: '11px', fontFamily: 'Inter, sans-serif',
     backgroundColor: '#FFFFFF', boxSizing: 'border-box', marginTop: '4px',
-    color: '#1A1A1A',
+    color: '#1A1A1A', height: '32px', lineHeight: '1.4',
+    appearance: 'none', WebkitAppearance: 'none', MozAppearance: 'none',
+    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23737373'/%3E%3C/svg%3E")`,
+    backgroundRepeat: 'no-repeat', backgroundPosition: 'right 10px center',
+    cursor: 'pointer',
   };
 
   const sectionCardStyle = {
     backgroundColor: '#FFFFFF', borderRadius: '0px', border: '1px solid #E5E7EB',
     padding: '24px', marginBottom: '24px',
   };
+  const sectionCardClass = 'tps-section-card';
 
   const sectionTitleStyle = {
     fontSize: '12px', fontWeight: '600', color: '#1A1A1A',
@@ -429,25 +488,26 @@ const PopulationStatistics = () => {
   };
 
   return (
-    <div className="tps-page-container max-w-7xl mx-auto bg-white" style={{ padding: '32px' }}>
+    <div className="px-4 py-5 sm:p-8 max-w-7xl mx-auto bg-white">
       <style>{`
-        @media (max-width: 767px) {
-          .tps-page-container { padding: 16px !important; }
+        .tps-stats-toolbar { display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; padding-top: 16px; border-top: 1px solid #E5E7EB; }
+        @media (max-width: 639px) {
+          .tps-stats-toolbar { flex-direction: column; }
+          .tps-stats-toolbar button { width: 100%; justify-content: center; }
+          .tps-section-card { padding: 16px !important; margin-bottom: 16px !important; }
         }
       `}</style>
       {/* Header */}
-      <div style={{ marginBottom: '32px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-6 sm:mb-8">
         <div>
-          <h2 style={{ fontSize: '20px', margin: '0 0 8px 0', color: colors.black, fontWeight: '500', letterSpacing: '0.02em' }}>
+          <h2 style={{ fontSize: '18px', margin: '0 0 4px 0', color: colors.black, fontWeight: '600', letterSpacing: '0.02em' }}>
             POPULATION STATISTICS
           </h2>
-          <p style={{ margin: 0, color: '#737373', fontSize: '12px' }}>
-            ခရိုင်၊ မြို့နယ်၊ ရပ်ကွက်/ကျေးရွာအလိုက် လူဦးရေစာရင်းအင်းများကို ကြည့်ရှုပါ။
-          </p>
         </div>
         <button
           onClick={() => { clearCache(); loadDistricts(); loadStats(true); }}
-          style={{ fontSize: '11px', border: '1px solid #E5E7EB', background: 'none', color: '#737373', padding: '6px 14px', cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}
+          className="w-full sm:w-auto flex items-center justify-center gap-1.5"
+          style={{ fontSize: '11px', border: '1px solid #E5E7EB', background: 'none', color: '#737373', padding: '6px 14px', cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.05em', flexShrink: 0 }}
           title="Fetch latest data from database"
         >
           ↻ Refresh Data
@@ -455,11 +515,11 @@ const PopulationStatistics = () => {
       </div>
 
       {/* ─── Filter Section ────────────────────────────────── */}
-      <div style={sectionCardStyle}>
+      <div style={sectionCardStyle} className={sectionCardClass}>
         <div style={sectionTitleStyle}>
           <Search size={14} color={colors.black} /> FILTER BY LOCATION
         </div>
-        <div className="tps-grid tps-grid-4" style={{ gap: '24px' }}>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
           {/* District */}
           <div>
             <label style={{ fontSize: '11px', fontWeight: '500', color: '#737373', display: 'block', letterSpacing: '0.02em' }}>
@@ -493,25 +553,25 @@ const PopulationStatistics = () => {
             </select>
           </div>
 
-          {/* Village */}
-          <div>
-            <label style={{ fontSize: '11px', fontWeight: '500', color: '#737373', display: 'block', letterSpacing: '0.02em' }}>
-              ကျေးရွာ (VILLAGE)
-            </label>
-            <select value={selectedVillage} onChange={(e) => { setSelectedVillage(e.target.value); setPage1(1); setPage2(1); }} style={selectStyle} disabled={!selectedTownship}>
-              <option value="">--- အားလုံး (All Villages) ---</option>
-              {villages.map(v => <option key={v} value={v}>{v}</option>)}
-            </select>
-          </div>
-
           {/* Group */}
           <div>
             <label style={{ fontSize: '11px', fontWeight: '500', color: '#737373', display: 'block', letterSpacing: '0.02em' }}>
               အုပ်စု (GROUP)
             </label>
-            <select value={selectedGroup} onChange={(e) => { setSelectedGroup(e.target.value); setPage1(1); setPage2(1); }} style={selectStyle} disabled={!selectedTownship}>
+            <select value={selectedGroup} onChange={(e) => { setSelectedGroup(e.target.value); setPage1(1); setPage2(1); }} style={selectStyle} disabled={!selectedTownship || !!selectedWard}>
               <option value="">--- အားလုံး (All Groups) ---</option>
               {groups.map(g => <option key={g} value={g}>{g}</option>)}
+            </select>
+          </div>
+
+          {/* Village */}
+          <div>
+            <label style={{ fontSize: '11px', fontWeight: '500', color: '#737373', display: 'block', letterSpacing: '0.02em' }}>
+              ကျေးရွာ (VILLAGE)
+            </label>
+            <select value={selectedVillage} onChange={(e) => { setSelectedVillage(e.target.value); setPage1(1); setPage2(1); }} style={selectStyle} disabled={!selectedGroup}>
+              <option value="">--- အားလုံး (All Villages) ---</option>
+              {filteredVillages.map(v => <option key={v} value={v}>{v}</option>)}
             </select>
           </div>
         </div>
@@ -533,14 +593,14 @@ const PopulationStatistics = () => {
                 {selectedWard}
               </span>
             )}
-            {selectedVillage && (
-              <span style={{ fontSize: '11px', border: `1px solid ${colors.forestGreen}`, padding: '2px 8px', color: colors.forestGreen, fontWeight: '500' }}>
-                {selectedVillage}
-              </span>
-            )}
             {selectedGroup && (
               <span style={{ fontSize: '11px', border: `1px solid ${colors.forestGreen}`, padding: '2px 8px', color: colors.forestGreen, fontWeight: '500' }}>
                 {selectedGroup}
+              </span>
+            )}
+            {selectedVillage && (
+              <span style={{ fontSize: '11px', border: `1px solid ${colors.forestGreen}`, padding: '2px 8px', color: colors.forestGreen, fontWeight: '500' }}>
+                {selectedVillage}
               </span>
             )}
             <button onClick={() => { setSelectedDistrict(''); setSelectedTownship(''); setSelectedWard(''); setSelectedVillage(''); setSelectedGroup(''); }}
@@ -552,7 +612,7 @@ const PopulationStatistics = () => {
       </div>
 
       {/* ─── Summary Cards ─────────────────────────────────── */}
-      <div className="tps-grid tps-grid-4" style={{ gap: '24px', marginBottom: '24px' }}>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-6">
         <StatCard label="Total Population" value={totalPopulation} icon={Users} color={colors.forestGreen} />
         <StatCard label="Male" value={totalMale} icon={User} color={colors.slateGray} />
         <StatCard label="Female" value={totalFemale} icon={User} color={colors.mutedClay} />
@@ -560,11 +620,11 @@ const PopulationStatistics = () => {
       </div>
 
       {/* ─── Age Distribution ──────────────────────────────── */}
-      <div style={sectionCardStyle}>
+      <div style={sectionCardStyle} className={sectionCardClass}>
         <div style={sectionTitleStyle}>
           <BarChart2 size={14} color={colors.black} /> AGE DISTRIBUTION
         </div>
-        <div className="tps-grid tps-grid-4" style={{ gap: '24px' }}>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
           <div style={{ padding: '24px', border: `1px solid ${colors.oliveGreen}`, textAlign: 'center' }}>
             <div style={{ fontSize: '10px', color: '#737373', fontWeight: '600', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Under 16</div>
             <div style={{ fontSize: '11px', color: '#737373', marginBottom: '12px' }}>အသက် ၁၆ နှစ်အောက်</div>
@@ -591,7 +651,7 @@ const PopulationStatistics = () => {
       </div>
 
       {/* ─── Breakdown Section ──────────────────────────────────── */}
-      <div className="tps-grid tps-grid-2" style={{ gap: '24px', marginBottom: '24px' }}>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4 sm:mb-6">
         {/* ─── Religious Statistics ───────────────────────── */}
         <div style={sectionCardStyle}>
           <div style={sectionTitleStyle}>
@@ -617,6 +677,13 @@ const PopulationStatistics = () => {
           : selectedDistrict
             ? 'မြို့နယ်'
             : 'ခရိုင်';
+
+        // Level suffix for table titles
+        const levelSuffix = selectedTownship
+          ? '(WARD / GROUP / VILLAGE)'
+          : selectedDistrict
+            ? '(TOWNSHIP)'
+            : '(DISTRICT)';
 
         // RPC returns pre-computed groupStats; split by kind when at ward/village/group level
         const isAtWardLevel = statsData?.groupKey === 'wvg';
@@ -652,6 +719,11 @@ const PopulationStatistics = () => {
         const groupPages1 = Math.max(1, Math.ceil(groupStatsList.length / PAGE_SIZE));
         const groupPages2 = Math.max(1, Math.ceil(groupStatsList.length / PAGE_SIZE));
 
+        // Prefix village names with group name when group is selected
+        const prefixedVillageStatsList = selectedGroup
+          ? villageStatsList.map(v => ({ ...v, name: `${selectedGroup} — ${v.name}` }))
+          : villageStatsList;
+
         const thS = { padding: '12px 8px', fontSize: '10px', fontWeight: '600', color: '#737373', borderBottom: '1px solid #E5E7EB', borderRight: '1px solid #E5E7EB', textAlign: 'center', whiteSpace: 'nowrap', textTransform: 'uppercase', letterSpacing: '0.05em', backgroundColor: '#FAFAFA' };
         const tdS = { padding: '10px 8px', fontSize: '12px', textAlign: 'center', borderBottom: '1px solid #E5E7EB', borderRight: '1px solid #E5E7EB', color: '#1A1A1A' };
         const tdMonoS = { ...tdS, fontFamily: 'var(--font-mono)' };
@@ -659,14 +731,16 @@ const PopulationStatistics = () => {
 
         const printArgs = {
           groupLabel, wardStats: wardStatsList, totalStats, allReligions, allNationalities,
-          selectedDistrict, selectedTownship, selectedWard,
+          selectedDistrict, selectedTownship, selectedWard, selectedGroup, selectedVillage,
+          isAtWardLevel,
+          wardStatsList, villageStatsList, groupStatsList,
         };
 
         // Helper to render table row
         const renderTableRow = (w, i, pageNum, stats) => (
           <tr key={w.name} style={{ backgroundColor: '#FFFFFF' }}>
             <td style={tdMonoS}>{toMyanmarNum((pageNum - 1) * PAGE_SIZE + i + 1)}</td>
-            <td style={{ ...tdS, textAlign: 'left', fontWeight: '500' }}>{w.name}</td>
+            <td style={{ ...tdS, textAlign: 'left', fontWeight: '500', whiteSpace: 'normal', wordBreak: 'break-word', maxWidth: '180px' }}>{w.name}</td>
             <td style={tdMonoS}>{toMyanmarNum(w.households)}</td>
             <td style={tdMonoS}>{toMyanmarNum(w.male)}</td>
             <td style={tdMonoS}>{toMyanmarNum(w.female)}</td>
@@ -681,7 +755,6 @@ const PopulationStatistics = () => {
             <td style={tdMonoS}>{toMyanmarNum(w.a60f)}</td>
             <td style={tdMonoS}>{toMyanmarNum(w.a60m + w.a60f)}</td>
             {allReligions.map(r => <td key={r} style={tdMonoS}>{w.relCounts[r] ? toMyanmarNum(w.relCounts[r]) : '-'}</td>)}
-            <td style={tdMonoS}>{w.nonLocal ? toMyanmarNum(w.nonLocal) : '-'}</td>
           </tr>
         );
 
@@ -696,11 +769,10 @@ const PopulationStatistics = () => {
                 <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #E5E7EB', minWidth: '600px' }}>
                   <thead>
                     <tr>
-                      <th rowSpan={2} style={thS}>စဉ်</th>
-                      <th rowSpan={2} style={thS}>အမည်</th>
+                      <th rowSpan={2} style={{ ...thS, width: '3%' }}>စဉ်</th>
+                      <th rowSpan={2} style={{ ...thS, minWidth: '120px', maxWidth: '180px', whiteSpace: 'normal', wordBreak: 'break-word' }}>အမည်</th>
                       <th colSpan={3} style={thS}>လူဦးရေပေါင်း</th>
                       {allNationalities.length > 0 && <th colSpan={allNationalities.length} style={thS}>လူမျိုးအလိုက်</th>}
-                      <th rowSpan={2} style={thS}>ပြည်နယ်ခြားသား</th>
                     </tr>
                     <tr>
                       <th style={thS}>ကျား</th><th style={thS}>မ</th><th style={thS}>ပေါင်း</th>
@@ -711,12 +783,11 @@ const PopulationStatistics = () => {
                     {pagedStats.map((w, i) => (
                       <tr key={w.name} style={{ backgroundColor: '#FFFFFF' }}>
                         <td style={tdMonoS}>{toMyanmarNum((pageNum - 1) * PAGE_SIZE + i + 1)}</td>
-                        <td style={{ ...tdS, textAlign: 'left', fontWeight: '500' }}>{w.name}</td>
+                        <td style={{ ...tdS, textAlign: 'left', fontWeight: '500', whiteSpace: 'normal', wordBreak: 'break-word', maxWidth: '180px' }}>{w.name}</td>
                         <td style={tdMonoS}>{toMyanmarNum(w.male)}</td>
                         <td style={tdMonoS}>{toMyanmarNum(w.female)}</td>
                         <td style={{ ...tdMonoS, fontWeight: '600', color: colors.forestGreen }}>{toMyanmarNum(w.total)}</td>
                         {allNationalities.map(n => <td key={n} style={tdMonoS}>{w.natCounts[n] ? toMyanmarNum(w.natCounts[n]) : '-'}</td>)}
-                        <td style={tdMonoS}>{w.nonLocal ? toMyanmarNum(w.nonLocal) : '-'}</td>
                       </tr>
                     ))}
                     <tr>
@@ -726,7 +797,6 @@ const PopulationStatistics = () => {
                       <td style={tdBold}>{toMyanmarNum(totalStats.female)}</td>
                       <td style={{ ...tdBold, color: colors.forestGreen }}>{toMyanmarNum(totalStats.total)}</td>
                       {allNationalities.map(n => <td key={n} style={tdBold}>{totalStats.natCounts[n] ? toMyanmarNum(totalStats.natCounts[n]) : '-'}</td>)}
-                      <td style={tdBold}>{totalStats.nonLocal ? toMyanmarNum(totalStats.nonLocal) : '-'}</td>
                     </tr>
                   </tbody>
                 </table>
@@ -766,15 +836,14 @@ const PopulationStatistics = () => {
                 <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #E5E7EB', minWidth: '900px' }}>
                   <thead>
                     <tr>
-                      <th rowSpan={2} style={thS}>စဉ်</th>
-                      <th rowSpan={2} style={thS}>အမည်</th>
-                      <th rowSpan={2} style={thS}>အိမ်ထ</th>
+                      <th rowSpan={2} style={{ ...thS, width: '3%' }}>စဉ်</th>
+                      <th rowSpan={2} style={{ ...thS, minWidth: '120px', maxWidth: '180px', whiteSpace: 'normal', wordBreak: 'break-word' }}>အမည်</th>
+                      <th rowSpan={2} style={thS}>အထစ</th>
                       <th colSpan={3} style={thS}>လူဦးရေပေါင်း</th>
                       <th colSpan={3} style={thS}>၁၆ နှစ်အောက်</th>
                       <th colSpan={3} style={thS}>၁၆ - ၆၀ နှစ်အကြား</th>
                       <th colSpan={3} style={thS}>၆၀ နှစ်အထက်</th>
                       {allReligions.length > 0 && <th colSpan={allReligions.length} style={thS}>ကိုးကွယ်သည့်ဘာသာ</th>}
-                      <th rowSpan={2} style={thS}>ပြည်နယ်ခြားသား</th>
                     </tr>
                     <tr>
                       <th style={thS}>ကျား</th><th style={thS}>မ</th><th style={thS}>ပေါင်း</th>
@@ -803,7 +872,6 @@ const PopulationStatistics = () => {
                       <td style={tdBold}>{toMyanmarNum(totalStats.a60f)}</td>
                       <td style={tdBold}>{toMyanmarNum(totalStats.a60m + totalStats.a60f)}</td>
                       {allReligions.map(r => <td key={r} style={tdBold}>{totalStats.relCounts[r] ? toMyanmarNum(totalStats.relCounts[r]) : '-'}</td>)}
-                      <td style={tdBold}>{totalStats.nonLocal ? toMyanmarNum(totalStats.nonLocal) : '-'}</td>
                     </tr>
                   </tbody>
                 </table>
@@ -837,29 +905,25 @@ const PopulationStatistics = () => {
             {/* ── Table 1: Population + Age + Religious ─────── */}
             {isAtWardLevel ? (
               <>
-                {/* WARD TABLE */}
-                {renderTable1('Table 1 — WARD (ရပ်) Statistics', wardStatsList, wardPage1, setWardPage1, wardPages1)}
-                {/* VILLAGE TABLE */}
-                {renderTable1('Table 1 — VILLAGE (ရွာ) Statistics', villageStatsList, villagePage1, setVillagePage1, villagePages1)}
-                {/* GROUP TABLE */}
-                {renderTable1('Table 1 — GROUP (အုပ်စု) Statistics', groupStatsList, groupPage1, setGroupPage1, groupPages1)}
+                {renderTable1(`SUMMARY TABLE (1) — POPULATION, AGE & RELIGION (WARDS)`, wardStatsList, wardPage1, setWardPage1, wardPages1)}
+                {renderTable1(`SUMMARY TABLE (1) — POPULATION, AGE & RELIGION (GROUPS)`, groupStatsList, groupPage1, setGroupPage1, groupPages1)}
+                {renderTable1(`SUMMARY TABLE (1) — POPULATION, AGE & RELIGION (VILLAGES)`, prefixedVillageStatsList, villagePage1, setVillagePage1, villagePages1)}
               </>
             ) : (
               <div style={sectionCardStyle}>
-                <div style={sectionTitleStyle}>SUMMARY TABLE (1) — POPULATION, AGE, RELIGION</div>
+                <div style={sectionTitleStyle}>{`SUMMARY TABLE (1) — POPULATION, AGE & RELIGION ${levelSuffix}`}</div>
               <div className="tps-responsive-table">
                 <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #E5E7EB', minWidth: '900px' }}>
                   <thead>
                     <tr>
                       <th rowSpan={2} style={thS}>စဉ်</th>
                       <th rowSpan={2} style={thS}>{groupLabel}</th>
-                      <th rowSpan={2} style={thS}>အိမ်ထ</th>
+                      <th rowSpan={2} style={thS}>အထစ</th>
                       <th colSpan={3} style={thS}>လူဦးရေပေါင်း</th>
                       <th colSpan={3} style={thS}>၁၆ နှစ်အောက်</th>
                       <th colSpan={3} style={thS}>၁၆ - ၆၀ နှစ်အကြား</th>
                       <th colSpan={3} style={thS}>၆၀ နှစ်အထက်</th>
                       {allReligions.length > 0 && <th colSpan={allReligions.length} style={thS}>ကိုးကွယ်သည့်ဘာသာ</th>}
-                      <th rowSpan={2} style={thS}>ပြည်နယ်ခြားသား</th>
                     </tr>
                     <tr>
                       <th style={thS}>ကျား</th><th style={thS}>မ</th><th style={thS}>ပေါင်း</th>
@@ -888,7 +952,6 @@ const PopulationStatistics = () => {
                         <td style={tdMonoS}>{toMyanmarNum(w.a60f)}</td>
                         <td style={tdMonoS}>{toMyanmarNum(w.a60m + w.a60f)}</td>
                         {allReligions.map(r => <td key={r} style={tdMonoS}>{w.relCounts[r] ? toMyanmarNum(w.relCounts[r]) : '-'}</td>)}
-                        <td style={tdMonoS}>{w.nonLocal ? toMyanmarNum(w.nonLocal) : '-'}</td>
                       </tr>
                     ))}
                     {/* Total Row */}
@@ -909,7 +972,6 @@ const PopulationStatistics = () => {
                       <td style={tdBold}>{toMyanmarNum(totalStats.a60f)}</td>
                       <td style={tdBold}>{toMyanmarNum(totalStats.a60m + totalStats.a60f)}</td>
                       {allReligions.map(r => <td key={r} style={tdBold}>{totalStats.relCounts[r] ? toMyanmarNum(totalStats.relCounts[r]) : '-'}</td>)}
-                      <td style={tdBold}>{totalStats.nonLocal ? toMyanmarNum(totalStats.nonLocal) : '-'}</td>
                     </tr>
                   </tbody>
                 </table>
@@ -940,16 +1002,13 @@ const PopulationStatistics = () => {
             {/* ── Table 2: Population + Nationality ──────────── */}
             {isAtWardLevel ? (
               <>
-                {/* WARD TABLE 2 */}
-                {renderTable2('Table 2 — WARD (ရပ်) Statistics', wardStatsList, wardPage2, setWardPage2, wardPages2)}
-                {/* VILLAGE TABLE 2 */}
-                {renderTable2('Table 2 — VILLAGE (ရွာ) Statistics', villageStatsList, villagePage2, setVillagePage2, villagePages2)}
-                {/* GROUP TABLE 2 */}
-                {renderTable2('Table 2 — GROUP (အုပ်စု) Statistics', groupStatsList, groupPage2, setGroupPage2, groupPages2)}
+                {renderTable2(`SUMMARY TABLE (2) — NATIONALITY (WARDS)`, wardStatsList, wardPage2, setWardPage2, wardPages2)}
+                {renderTable2(`SUMMARY TABLE (2) — NATIONALITY (GROUPS)`, groupStatsList, groupPage2, setGroupPage2, groupPages2)}
+                {renderTable2(`SUMMARY TABLE (2) — NATIONALITY (VILLAGES)`, prefixedVillageStatsList, villagePage2, setVillagePage2, villagePages2)}
               </>
             ) : (
             <div style={sectionCardStyle}>
-              <div style={sectionTitleStyle}>SUMMARY TABLE (2) — NATIONALITY</div>
+              <div style={sectionTitleStyle}>{`SUMMARY TABLE (2) — NATIONALITY ${levelSuffix}`}</div>
               <div className="tps-responsive-table">
                 <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #E5E7EB', minWidth: '600px' }}>
                   <thead>
@@ -958,7 +1017,6 @@ const PopulationStatistics = () => {
                       <th rowSpan={2} style={thS}>{groupLabel}</th>
                       <th colSpan={3} style={thS}>လူဦးရေပေါင်း</th>
                       {allNationalities.length > 0 && <th colSpan={allNationalities.length} style={thS}>လူမျိုးအလိုက်</th>}
-                      <th rowSpan={2} style={thS}>ပြည်နယ်ခြားသား</th>
                     </tr>
                     <tr>
                       <th style={thS}>ကျား</th><th style={thS}>မ</th><th style={thS}>ပေါင်း</th>
@@ -974,7 +1032,6 @@ const PopulationStatistics = () => {
                         <td style={tdMonoS}>{toMyanmarNum(w.female)}</td>
                         <td style={{ ...tdMonoS, fontWeight: '600', color: colors.forestGreen }}>{toMyanmarNum(w.total)}</td>
                         {allNationalities.map(n => <td key={n} style={tdMonoS}>{w.natCounts[n] ? toMyanmarNum(w.natCounts[n]) : '-'}</td>)}
-                        <td style={tdMonoS}>{w.nonLocal ? toMyanmarNum(w.nonLocal) : '-'}</td>
                       </tr>
                     ))}
                     {/* Total Row */}
@@ -985,7 +1042,6 @@ const PopulationStatistics = () => {
                       <td style={tdBold}>{toMyanmarNum(totalStats.female)}</td>
                       <td style={{ ...tdBold, color: colors.forestGreen }}>{toMyanmarNum(totalStats.total)}</td>
                       {allNationalities.map(n => <td key={n} style={tdBold}>{totalStats.natCounts[n] ? toMyanmarNum(totalStats.natCounts[n]) : '-'}</td>)}
-                      <td style={tdBold}>{totalStats.nonLocal ? toMyanmarNum(totalStats.nonLocal) : '-'}</td>
                     </tr>
                   </tbody>
                 </table>
@@ -1014,13 +1070,13 @@ const PopulationStatistics = () => {
             )}
 
             {/* ── Print / Export toolbar ─────────────────────── */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '24px', paddingTop: '16px', borderTop: '1px solid #E5E7EB' }}>
+            <div className="tps-stats-toolbar">
               <button
                 type="button"
                 onClick={() => exportStatisticsExcel(printArgs)}
                 style={{
                   display: 'flex', alignItems: 'center', gap: '6px',
-                  padding: '7px 16px', border: '1px solid #1A1A1A', backgroundColor: '#FFFFFF',
+                  padding: '8px 16px', border: '1px solid #1A1A1A', backgroundColor: '#FFFFFF',
                   color: '#1A1A1A', fontSize: '11px', fontWeight: '500', cursor: 'pointer',
                   textTransform: 'uppercase', letterSpacing: '0.05em',
                 }}
@@ -1035,7 +1091,7 @@ const PopulationStatistics = () => {
                 onMouseOut={e => { e.currentTarget.style.backgroundColor = '#1A1A1A'; e.currentTarget.style.color = '#FFFFFF'; }}
                 style={{
                   display: 'flex', alignItems: 'center', gap: '6px',
-                  padding: '7px 16px', border: '1px solid #1A1A1A', backgroundColor: '#1A1A1A',
+                  padding: '8px 16px', border: '1px solid #1A1A1A', backgroundColor: '#1A1A1A',
                   color: '#FFFFFF', fontSize: '11px', fontWeight: '500', cursor: 'pointer',
                   textTransform: 'uppercase', letterSpacing: '0.05em',
                   transition: 'background-color 120ms cubic-bezier(0.23,1,0.32,1), color 120ms cubic-bezier(0.23,1,0.32,1)',

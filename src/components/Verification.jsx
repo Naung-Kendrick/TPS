@@ -221,18 +221,18 @@ const Verification = () => {
           <form onSubmit={handleVerify}>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1 uppercase letter-spacing-0.02">Household No.</label>
+                <label className="block text-xs font-medium text-gray-600 mb-1 uppercase letter-spacing-0.02">HOUSEHOLD NO.</label>
                 <input 
                   type="text" 
                   name="household_no" 
                   value={formData.household_no} 
                   onChange={handleChange}
                   className="w-full px-3 py-2 bg-white border border-gray-200 rounded-none focus:outline-none focus:border-gray-900 transition-colors text-sm font-mono"
-                  placeholder="e.g. HH-001"
+                  placeholder="Enter Household Number (e.g., HH-001)"
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1 uppercase letter-spacing-0.02">Name</label>
+                <label className="block text-xs font-medium text-gray-600 mb-1 uppercase letter-spacing-0.02">NAME</label>
                 <input 
                   type="text" 
                   name="name" 
@@ -243,7 +243,7 @@ const Verification = () => {
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1 uppercase letter-spacing-0.02">Father's Name</label>
+                <label className="block text-xs font-medium text-gray-600 mb-1 uppercase letter-spacing-0.02">FATHER'S NAME</label>
                 <input 
                   type="text" 
                   name="fathers_name" 
@@ -254,58 +254,58 @@ const Verification = () => {
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1 uppercase letter-spacing-0.02">Ward <span className="normal-case text-gray-400">(ရပ်ကွက်)</span></label>
+                <label className="block text-xs font-medium text-gray-600 mb-1 uppercase letter-spacing-0.02">WARD</label>
                 <input 
                   type="text" 
                   name="ward" 
                   value={formData.ward} 
                   onChange={handleChange}
                   className="w-full px-3 py-2 bg-white border border-gray-200 rounded-none focus:outline-none focus:border-gray-900 transition-colors text-sm"
-                  placeholder="ရပ်ကွက် ရှာပါ"
+                  placeholder="Enter ward name"
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1 uppercase letter-spacing-0.02">Village <span className="normal-case text-gray-400">(ရွာ)</span></label>
+                <label className="block text-xs font-medium text-gray-600 mb-1 uppercase letter-spacing-0.02">VILLAGE</label>
                 <input 
                   type="text" 
                   name="village" 
                   value={formData.village} 
                   onChange={handleChange}
                   className="w-full px-3 py-2 bg-white border border-gray-200 rounded-none focus:outline-none focus:border-gray-900 transition-colors text-sm"
-                  placeholder="ရွာ ရှာပါ"
+                  placeholder="Enter village name"
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1 uppercase letter-spacing-0.02">Group <span className="normal-case text-gray-400">(အုပ်စု)</span></label>
+                <label className="block text-xs font-medium text-gray-600 mb-1 uppercase letter-spacing-0.02">GROUP</label>
                 <input 
                   type="text" 
                   name="group" 
                   value={formData.group} 
                   onChange={handleChange}
                   className="w-full px-3 py-2 bg-white border border-gray-200 rounded-none focus:outline-none focus:border-gray-900 transition-colors text-sm"
-                  placeholder="အုပ်စု ရှာပါ"
+                  placeholder="Enter group name"
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1 uppercase letter-spacing-0.02">Township <span className="normal-case text-gray-400">(မြို့နယ်)</span></label>
+                <label className="block text-xs font-medium text-gray-600 mb-1 uppercase letter-spacing-0.02">TOWNSHIP</label>
                 <input 
                   type="text" 
                   name="township" 
                   value={formData.township} 
                   onChange={handleChange}
                   className="w-full px-3 py-2 bg-white border border-gray-200 rounded-none focus:outline-none focus:border-gray-900 transition-colors text-sm"
-                  placeholder="မြို့နယ် ရှာပါ"
+                  placeholder="Enter township name"
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1 uppercase letter-spacing-0.02">District <span className="normal-case text-gray-400">(ခရိုင်)</span></label>
+                <label className="block text-xs font-medium text-gray-600 mb-1 uppercase letter-spacing-0.02">DISTRICT</label>
                 <input 
                   type="text" 
                   name="district" 
                   value={formData.district} 
                   onChange={handleChange}
                   className="w-full px-3 py-2 bg-white border border-gray-200 rounded-none focus:outline-none focus:border-gray-900 transition-colors text-sm"
-                  placeholder="ခရိုင် ရှာပါ"
+                  placeholder="Enter district name"
                 />
               </div>
             </div>
@@ -313,7 +313,7 @@ const Verification = () => {
             {/* Previous ID No. - 4 Box Search */}
             <div className="mb-6">
               <label className="block text-xs font-medium text-gray-600 mb-2 uppercase letter-spacing-0.02">
-                Previous ID No. (NRC) - ယခင် မှတ်ပုံတင်အမှတ်
+                PREVIOUS ID NO. (NRC)
               </label>
               <div className="flex items-center gap-1 sm:gap-2 w-full max-w-xl">
                 <input 
@@ -356,9 +356,6 @@ const Verification = () => {
                   maxLength="8"
                 />
               </div>
-              <p className="text-[10px] text-gray-400 mt-1">
-                Format: Region / Township Code (Type) Serial | ဥပမာ - ၁၃/နခန(နိုင်)၀၉၆၉၁၅ — Search using 1, 2, 3, or all 4 boxes
-              </p>
             </div>
             
             <div className="flex items-center gap-4">
@@ -368,7 +365,7 @@ const Verification = () => {
                 className="flex items-center gap-2 bg-gray-900 hover:bg-white hover:text-gray-900 border border-transparent hover:border-gray-900 text-white px-5 py-2 rounded-none font-medium transition-colors text-xs uppercase letter-spacing-0.05 disabled:opacity-50"
               >
                 {loading ? <RotateCcw size={14} className="animate-spin" /> : null}
-                Verify Data
+                VERIFY DATA
               </button>
               <button 
                 type="button" 
@@ -376,7 +373,7 @@ const Verification = () => {
                 disabled={loading}
                 className="flex items-center gap-2 bg-white border border-gray-900 text-gray-900 px-5 py-2 rounded-none font-medium text-xs uppercase letter-spacing-0.05 disabled:opacity-50"
               >
-                Clear Filters
+                CLEAR FILTERS
               </button>
             </div>
           </form>

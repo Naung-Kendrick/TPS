@@ -20,25 +20,26 @@ const toMM = (num) => {
 // ─────────────────────────────────────────────────────────────────────────────
 export const exportStatisticsExcel = ({
   groupLabel, wardStats, totalStats, allReligions, allNationalities,
-  selectedDistrict, selectedTownship, selectedWard,
+  selectedDistrict, selectedTownship, selectedWard, selectedGroup, selectedVillage,
+  isAtWardLevel, wardStatsList, villageStatsList, groupStatsList,
 }) => {
   const wb = XLSX.utils.book_new();
   const now = new Date();
   const dateStr = now.toLocaleDateString('en-GB');
 
-  const filterLine = selectedWard
-    ? `District: ${selectedDistrict} | Township: ${selectedTownship} | Ward/Village: ${selectedWard}`
-    : selectedTownship
-      ? `District: ${selectedDistrict} | Township: ${selectedTownship}`
-      : selectedDistrict
-        ? `District: ${selectedDistrict}`
-        : 'All Districts';
+  const parts = [];
+  if (selectedDistrict) parts.push(`District: ${selectedDistrict}`);
+  if (selectedTownship) parts.push(`Township: ${selectedTownship}`);
+  if (selectedWard)     parts.push(`Ward: ${selectedWard}`);
+  if (selectedGroup)    parts.push(`Group: ${selectedGroup}`);
+  if (selectedVillage)  parts.push(`Village: ${selectedVillage}`);
+  const filterLine = parts.length > 0 ? parts.join(' | ') : 'All Districts';
 
   // ── Sheet 1: Population, Age, Religion ──────────────────────────────────────
   const relHeaders = allReligions.map(r => r);
   const hdr1 = [
     "Ta'ang Land Immigration Department — Population Statistics",
-    '', '', '', '', '', '', '', '', '', '', '', '', ...relHeaders.map(() => ''), ''
+    '', '', '', '', '', '', '', '', '', '', '', '', ...relHeaders.map(() => '')
   ];
   const hdr2 = [`Filter: ${filterLine}`, `Printed: ${dateStr}`];
   const hdr3 = [];
@@ -48,8 +49,7 @@ export const exportStatisticsExcel = ({
     '<16 Male', '<16 Female', '<16 Total',
     '16-60 Male', '16-60 Female', '16-60 Total',
     '>60 Male', '>60 Female', '>60 Total',
-    ...relHeaders,
-    'Non-Local'
+    ...relHeaders
   ];
 
   const dataRows1 = wardStats.map((w, i) => [
@@ -58,8 +58,7 @@ export const exportStatisticsExcel = ({
     w.u16m, w.u16f, w.u16m + w.u16f,
     w.b1660m, w.b1660f, w.b1660m + w.b1660f,
     w.a60m, w.a60f, w.a60m + w.a60f,
-    ...allReligions.map(r => w.relCounts[r] || 0),
-    w.nonLocal || 0
+    ...allReligions.map(r => w.relCounts[r] || 0)
   ]);
 
   const totalRow1 = [
@@ -68,8 +67,7 @@ export const exportStatisticsExcel = ({
     totalStats.u16m, totalStats.u16f, totalStats.u16m + totalStats.u16f,
     totalStats.b1660m, totalStats.b1660f, totalStats.b1660m + totalStats.b1660f,
     totalStats.a60m, totalStats.a60f, totalStats.a60m + totalStats.a60f,
-    ...allReligions.map(r => totalStats.relCounts[r] || 0),
-    totalStats.nonLocal || 0
+    ...allReligions.map(r => totalStats.relCounts[r] || 0)
   ];
 
   const aoa1 = [hdr1, hdr2, hdr3, hdr4, ...dataRows1, totalRow1];
@@ -86,8 +84,7 @@ export const exportStatisticsExcel = ({
     { wch: 9 }, { wch: 9 }, { wch: 10 },
     { wch: 10 }, { wch: 10 }, { wch: 10 },
     { wch: 9 }, { wch: 9 }, { wch: 10 },
-    ...allReligions.map(() => ({ wch: 18 })),
-    { wch: 14 }
+    ...allReligions.map(() => ({ wch: 18 }))
   ];
   ws1['!rows'] = [{ hpt: 24 }, { hpt: 18 }, { hpt: 12 }, { hpt: 36 }];
   XLSX.utils.book_append_sheet(wb, ws1, 'Population, Age, Religion');
@@ -96,20 +93,17 @@ export const exportStatisticsExcel = ({
   const natHeaders = allNationalities.map(n => n);
   const hdr4b = [
     'No.', groupLabel, 'Male', 'Female', 'Total',
-    ...natHeaders,
-    'Non-Local'
+    ...natHeaders
   ];
 
   const dataRows2 = wardStats.map((w, i) => [
     i + 1, w.name, w.male, w.female, w.total,
-    ...allNationalities.map(n => w.natCounts[n] || 0),
-    w.nonLocal || 0
+    ...allNationalities.map(n => w.natCounts[n] || 0)
   ]);
 
   const totalRow2 = [
     '', 'TOTAL', totalStats.male, totalStats.female, totalStats.total,
-    ...allNationalities.map(n => totalStats.natCounts[n] || 0),
-    totalStats.nonLocal || 0
+    ...allNationalities.map(n => totalStats.natCounts[n] || 0)
   ];
 
   const aoa2 = [
@@ -134,7 +128,7 @@ export const exportStatisticsExcel = ({
   ws2['!rows'] = [{ hpt: 24 }, { hpt: 18 }, { hpt: 12 }, { hpt: 36 }];
   XLSX.utils.book_append_sheet(wb, ws2, 'Nationality');
 
-  const suffix = selectedWard || selectedTownship || selectedDistrict || 'All';
+  const suffix = selectedVillage || selectedGroup || selectedWard || selectedTownship || selectedDistrict || 'All';
   const filename = `TPS_Statistics_${suffix.replace(/[^a-zA-Z0-9_\u1000-\u109F]/g, '_')}_${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}.xlsx`;
   XLSX.writeFile(wb, filename);
 };
@@ -144,18 +138,27 @@ export const exportStatisticsExcel = ({
 // ─────────────────────────────────────────────────────────────────────────────
 export const printStatistics = ({
   groupLabel, wardStats, totalStats, allReligions, allNationalities,
-  selectedDistrict, selectedTownship, selectedWard,
+  selectedDistrict, selectedTownship, selectedWard, selectedGroup, selectedVillage,
+  isAtWardLevel, wardStatsList, villageStatsList, groupStatsList,
 }) => {
   const flagUrl  = new URL(taangFlag,  window.location.href).href;
   const logoUrl  = new URL(taangLogo, window.location.href).href;
   const now      = new Date();
   const dateStr  = now.toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: '2-digit' });
 
-  const filterLine = selectedWard
-    ? `${selectedDistrict} / ${selectedTownship} / ${selectedWard}`
-    : selectedTownship
-      ? `${selectedDistrict} / ${selectedTownship}`
-      : selectedDistrict || 'All Districts';
+  const parts = [];
+  if (selectedDistrict) parts.push(selectedDistrict);
+  if (selectedTownship) parts.push(selectedTownship);
+  if (selectedWard)     parts.push(selectedWard);
+  if (selectedGroup)    parts.push(selectedGroup);
+  if (selectedVillage)  parts.push(selectedVillage);
+  const filterLine = parts.length > 0 ? parts.join(' / ') : 'All Districts';
+
+  const levelSuffix = selectedTownship
+    ? '(WARD / GROUP / VILLAGE)'
+    : selectedDistrict
+      ? '(TOWNSHIP)'
+      : '(DISTRICT)';
 
   // ── Helpers ──────────────────────────────────────────────────────────────────
   // Fit everything on one page - no chunking
@@ -168,13 +171,12 @@ export const printStatistics = ({
       <tr>
         <th rowspan="2" style="width:3%">စဉ်</th>
         <th rowspan="2" style="min-width:70px">${safeHtml(groupLabel)}</th>
-        <th rowspan="2">အိမ်ထ</th>
+        <th rowspan="2">အထစ</th>
         <th colspan="3" class="group-header">လူဦးရေပေါင်း</th>
         <th colspan="3" class="group-header">၁၆ နှစ်အောက်</th>
         <th colspan="3" class="group-header">၁၆ - ၆၀ နှစ်</th>
         <th colspan="3" class="group-header">၆၀ နှစ်အထက်</th>
         ${allReligions.length > 0 ? `<th colspan="${allReligions.length}" class="group-header">ကိုးကွယ်သည့်ဘာသာ</th>` : ''}
-        <th rowspan="2">ပြည်နယ်<br>ခြားသား</th>
       </tr>
       <tr>
         <th>ကျား</th><th>မ</th><th>ပေါင်း</th>
@@ -203,7 +205,6 @@ export const printStatistics = ({
       <td class="num">${toMM(w.a60f)}</td>
       <td class="num">${toMM(w.a60m + w.a60f)}</td>
       ${allReligions.map(r => `<td class="num">${w.relCounts[r] ? toMM(w.relCounts[r]) : '-'}</td>`).join('')}
-      <td class="num">${w.nonLocal ? toMM(w.nonLocal) : '-'}</td>
     </tr>`;
 
   const table1TotalRow = `
@@ -224,30 +225,104 @@ export const printStatistics = ({
       <td class="num bold">${toMM(totalStats.a60f)}</td>
       <td class="num bold">${toMM(totalStats.a60m + totalStats.a60f)}</td>
       ${allReligions.map(r => `<td class="num bold">${totalStats.relCounts[r] ? toMM(totalStats.relCounts[r]) : '-'}</td>`).join('')}
-      <td class="num bold">${totalStats.nonLocal ? toMM(totalStats.nonLocal) : '-'}</td>
     </tr>`;
 
-  const table1Html = `
-    <div class="section-title">Summary Table (1) — Population, Age &amp; Religion</div>
-    <table>${table1Header}<tbody>${wardStats.map((w, i) => makeTable1Row(w, i)).join('')}${table1TotalRow}</tbody></table>`;
+  const makeTable1Block = (title, colLabel, statsArr) => {
+    if (!statsArr || statsArr.length === 0) return '';
+    const hdr = `
+      <thead>
+        <tr>
+          <th rowspan="2" style="width:3%">စဉ်</th>
+          <th rowspan="2" style="min-width:70px">${safeHtml(colLabel)}</th>
+          <th rowspan="2">အထစ</th>
+          <th colspan="3" class="group-header">လူဦးရေပေါင်း</th>
+          <th colspan="3" class="group-header">၁၆ နှစ်အောက်</th>
+          <th colspan="3" class="group-header">၁၆ - ၆၀ နှစ်</th>
+          <th colspan="3" class="group-header">၆၀ နှစ်အထက်</th>
+          ${allReligions.length > 0 ? `<th colspan="${allReligions.length}" class="group-header">ကိုးကွယ်သည့်ဘာသာ</th>` : ''}
+        </tr>
+        <tr>
+          <th>ကျား</th><th>မ</th><th>ပေါင်း</th>
+          <th>ကျား</th><th>မ</th><th>ပေါင်း</th>
+          <th>ကျား</th><th>မ</th><th>ပေါင်း</th>
+          <th>ကျား</th><th>မ</th><th>ပေါင်း</th>
+          ${relThs}
+        </tr>
+      </thead>`;
+    const rows = statsArr.map((w, i) => makeTable1Row(w, i)).join('');
+    const totR = `
+      <tr class="total-row">
+        <td class="num"></td>
+        <td class="name bold">စုစုပေါင်း</td>
+        <td class="num bold">${toMM(totalStats.households)}</td>
+        <td class="num bold">${toMM(totalStats.male)}</td>
+        <td class="num bold">${toMM(totalStats.female)}</td>
+        <td class="num bold green">${toMM(totalStats.total)}</td>
+        <td class="num bold">${toMM(totalStats.u16m)}</td>
+        <td class="num bold">${toMM(totalStats.u16f)}</td>
+        <td class="num bold">${toMM(totalStats.u16m + totalStats.u16f)}</td>
+        <td class="num bold">${toMM(totalStats.b1660m)}</td>
+        <td class="num bold">${toMM(totalStats.b1660f)}</td>
+        <td class="num bold">${toMM(totalStats.b1660m + totalStats.b1660f)}</td>
+        <td class="num bold">${toMM(totalStats.a60m)}</td>
+        <td class="num bold">${toMM(totalStats.a60f)}</td>
+        <td class="num bold">${toMM(totalStats.a60m + totalStats.a60f)}</td>
+        ${allReligions.map(r => `<td class="num bold">${totalStats.relCounts[r] ? toMM(totalStats.relCounts[r]) : '-'}</td>`).join('')}
+      </tr>`;
+    return `<div class="section-title">${safeHtml(title)}</div><table>${hdr}<tbody>${rows}${totR}</tbody></table>`;
+  };
+
+  const prefixedVillageStats = selectedGroup
+    ? (villageStatsList || []).map(v => ({ ...v, name: `${selectedGroup} — ${v.name}` }))
+    : (villageStatsList || []);
+
+  const table1Html = isAtWardLevel
+    ? [
+        makeTable1Block('SUMMARY TABLE (1) — POPULATION, AGE & RELIGION (WARDS)', 'ရပ်ကွက်', wardStatsList || []),
+        makeTable1Block('SUMMARY TABLE (1) — POPULATION, AGE & RELIGION (GROUPS)', 'ကျေးရွာအုပ်စု', groupStatsList || []),
+        makeTable1Block('SUMMARY TABLE (1) — POPULATION, AGE & RELIGION (VILLAGES)', 'ကျေးရွာ', prefixedVillageStats),
+      ].join('')
+    : `<div class="section-title">SUMMARY TABLE (1) — POPULATION, AGE &amp; RELIGION ${safeHtml(levelSuffix)}</div>
+       <table>${table1Header}<tbody>${wardStats.map((w, i) => makeTable1Row(w, i)).join('')}${table1TotalRow}</tbody></table>`;
 
   // ── Table 2: Nationality ─────────────────────────────────────────────────────
   const natThs = allNationalities.map(n => `<th class="vertical">${safeHtml(n)}</th>`).join('');
 
-  const table2Header = `
-    <thead>
+  const makeTable2Block = (title, colLabel, statsArr) => {
+    if (!statsArr || statsArr.length === 0) return '';
+    const hdr = `
+      <thead>
+        <tr>
+          <th rowspan="2" style="width:3%">စဉ်</th>
+          <th rowspan="2" style="min-width:70px">${safeHtml(colLabel)}</th>
+          <th colspan="3" class="group-header">လူဦးရေပေါင်း</th>
+          ${allNationalities.length > 0 ? `<th colspan="${allNationalities.length}" class="group-header">လူမျိုးအလိုက်</th>` : ''}
+        </tr>
+        <tr>
+          <th>ကျား</th><th>မ</th><th>ပေါင်း</th>
+          ${natThs}
+        </tr>
+      </thead>`;
+    const rows = statsArr.map((w, i) => `
       <tr>
-        <th rowspan="2" style="width:3%">စဉ်</th>
-        <th rowspan="2" style="min-width:70px">${safeHtml(groupLabel)}</th>
-        <th colspan="3" class="group-header">လူဦးရေပေါင်း</th>
-        ${allNationalities.length > 0 ? `<th colspan="${allNationalities.length}" class="group-header">လူမျိုးအလိုက်</th>` : ''}
-        <th rowspan="2">ပြည်နယ်<br>ခြားသား</th>
-      </tr>
-      <tr>
-        <th>ကျား</th><th>မ</th><th>ပေါင်း</th>
-        ${natThs}
-      </tr>
-    </thead>`;
+        <td class="num">${toMM(i + 1)}</td>
+        <td class="name">${safeHtml(w.name)}</td>
+        <td class="num">${toMM(w.male)}</td>
+        <td class="num">${toMM(w.female)}</td>
+        <td class="num bold green">${toMM(w.total)}</td>
+        ${allNationalities.map(n => `<td class="num">${w.natCounts[n] ? toMM(w.natCounts[n]) : '-'}</td>`).join('')}
+      </tr>`).join('');
+    const totR = `
+      <tr class="total-row">
+        <td class="num"></td>
+        <td class="name bold">စုစုပေါင်း</td>
+        <td class="num bold">${toMM(totalStats.male)}</td>
+        <td class="num bold">${toMM(totalStats.female)}</td>
+        <td class="num bold green">${toMM(totalStats.total)}</td>
+        ${allNationalities.map(n => `<td class="num bold">${totalStats.natCounts[n] ? toMM(totalStats.natCounts[n]) : '-'}</td>`).join('')}
+      </tr>`;
+    return `<div class="section-title">${safeHtml(title)}</div><table>${hdr}<tbody>${rows}${totR}</tbody></table>`;
+  };
 
   const makeTable2Row = (w, i) => `
     <tr>
@@ -257,7 +332,6 @@ export const printStatistics = ({
       <td class="num">${toMM(w.female)}</td>
       <td class="num bold green">${toMM(w.total)}</td>
       ${allNationalities.map(n => `<td class="num">${w.natCounts[n] ? toMM(w.natCounts[n]) : '-'}</td>`).join('')}
-      <td class="num">${w.nonLocal ? toMM(w.nonLocal) : '-'}</td>
     </tr>`;
 
   const table2TotalRow = `
@@ -268,12 +342,30 @@ export const printStatistics = ({
       <td class="num bold">${toMM(totalStats.female)}</td>
       <td class="num bold green">${toMM(totalStats.total)}</td>
       ${allNationalities.map(n => `<td class="num bold">${totalStats.natCounts[n] ? toMM(totalStats.natCounts[n]) : '-'}</td>`).join('')}
-      <td class="num bold">${totalStats.nonLocal ? toMM(totalStats.nonLocal) : '-'}</td>
     </tr>`;
 
-  const table2Html = `
-    <div class="section-title">Summary Table (2) — Nationality</div>
-    <table>${table2Header}<tbody>${wardStats.map((w, i) => makeTable2Row(w, i)).join('')}${table2TotalRow}</tbody></table>`;
+  const table2Header = `
+    <thead>
+      <tr>
+        <th rowspan="2" style="width:3%">စဉ်</th>
+        <th rowspan="2" style="min-width:70px">${safeHtml(groupLabel)}</th>
+        <th colspan="3" class="group-header">လူဦးရေပေါင်း</th>
+        ${allNationalities.length > 0 ? `<th colspan="${allNationalities.length}" class="group-header">လူမျိုးအလိုက်</th>` : ''}
+      </tr>
+      <tr>
+        <th>ကျား</th><th>မ</th><th>ပေါင်း</th>
+        ${natThs}
+      </tr>
+    </thead>`;
+
+  const table2Html = isAtWardLevel
+    ? [
+        makeTable2Block('SUMMARY TABLE (2) — NATIONALITY (WARDS)', 'ရပ်ကွက်', wardStatsList || []),
+        makeTable2Block('SUMMARY TABLE (2) — NATIONALITY (GROUPS)', 'ကျေးရွာအုပ်စု', groupStatsList || []),
+        makeTable2Block('SUMMARY TABLE (2) — NATIONALITY (VILLAGES)', 'ကျေးရွာ', prefixedVillageStats),
+      ].join('')
+    : `<div class="section-title">SUMMARY TABLE (2) — NATIONALITY ${levelSuffix}</div>
+       <table>${table2Header}<tbody>${wardStats.map((w, i) => makeTable2Row(w, i)).join('')}${table2TotalRow}</tbody></table>`;
 
   const html = `<!DOCTYPE html>
 <html>
@@ -341,7 +433,7 @@ export const printStatistics = ({
     th.group-header { background: #d4d4d4 !important; }
     th.vertical { writing-mode: vertical-rl; transform: rotate(180deg); white-space: nowrap; padding: 4px 2px; font-size: 7px; }
     td.num { text-align: center; font-family: 'Courier New', monospace; }
-    td.name { text-align: left; font-weight: 500; }
+    td.name { text-align: left; font-weight: 500; white-space: normal; word-break: break-word; min-width: 80px; max-width: 140px; }
     td.bold { font-weight: 700; }
     td.green { color: #2E7D32; }
     tr.total-row td { background: #f0f0f0 !important; font-weight: 700;

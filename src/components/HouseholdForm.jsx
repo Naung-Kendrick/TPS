@@ -89,7 +89,7 @@ const MyanmarCalendar = ({ value, onChange }) => {
         }}
       >
         <span style={{ color: value ? '#1A1A1A' : '#737373' }}>
-          {value || 'ရက်စွဲရွေးချယ်ပါ (SELECT DATE)'}
+          {value || 'Select Date'}
         </span>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: '#737373' }}>
           <rect x="3" y="4" width="18" height="18" rx="0" ry="0"></rect>
@@ -589,55 +589,55 @@ const HouseholdForm = () => {
     <div className="tps-grid tps-grid-4" style={{ gap: '10px 14px', alignItems: 'start' }}>
 
       <div style={{ ...groupStyle, gridColumn: 'span 1' }}>
-        <label style={labelStyle}>အိမ်ထောင်စုစာရင်းအမှတ် (Household No.)</label>
-        <input type="text" name="household_no" value={formData.household_no} onChange={handleChange} onBlur={checkHouseholdExists} placeholder="ဥပမာ - မနမ-၁" style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }} autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} required />
+        <label style={labelStyle}>HOUSEHOLD NO.</label>
+        <input type="text" name="household_no" value={formData.household_no} onChange={handleChange} onBlur={checkHouseholdExists} placeholder="Enter household number" style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }} autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} required />
         {autoFillMessage && <p style={{ margin: '4px 0 0', fontSize: '10px', color: '#737373', fontWeight: '600' }}>{autoFillMessage}</p>}
       </div>
 
       <div style={{ ...groupStyle, gridColumn: 'span 1' }}>
-        <label style={labelStyle}>အမည် (Name)</label>
-        <input type="text" name="name" value={formData.name} onChange={handleChange} placeholder="အမည် ဖြည့်ပါ" style={inputStyle} autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} required />
+        <label style={labelStyle}>NAME</label>
+        <input type="text" name="name" value={formData.name} onChange={handleChange} placeholder="Enter full name" style={inputStyle} autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} required />
       </div>
 
       <div style={{ ...groupStyle, gridColumn: 'span 1' }}>
-        <label style={labelStyle}>မွေးသက္ကရာဇ် (Date of Birth)</label>
+        <label style={labelStyle}>DATE OF BIRTH</label>
         <div style={{ display: 'flex', gap: '6px' }}>
           <select name="day" value={dob.day} onChange={handleDobChange} style={{ ...inputStyle, flex: '0 0 28%', fontFamily: 'var(--font-mono)' }}>
-            <option value="">ရက်</option>
+            <option value="">Day</option>
             {days.map(d => <option key={d} value={d}>{d}</option>)}
           </select>
           <select name="month" value={dob.month} onChange={handleDobChange} style={{ ...inputStyle, flex: '0 0 40%' }}>
-            <option value="">လ</option>
+            <option value="">Month</option>
             {months.map((m, i) => <option key={m} value={toMyanmarNum(i + 1)}>{toMyanmarNum(i + 1)}</option>)}
           </select>
           <select name="year" value={dob.year} onChange={handleDobChange} style={{ ...inputStyle, flex: '1 1 0', fontFamily: 'var(--font-mono)' }}>
-            <option value="">နှစ်</option>
+            <option value="">Year</option>
             {years.map(y => <option key={y} value={y}>{y}</option>)}
           </select>
         </div>
       </div>
 
       <div style={{ ...groupStyle, gridColumn: 'span 1' }}>
-        <label style={labelStyle}>ကျား / မ (Gender)</label>
+        <label style={labelStyle}>GENDER</label>
         <select name="gender" value={formData.gender} onChange={handleChange} style={inputStyle}>
-          <option value="">ရွေးချယ်ပါ</option>
-          <option value="ကျား">ကျား</option>
-          <option value="မ">မ</option>
+          <option value="">Select Gender</option>
+          <option value="ကျား">Male</option>
+          <option value="မ">Female</option>
         </select>
       </div>
 
       <div style={{ ...groupStyle, gridColumn: 'span 1' }}>
-        <label style={labelStyle}>အဘအမည် (Father's Name)</label>
-        <input type="text" name="fathers_name" value={formData.fathers_name} onChange={handleChange} placeholder="အဘအမည် ဖြည့်ပါ" style={inputStyle} autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} />
+        <label style={labelStyle}>FATHER'S NAME</label>
+        <input type="text" name="fathers_name" value={formData.fathers_name} onChange={handleChange} placeholder="Enter father's name" style={inputStyle} autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} />
       </div>
 
       <div style={{ ...groupStyle, gridColumn: 'span 1' }}>
-        <label style={labelStyle}>မိခင်အမည် (Mother's Name)</label>
-        <input type="text" name="mothers_name" value={formData.mothers_name} onChange={handleChange} placeholder="မိခင်အမည် ဖြည့်ပါ" style={inputStyle} autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} />
+        <label style={labelStyle}>MOTHER'S NAME</label>
+        <input type="text" name="mothers_name" value={formData.mothers_name} onChange={handleChange} placeholder="Enter mother's name" style={inputStyle} autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} />
       </div>
 
       <div style={{ ...groupStyle, gridColumn: 'span 1' }}>
-        <label style={labelStyle}>အိမ်ထောင်ဦးစီးနှင့်တော်စပ်ပုံ (Relationship)</label>
+        <label style={labelStyle}>RELATIONSHIP TO HEAD</label>
         <select
           name="household_relationship"
           value={isCustomRelationship ? "other" : formData.household_relationship}
@@ -652,51 +652,51 @@ const HouseholdForm = () => {
           }}
           style={inputStyle}
         >
-          <option value="">ရွေးချယ်ပါ</option>
-          <option value="ဦးစီး">ဦးစီး</option>
-          <option value="ဇနီး">ဇနီး</option>
-          <option value="သား">သား</option>
-          <option value="သမီး">သမီး</option>
-          <option value="ချွေးမ">ချွေးမ</option>
-          <option value="မြေး">မြေး</option>
-          <option value="other">အခြား (Other...)</option>
+          <option value="">Select Relationship</option>
+          <option value="ဦးစီး">Head</option>
+          <option value="ဇနီး">Wife</option>
+          <option value="သား">Son</option>
+          <option value="သမီး">Daughter</option>
+          <option value="ချွေးမ">Daughter-in-law</option>
+          <option value="မြေး">Grandchild</option>
+          <option value="other">Other...</option>
         </select>
         {isCustomRelationship && (
-          <input type="text" name="household_relationship" value={formData.household_relationship} onChange={handleChange} placeholder="တော်စပ်ပုံ ရိုက်ထည့်ပါ" style={{ ...inputStyle, marginTop: '8px' }} autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} autoFocus />
+          <input type="text" name="household_relationship" value={formData.household_relationship} onChange={handleChange} placeholder="Enter relationship" style={{ ...inputStyle, marginTop: '8px' }} autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} autoFocus />
         )}
       </div>
 
       <div style={{ ...groupStyle, gridColumn: 'span 1' }}>
-        <label style={labelStyle}>အလုပ်အကိုင် (Occupation)</label>
-        <input type="text" name="occupation" value={formData.occupation} onChange={handleChange} placeholder="အလုပ်အကိုင် ဖြည့်ပါ" style={inputStyle} autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} />
+        <label style={labelStyle}>OCCUPATION</label>
+        <input type="text" name="occupation" value={formData.occupation} onChange={handleChange} placeholder="Enter occupation" style={inputStyle} autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} />
       </div>
 
       <div style={{ ...groupStyle, gridColumn: 'span 1' }}>
-        <label style={labelStyle}>ယခင်မှတ်ပုံတင်အမှတ် (Previous ID No.)</label>
-        <input type="text" name="previous_id_no" value={formData.previous_id_no} onChange={handleChange} placeholder="ယခင်မှတ်ပုံတင်အမှတ် ဖြည့်ပါ" style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }} autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} />
+        <label style={labelStyle}>PREVIOUS ID NO. (NRC)</label>
+        <input type="text" name="previous_id_no" value={formData.previous_id_no} onChange={handleChange} placeholder="Enter NRC number" style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }} autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} />
       </div>
 
       <div style={{ ...groupStyle, gridColumn: 'span 1' }}>
-        <label style={labelStyle}>တအာင်းပြည်နယ်မှတ်ပုံတင်အမှတ် (Ta'ang Land ID No.)</label>
-        <input type="text" name="taang_land_id_no" value={formData.taang_land_id_no} onChange={handleChange} placeholder="တအာင်းပြည်နယ်မှတ်ပုံတင်အမှတ် ဖြည့်ပါ" style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }} autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} />
+        <label style={labelStyle}>TA'ANG LAND ID NO.</label>
+        <input type="text" name="taang_land_id_no" value={formData.taang_land_id_no} onChange={handleChange} placeholder="Enter Ta'ang Land ID number" style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }} autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} />
       </div>
 
       <div style={{ ...groupStyle, gridColumn: 'span 1' }}>
-        <label style={labelStyle}>လူမျိုး (Nationality)</label>
-        <input type="text" name="nationality" value={formData.nationality} onChange={handleChange} placeholder="လူမျိုး ဖြည့်ပါ" style={inputStyle} autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} />
+        <label style={labelStyle}>NATIONALITY</label>
+        <input type="text" name="nationality" value={formData.nationality} onChange={handleChange} placeholder="Ta'ang" style={inputStyle} autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} />
       </div>
 
       <div style={{ ...groupStyle, gridColumn: 'span 1' }}>
-        <label style={labelStyle}>နေထိုင်မှုအခြေအနေ (Resident Status)</label>
+        <label style={labelStyle}>RESIDENT STATUS</label>
         <select name="resident_status" value={formData.resident_status} onChange={handleChange} style={inputStyle}>
-          <option value="">ရွေးချယ်ပါ</option>
+          <option value="">Select status</option>
           <option value="တအာင်း">တအာင်း</option>
           <option value="ပြည်နယ်ခြားသား">ပြည်နယ်ခြားသား</option>
         </select>
       </div>
 
       <div style={{ ...groupStyle, gridColumn: 'span 1' }}>
-        <label style={labelStyle}>ကိုးကွယ်သည့်ဘာသာ (Religious)</label>
+        <label style={labelStyle}>RELIGION</label>
         <select
           name="religious"
           value={isCustomReligion ? "other" : formData.religious}
@@ -711,43 +711,42 @@ const HouseholdForm = () => {
           }}
           style={inputStyle}
         >
-          <option value="">ရွေးချယ်ပါ</option>
+          <option value="">Select religion</option>
           <option value="ဗုဒ္ဓ">ဗုဒ္ဓ</option>
           <option value="ခရစ်ယာန်">ခရစ်ယာန်</option>
           <option value="အစ္စလာမ်">အစ္စလာမ်</option>
           <option value="ဟိန္ဒူ">ဟိန္ဒူ</option>
           <option value="နတ်">နတ်</option>
-          <option value="other">အခြား (Other...)</option>
+          <option value="other">Other...</option>
         </select>
         {isCustomReligion && (
-          <input type="text" name="religious" value={formData.religious} onChange={handleChange} placeholder="ဘာသာအမည် ရိုက်ထည့်ပါ" style={{ ...inputStyle, marginTop: '8px' }} autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} autoFocus />
+          <input type="text" name="religious" value={formData.religious} onChange={handleChange} placeholder="Enter religion name" style={{ ...inputStyle, marginTop: '8px' }} autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} autoFocus />
         )}
       </div>
 
       <div style={{ ...groupStyle, gridColumn: 'span 1' }}>
-        <label style={labelStyle}>အိမ်အမှတ် (House NO.)</label>
-        <input type="text" name="house_no" value={formData.house_no} onChange={handleChange} placeholder="အိမ်အမှတ် ဖြည့်ပါ" style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }} autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} />
+        <label style={labelStyle}>HOUSE NO.</label>
+        <input type="text" name="house_no" value={formData.house_no} onChange={handleChange} placeholder="Enter house number" style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }} autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} />
       </div>
 
       <div style={{ ...groupStyle, gridColumn: 'span 1' }}>
-        <label style={labelStyle}>ရပ်ကွက် / ကျေးရွာ / အုပ်စု</label>
-        <input type="text" name="ward_village_group" value={formData.ward_village_group} onChange={handleChange} placeholder="ဥပမာ - ကောင်းတပ် ရပ်ကွက် / အေးချမ်း ရွာ / အုပ်စု" style={{ ...inputStyle, borderColor: wardVillageError ? '#EF4444' : undefined }} autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} />
+        <label style={labelStyle}>WARD / VILLAGE / GROUP</label>
+        <input type="text" name="ward_village_group" value={formData.ward_village_group} onChange={handleChange} placeholder="Enter ward, village, or group name" style={{ ...inputStyle, borderColor: wardVillageError ? '#EF4444' : undefined }} autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} />
         {wardVillageError && <p style={{ margin: '4px 0 0', fontSize: '10px', color: '#EF4444', fontWeight: '500' }}>{wardVillageError}</p>}
-        <p style={{ margin: '2px 0 0', fontSize: '9px', color: '#9CA3AF' }}>Auto-fix: ကောင်းတပ်ရပ်ကွက်→ကောင်းတပ် ရပ်ကွက် | အေးချမ်းရွာ→အေးချမ်း ရွာ</p>
       </div>
 
       <div style={{ ...groupStyle, gridColumn: 'span 1' }}>
-        <label style={labelStyle}>မြို့နယ် (Township)</label>
-        <input type="text" name="township" value={formData.township} onChange={handleChange} placeholder="မြို့နယ် ဖြည့်ပါ" style={inputStyle} autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} />
+        <label style={labelStyle}>TOWNSHIP</label>
+        <input type="text" name="township" value={formData.township} onChange={handleChange} placeholder="Enter township name" style={inputStyle} autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} />
       </div>
 
       <div style={{ ...groupStyle, gridColumn: 'span 1' }}>
-        <label style={labelStyle}>ခရိုင် (District)</label>
-        <input type="text" name="district" value={formData.district} onChange={handleChange} placeholder="ခရိုင် ဖြည့်ပါ" style={inputStyle} autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} />
+        <label style={labelStyle}>DISTRICT</label>
+        <input type="text" name="district" value={formData.district} onChange={handleChange} placeholder="Enter district name" style={inputStyle} autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} />
       </div>
 
       <div style={{ ...groupStyle, gridColumn: 'span 1' }}>
-        <label style={labelStyle}>တင်သွင်းသည့်ရက်စွဲ (Submission Date)</label>
+        <label style={labelStyle}>SUBMISSION DATE</label>
         <MyanmarCalendar
           value={formData.submission_date}
           onChange={(val) => setFormData(prev => ({ ...prev, submission_date: val }))}
@@ -762,7 +761,7 @@ const HouseholdForm = () => {
       <div style={{ marginBottom: '32px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
         <div>
           <h2 style={{ fontSize: '20px', margin: '0 0 8px 0', color: '#1A1A1A', fontWeight: '500', letterSpacing: '0.02em' }}>HOUSEHOLD REGISTRATION</h2>
-          <p style={{ margin: 0, color: '#737373', fontSize: '12px' }}>အချက်အလက်များကို ဖြည့်စွက်ပြီး စာရင်းသွင်းပါ။</p>
+          <p style={{ margin: 0, color: '#737373', fontSize: '12px' }}>Please fill out the form to register household members.</p>
         </div>
         <button
           type="button"
@@ -805,7 +804,7 @@ const HouseholdForm = () => {
                   HOUSEHOLD REGISTRATION
                 </h3>
                 <p style={{ margin: '1px 0 0', fontSize: '10px', color: '#737373' }}>
-                  အချက်အလက်များကို ဖြည့်စွက်ပြီး စာရင်းသွင်းပါ။
+                  Please fill out the form to register household members.
                 </p>
               </div>
               <button onClick={closeForm} type="button" style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#737373', lineHeight: 1 }}>&times;</button>
@@ -826,7 +825,7 @@ const HouseholdForm = () => {
             {success && (
               <div style={{ margin: '12px 24px 0', padding: '10px 12px', border: '1px solid #A5D6A7', backgroundColor: '#F0F7F0', color: '#1B5E20', fontSize: '12px', flexShrink: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <span style={{ color: '#2E7D32', fontSize: '16px' }}>✓</span>
-                အချက်အလက်များ အောင်မြင်စွာ သိမ်းဆည်းပြီးပါပြီ။
+                Member record saved successfully.
               </div>
             )}
             {error && (

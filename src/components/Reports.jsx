@@ -17,13 +17,16 @@ const Reports = () => {
   const [path, setPath] = useState({
     district: null,
     township: null,
+    locationType: null, // 'ward' | 'group' | null
+    ward: null,
+    group: null,
     village: null,
     headName: null,
     householdNo: null
   });
 
-  const [dataList, setDataList] = useState([]); // Stores items for Levels 1 to 4
-  const [familyMembers, setFamilyMembers] = useState([]); // Stores items for Level 5
+  const [dataList, setDataList] = useState([]); // Stores items for Levels 1 to 5
+  const [familyMembers, setFamilyMembers] = useState([]); // Stores items for Level 6
 
   // Export All JSON state
   const [exportingJson, setExportingJson] = useState(false);
@@ -43,11 +46,11 @@ const Reports = () => {
   // Trigger data fetching whenever level or path changes
   useEffect(() => {
     fetchData();
-  }, [level, path.district, path.township, path.village, path.householdNo]);
+  }, [level, path.district, path.township, path.locationType, path.ward, path.group, path.village, path.householdNo]);
 
-  // Real-time subscription for level 5 (family members)
+  // Real-time subscription for level 6 (family members)
   useEffect(() => {
-    if (level !== 5 || !path.householdNo) return;
+    if (level !== 6 || !path.householdNo) return;
 
     const relationshipOrder = { 'ဦးစီး': 1, 'ဇနီး': 2, 'ခင်ပွန်း': 2, 'သား': 3, 'သမီး': 3 };
     const resort = (arr) => [...arr].sort((a, b) =>
@@ -79,13 +82,13 @@ const Reports = () => {
     setError(null);
     setSearch('');
 
-    // Cache key for this navigation state
-    const cacheKey = `reports_l${level}_${path.district||''}_${path.township||''}_${path.village||''}_${path.householdNo||''}`;
+    // Cache key for this navigation state (v3 = normalized Myanmar text)
+    const cacheKey = `reports_v3_l${level}_${path.district||''}_${path.township||''}_${path.locationType||''}_${path.ward||''}_${path.group||''}_${path.village||''}_${path.householdNo||''}`;
 
     // Serve cached data immediately (stale-while-revalidate)
     const cached = await cacheGet(cacheKey);
     if (cached) {
-      if (level === 5) setFamilyMembers(cached);
+      if (level === 6) setFamilyMembers(cached);
       else setDataList(cached);
       setLoading(false);
     } else {
@@ -94,7 +97,7 @@ const Reports = () => {
 
     try {
       if (level === 1) {
-        // Use RPC for distinct districts - fast and no pagination needed
+        // Districts
         const { data, error } = await supabase.rpc('report_districts');
         if (error) throw error;
         const list = (data || []).map(d => ({ id: d.district, name: d.district }));
@@ -102,7 +105,7 @@ const Reports = () => {
         cacheSet(cacheKey, list);
       } 
       else if (level === 2) {
-        // Use RPC for distinct townships - fast and no pagination needed
+        // Townships
         const { data, error } = await supabase.rpc('report_townships', { p_district: path.district });
         if (error) throw error;
         const list = (data || []).map(d => ({ id: d.township, name: d.township }));
@@ -110,24 +113,79 @@ const Reports = () => {
         cacheSet(cacheKey, list);
       }
       else if (level === 3) {
-        // Use RPC for distinct villages - fast and no pagination needed
-        const { data, error } = await supabase.rpc('report_villages', { p_township: path.township });
-        if (error) throw error;
-        const list = (data || []).map(d => ({ id: d.village, name: d.village }));
+        // After Township, show BOTH Wards AND Groups as separate options
+        // Fetch wards
+        const { data: wardsData, error: wardsError } = await supabase.rpc('report_wards', { p_township: path.township });
+        if (wardsError) throw wardsError;
+        
+        // Fetch groups
+        const { data: groupsData, error: groupsError } = await supabase.rpc('report_groups_by_township', { p_township: path.township });
+        if (groupsError) throw groupsError;
+        
+        // Combine into location type options
+        const list = [
+          ...(wardsData || []).map(d => ({ id: `ward:${d.ward}`, name: d.ward, locationType: 'ward' })),
+          ...(groupsData || []).map(d => ({ id: `group:${d.group_name}`, name: d.group_name, locationType: 'group' }))
+        ];
         setDataList(list);
         cacheSet(cacheKey, list);
       }
       else if (level === 4) {
-        const { data, error } = await supabase
+        // If user selected a Ward: show household heads directly
+        if (path.locationType === 'ward') {
+          const { data, error } = await supabase
+            .from('households')
+            .select('id, name, household_no, gender, occupation, date_of_birth')
+            .ilike('ward_village_group', '%' + path.ward.trim() + '%')
+            .ilike('household_relationship', '%ဦးစီး%');
+          if (error) throw error;
+          console.log('Ward query:', path.ward, 'Results:', data?.length || 0);
+          setDataList(data || []);
+          cacheSet(cacheKey, data || []);
+        }
+        // If user selected a Group: show villages in this group
+        else if (path.locationType === 'group') {
+          console.log('Fetching villages for group:', path.group);
+          const { data, error } = await supabase.rpc('report_village_only', { p_group: path.group.trim() });
+          if (error) throw error;
+          console.log('Group villages result:', data?.length || 0, 'villages');
+          const list = (data || []).map(d => ({ id: d.village, name: d.village }));
+          setDataList(list);
+          cacheSet(cacheKey, list);
+        }
+      }
+      else if (level === 5 && path.locationType === 'group' && path.village) {
+        // Only reachable if locationType is 'group' and village is selected
+        // Household heads under this village
+        console.log('Fetching household heads for village:', path.village);
+        
+        // First try: search for village name anywhere in ward_village_group
+        let { data, error } = await supabase
           .from('households')
           .select('id, name, household_no, gender, occupation, date_of_birth')
-          .eq('ward_village_group', path.village)
+          .ilike('ward_village_group', '%' + path.village.trim() + '%')
           .ilike('household_relationship', '%ဦးစီး%');
+          
         if (error) throw error;
+        console.log('Village household heads (pattern search):', data?.length || 0);
+        
+        // If no results, try exact match
+        if (!data || data.length === 0) {
+          console.log('Trying exact match for village:', path.village);
+          const result2 = await supabase
+            .from('households')
+            .select('id, name, household_no, gender, occupation, date_of_birth')
+            .eq('ward_village_group', path.village.trim())
+            .ilike('household_relationship', '%ဦးစီး%');
+          data = result2.data;
+          console.log('Village household heads (exact match):', data?.length || 0);
+        }
+        
         setDataList(data || []);
         cacheSet(cacheKey, data || []);
       }
-      else if (level === 5) {
+      else if (level === 6) {
+        // Family members
         const { data, error } = await supabase
           .from('households')
           .select('*')
@@ -153,11 +211,57 @@ const Reports = () => {
 
   const handleNavigate = (newLevel, payload) => {
     setPath(prev => {
-      // When navigating, reset child states based on new level
       const newPath = { ...prev, ...payload };
-      if (newLevel <= 2) { newPath.township = null; newPath.village = null; newPath.householdNo = null; newPath.headName = null; }
-      if (newLevel <= 3) { newPath.village = null; newPath.householdNo = null; newPath.headName = null; }
-      if (newLevel <= 4) { newPath.householdNo = null; newPath.headName = null; }
+      
+      // Strict hierarchy reset rules:
+      // When changing district: reset everything below
+      if (newLevel <= 2) {
+        newPath.township = null;
+        newPath.locationType = null;
+        newPath.ward = null;
+        newPath.group = null;
+        newPath.village = null;
+        newPath.householdNo = null;
+        newPath.headName = null;
+      }
+      
+      // When changing township: reset location selection and everything below
+      if (newLevel <= 3) {
+        newPath.locationType = null;
+        newPath.ward = null;
+        newPath.group = null;
+        newPath.village = null;
+        newPath.householdNo = null;
+        newPath.headName = null;
+      }
+      
+      // When selecting ward vs group (mutually exclusive):
+      // Clear the other location type completely
+      if (newLevel <= 4) {
+        if (newPath.locationType === 'ward') {
+          // Ward selected: clear all group/village related fields
+          newPath.group = null;
+          newPath.village = null;
+        } else if (newPath.locationType === 'group') {
+          // Group selected: clear ward
+          newPath.ward = null;
+        }
+        newPath.householdNo = null;
+        newPath.headName = null;
+      }
+      
+      // When changing village (only applies to group path): reset household
+      if (newLevel <= 5 && newPath.locationType === 'group') {
+        newPath.householdNo = null;
+        newPath.headName = null;
+      }
+      
+      // When navigating BACK from level 6 (family members): reset household
+      if (newLevel < 6) {
+        newPath.householdNo = null;
+        newPath.headName = null;
+      }
+      
       return newPath;
     });
     setLevel(newLevel);
@@ -166,10 +270,23 @@ const Reports = () => {
   const jumpToLevel = (targetLevel) => {
     if (targetLevel >= level) return;
     const newPath = { ...path };
-    if (targetLevel < 5) { newPath.householdNo = null; newPath.headName = null; }
-    if (targetLevel < 4) newPath.village = null;
+    
+    // Reset states based on target level
+    if (targetLevel < 6) { newPath.householdNo = null; newPath.headName = null; }
+    if (targetLevel < 5 && newPath.locationType === 'group') newPath.village = null;
+    if (targetLevel < 4) {
+      // Jumping back to township level or above: clear location selection entirely
+      // This allows user to choose different path (ward vs group)
+      newPath.locationType = null;
+      newPath.ward = null;
+      newPath.group = null;
+      newPath.village = null;
+      newPath.householdNo = null;
+      newPath.headName = null;
+    }
     if (targetLevel < 3) newPath.township = null;
     if (targetLevel < 2) newPath.district = null;
+    
     setPath(newPath);
     setLevel(targetLevel);
   };
@@ -330,10 +447,16 @@ const Reports = () => {
     }
   };
 
-  const filteredData = dataList.filter(item => 
-    item.name?.toLowerCase().includes(search.toLowerCase()) || 
-    item.household_no?.toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredData = dataList.filter(item => {
+    const matches = item.name?.toLowerCase().includes(search.toLowerCase()) || 
+                    item.household_no?.toLowerCase().includes(search.toLowerCase());
+    return matches;
+  });
+  
+  // Debug logging
+  useEffect(() => {
+    console.log('Level:', level, 'dataList length:', dataList.length, 'filteredData length:', filteredData.length, 'search:', search);
+  }, [level, dataList, filteredData, search]);
 
   const thStyle = {
     padding: '12px 16px',
@@ -355,24 +478,25 @@ const Reports = () => {
   };
 
   return (
-    <div className="p-8 max-w-7xl mx-auto min-h-screen bg-white">
+    <div className="px-4 py-5 sm:p-8 max-w-7xl mx-auto min-h-screen bg-white">
       
       {/* HEADER & BREADCRUMBS */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between">
-          <h2 style={{ fontSize: '20px', margin: '0 0 8px 0', color: '#1A1A1A', fontWeight: '500', letterSpacing: '0.02em' }}>CENTRAL DATABASE</h2>
+      <div className="mb-5 sm:mb-8">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
+          <h2 style={{ fontSize: '18px', margin: 0, color: '#1A1A1A', fontWeight: '600', letterSpacing: '0.02em' }}>CENTRAL DATABASE</h2>
           <button
             type="button"
             onClick={exportAllJson}
             disabled={exportingJson}
-            className="flex items-center gap-2 border border-gray-300 text-gray-600 hover:border-gray-900 hover:text-gray-900 px-4 py-2 text-xs uppercase font-medium transition-colors disabled:opacity-50"
+            className="flex items-center justify-center gap-2 border border-gray-300 text-gray-600 hover:border-gray-900 hover:text-gray-900 px-3 py-2 text-xs uppercase font-medium transition-colors disabled:opacity-50 w-full sm:w-auto"
           >
-            {exportingJson ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
+            {exportingJson ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
             {exportingJson ? 'Exporting...' : 'Export All JSON'}
           </button>
         </div>
-        
-        <div className="flex flex-wrap items-center gap-2 text-xs font-medium text-gray-500 uppercase letter-spacing-0.02">
+
+        {/* Breadcrumb — scrollable horizontally on mobile */}
+        <div className="flex items-center gap-1.5 text-xs font-medium text-gray-500 uppercase overflow-x-auto pb-1 scrollbar-none whitespace-nowrap">        
           <button onClick={() => jumpToLevel(1)} className={`flex items-center gap-1 hover:text-gray-900 transition-colors ${level === 1 ? 'text-gray-900 font-bold' : ''}`}>
             <MapIcon size={14} /> Districts
           </button>
@@ -389,17 +513,27 @@ const Reports = () => {
           {path.township && (
             <>
               <ChevronRight size={14} />
-              <button onClick={() => jumpToLevel(3)} className={`flex items-center gap-1 hover:text-gray-900 transition-colors ${level === 3 ? 'text-gray-900 font-bold' : ''}`}>
+              <button onClick={() => jumpToLevel(2)} className={`flex items-center gap-1 hover:text-gray-900 transition-colors ${level === 2 ? 'text-gray-900 font-bold' : ''}`}>
                 <Home size={14} /> {path.township}
               </button>
             </>
           )}
 
-          {path.village && (
+          {path.locationType && (
+            <>
+              <ChevronRight size={14} />
+              <button onClick={() => jumpToLevel(3)} className={`flex items-center gap-1 hover:text-gray-900 transition-colors ${level === 3 ? 'text-gray-900 font-bold' : ''}`}>
+                {path.locationType === 'ward' ? <Home size={14} /> : <Users size={14} />}
+                {path.locationType === 'ward' ? path.ward : path.group}
+              </button>
+            </>
+          )}
+
+          {path.village && path.locationType === 'group' && (
             <>
               <ChevronRight size={14} />
               <button onClick={() => jumpToLevel(4)} className={`flex items-center gap-1 hover:text-gray-900 transition-colors ${level === 4 ? 'text-gray-900 font-bold' : ''}`}>
-                <Users size={14} /> {path.village}
+                <Home size={14} /> {path.village}
               </button>
             </>
           )}
@@ -427,40 +561,40 @@ const Reports = () => {
       )}
 
       {/* CONTROLS */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-6">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 mb-4">
         {level > 1 ? (
-          <button onClick={goBack} className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-900 text-gray-900 font-medium text-xs uppercase letter-spacing-0.05">
-            <ArrowLeft size={14} /> Back
+          <button onClick={goBack} className="flex items-center justify-center gap-2 px-4 py-2 bg-white border border-gray-900 text-gray-900 font-medium text-xs uppercase w-full sm:w-auto">
+            <ArrowLeft size={13} /> Back
           </button>
-        ) : <div />}
+        ) : <div className="hidden sm:block" />}
 
-        {level < 5 && (
-          <div className="relative w-full sm:w-96">
+        {level <= 4 && (
+          <div className="relative w-full sm:w-80">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
-              <Search size={14} />
+              <Search size={13} />
             </div>
-            <input 
-              type="text" 
-              placeholder={`Search ${level === 1 ? 'districts' : level === 2 ? 'townships' : level === 3 ? 'villages' : 'household heads'}...`} 
+            <input
+              type="text"
+              placeholder={`Search ${level === 1 ? 'districts' : level === 2 ? 'townships' : level === 3 ? 'locations' : level === 4 && path.locationType === 'ward' ? 'household heads' : 'villages'}...`}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-none focus:outline-none focus:border-gray-900 transition-colors text-xs"
+              className="w-full pl-9 pr-4 py-2 bg-white border border-gray-200 rounded-none focus:outline-none focus:border-gray-900 transition-colors text-xs"
             />
           </div>
         )}
       </div>
 
       {/* MAIN CONTENT AREA */}
-      <div className="border border-gray-200 bg-white min-h-[400px]">
+      <div className="border border-gray-200 bg-white min-h-[300px]">
         {loading ? (
           <div style={{ padding: '24px' }}>
-            <SkeletonTable rows={level === 4 || level === 5 ? 8 : 6} cols={level === 4 || level === 5 ? 5 : 2} />
+            <SkeletonTable rows={level === 4 || level === 5 || level === 6 ? 8 : 6} cols={level === 4 || level === 5 || level === 6 ? 5 : 2} />
           </div>
         ) : (
           <>
             {/* LEVELS 1, 2, 3: CARDS GRID */}
             {level <= 3 && (
-              <div className="p-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 bg-white min-h-[400px]">
+              <div className="p-3 sm:p-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 bg-white min-h-[300px]">
                 {filteredData.length === 0 ? (
                   <div className="col-span-full">
                     <EmptyState type="no-results" message={search ? `No results for "${search}".` : 'No records available at this level.'} compact />
@@ -472,66 +606,179 @@ const Reports = () => {
                       onClick={() => {
                         if (level === 1) handleNavigate(2, { district: item.name });
                         if (level === 2) handleNavigate(3, { township: item.name });
-                        if (level === 3) handleNavigate(4, { village: item.name });
+                        if (level === 3) {
+                          // Level 3: handle selection of ward or group
+                          if (item.locationType === 'ward') {
+                            handleNavigate(4, { locationType: 'ward', ward: item.name });
+                          } else if (item.locationType === 'group') {
+                            handleNavigate(4, { locationType: 'group', group: item.name });
+                          }
+                        }
                       }}
-                      className="bg-white p-5 border border-gray-200 hover:border-gray-900 cursor-pointer transition-[border-color] duration-100 flex items-center justify-between group"
+                      className="bg-white p-4 border border-gray-200 hover:border-gray-900 active:bg-gray-50 cursor-pointer transition-[border-color] duration-100 flex items-center justify-between group"
                     >
                       <div className="flex items-center gap-3">
-                        <div className="text-gray-900">
-                          {level === 1 && <MapIcon size={16} />}
-                          {level === 2 && <MapPin size={16} />}
-                          {level === 3 && <Home size={16} />}
+                        <div className="text-gray-500 group-hover:text-gray-900 transition-colors">
+                          {level === 1 && <MapIcon size={15} />}
+                          {level === 2 && <MapPin size={15} />}
+                          {level === 3 && item.locationType === 'ward' && <Home size={15} />}
+                          {level === 3 && item.locationType === 'group' && <Users size={15} />}
                         </div>
-                        <span className="font-medium text-gray-900 text-xs">{item.name}</span>
+                        <span className="font-medium text-gray-900 text-xs leading-snug">{item.name}</span>
                       </div>
-                      <ChevronRight size={14} className="text-gray-400 group-hover:text-gray-900 transition-colors" />
+                      <ChevronRight size={13} className="text-gray-300 group-hover:text-gray-900 transition-colors flex-shrink-0" />
                     </div>
                   ))
                 )}
               </div>
             )}
 
-            {/* LEVEL 4: HOUSEHOLD HEADS TABLE */}
+            {/* LEVEL 4: WARD HOUSEHOLD HEADS or GROUP VILLAGES */}
             {level === 4 && (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr>
-                      <th style={thStyle}>Household Head (ဦးစီး)</th>
-                      <th style={thStyle}>Household No.</th>
-                      <th style={thStyle}>Gender</th>
-                      <th style={thStyle}>Occupation</th>
-                      <th style={{ ...thStyle, textAlign: 'right' }}>Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
+              path.locationType === 'ward' ? (
+                // Ward path: show household heads — mobile-card / desktop-table
+                <>
+                  {/* Mobile card list */}
+                  <div className="block sm:hidden divide-y divide-gray-100">
                     {filteredData.length === 0 ? (
-                      <tr><td colSpan={5}><EmptyState type="no-results" message={search ? `No household heads match "${search}".` : 'No household heads found in this village.'} compact /></td></tr>
-                    ) : (
-                      filteredData.map(head => (
-                        <tr key={head.id} className="hover:bg-gray-50 transition-colors">
-                          <td style={tdStyle} className="font-medium">{head.name}</td>
-                          <td style={tdStyle} className="font-mono">{head.household_no}</td>
-                          <td style={tdStyle}>{head.gender}</td>
-                          <td style={tdStyle}>{head.occupation || '-'}</td>
-                          <td style={{ ...tdStyle, textAlign: 'right' }}>
-                            <button 
-                              onClick={() => handleNavigate(5, { headName: head.name, householdNo: head.household_no })}
-                              className="inline-flex items-center gap-1 bg-white border border-gray-900 text-gray-900 px-3 py-1 text-xs font-medium uppercase"
-                            >
-                              View Family <ChevronRight size={14} />
-                            </button>
-                          </td>
+                      <EmptyState type="no-results" message={search ? `No results for "${search}".` : 'No household heads found.'} compact />
+                    ) : filteredData.map(head => (
+                      <div key={head.id}
+                        onClick={() => handleNavigate(6, { headName: head.name, householdNo: head.household_no })}
+                        className="flex items-center justify-between px-4 py-3 active:bg-gray-50 cursor-pointer"
+                      >
+                        <div>
+                          <p className="text-xs font-semibold text-gray-900">{head.name}</p>
+                          <p className="text-[11px] text-gray-500 font-mono mt-0.5">{head.household_no} · {head.gender || '—'}</p>
+                        </div>
+                        <ChevronRight size={14} className="text-gray-300 flex-shrink-0" />
+                      </div>
+                    ))}
+                  </div>
+                  {/* Desktop table */}
+                  <div className="hidden sm:block overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr>
+                          <th style={thStyle}>Household Head</th>
+                          <th style={thStyle}>Household No.</th>
+                          <th style={thStyle}>Gender</th>
+                          <th style={thStyle}>Occupation</th>
+                          <th style={{ ...thStyle, textAlign: 'right' }}>Action</th>
                         </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
+                      </thead>
+                      <tbody>
+                        {filteredData.length === 0 ? (
+                          <tr><td colSpan={5}><EmptyState type="no-results" message={search ? `No household heads match "${search}".` : 'No household heads found in this ward.'} compact /></td></tr>
+                        ) : (
+                          filteredData.map(head => (
+                            <tr key={head.id} className="hover:bg-gray-50 transition-colors">
+                              <td style={tdStyle} className="font-medium">{head.name}</td>
+                              <td style={tdStyle} className="font-mono">{head.household_no}</td>
+                              <td style={tdStyle}>{head.gender}</td>
+                              <td style={tdStyle}>{head.occupation || '-'}</td>
+                              <td style={{ ...tdStyle, textAlign: 'right' }}>
+                                <button
+                                  onClick={() => handleNavigate(6, { headName: head.name, householdNo: head.household_no })}
+                                  className="inline-flex items-center gap-1 bg-white border border-gray-900 text-gray-900 px-3 py-1 text-xs font-medium uppercase"
+                                >
+                                  View Family <ChevronRight size={13} />
+                                </button>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              ) : (
+                // Group path: show villages as cards
+                <div className="p-3 sm:p-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 bg-white min-h-[300px]">
+                  {filteredData.length === 0 ? (
+                    <div className="col-span-full">
+                      <EmptyState type="no-results" message={search ? `No results for "${search}".` : 'No villages found in this group.'} compact />
+                    </div>
+                  ) : (
+                    filteredData.map((item, idx) => (
+                      <div 
+                        key={idx} 
+                        onClick={() => handleNavigate(5, { village: item.name })}
+                        className="bg-white p-4 border border-gray-200 hover:border-gray-900 active:bg-gray-50 cursor-pointer transition-[border-color] duration-100 flex items-center justify-between group"
+                      >
+                        <div className="flex items-center gap-3">
+                          <Home size={15} className="text-gray-500 group-hover:text-gray-900 transition-colors" />
+                          <span className="font-medium text-gray-900 text-xs leading-snug">{item.name}</span>
+                        </div>
+                        <ChevronRight size={13} className="text-gray-300 group-hover:text-gray-900 transition-colors flex-shrink-0" />
+                      </div>
+                    ))
+                  )}
+                </div>
+              )
             )}
 
-            {/* LEVEL 5: FAMILY MEMBERS TABLE */}
-            {level === 5 && (
+            {/* LEVEL 5: VILLAGE HOUSEHOLD HEADS (group path only) */}
+            {level === 5 && path.locationType === 'group' && (
+              <>
+                {/* Mobile card list */}
+                <div className="block sm:hidden divide-y divide-gray-100">
+                  {filteredData.length === 0 ? (
+                    <EmptyState type="no-results" message={search ? `No results for "${search}".` : 'No household heads found.'} compact />
+                  ) : filteredData.map(head => (
+                    <div key={head.id}
+                      onClick={() => handleNavigate(6, { headName: head.name, householdNo: head.household_no })}
+                      className="flex items-center justify-between px-4 py-3 active:bg-gray-50 cursor-pointer"
+                    >
+                      <div>
+                        <p className="text-xs font-semibold text-gray-900">{head.name}</p>
+                        <p className="text-[11px] text-gray-500 font-mono mt-0.5">{head.household_no} · {head.gender || '—'}</p>
+                      </div>
+                      <ChevronRight size={14} className="text-gray-300 flex-shrink-0" />
+                    </div>
+                  ))}
+                </div>
+                {/* Desktop table */}
+                <div className="hidden sm:block overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr>
+                        <th style={thStyle}>Household Head</th>
+                        <th style={thStyle}>Household No.</th>
+                        <th style={thStyle}>Gender</th>
+                        <th style={thStyle}>Occupation</th>
+                        <th style={{ ...thStyle, textAlign: 'right' }}>Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredData.length === 0 ? (
+                        <tr><td colSpan={5}><EmptyState type="no-results" message={search ? `No household heads match "${search}".` : 'No household heads found in this village.'} compact /></td></tr>
+                      ) : (
+                        filteredData.map(head => (
+                          <tr key={head.id} className="hover:bg-gray-50 transition-colors">
+                            <td style={tdStyle} className="font-medium">{head.name}</td>
+                            <td style={tdStyle} className="font-mono">{head.household_no}</td>
+                            <td style={tdStyle}>{head.gender}</td>
+                            <td style={tdStyle}>{head.occupation || '-'}</td>
+                            <td style={{ ...tdStyle, textAlign: 'right' }}>
+                              <button
+                                onClick={() => handleNavigate(6, { headName: head.name, householdNo: head.household_no })}
+                                className="inline-flex items-center gap-1 bg-white border border-gray-900 text-gray-900 px-3 py-1 text-xs font-medium uppercase"
+                              >
+                                View Family <ChevronRight size={13} />
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
+
+            {/* LEVEL 6: FAMILY MEMBERS TABLE (for both ward and group/village paths) */}
+            {level === 6 && (
               <div>
                 {/* Delete confirmation modal */}
                 {deleteConfirmId && (
@@ -552,9 +799,9 @@ const Reports = () => {
                   </div>
                 )}
 
-                <div className="px-4 py-3 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
-                  <h3 className="font-semibold text-gray-900 text-xs uppercase">Family Roster: {path.householdNo}</h3>
-                  <span className="text-[10px] text-gray-400 uppercase">{familyMembers.length} member{familyMembers.length !== 1 ? 's' : ''}</span>
+                <div className="px-4 py-3 border-b border-gray-200 bg-gray-50 flex flex-wrap items-center justify-between gap-1">
+                  <h3 className="font-semibold text-gray-900 text-xs uppercase tracking-wide">Family Roster: {path.householdNo}</h3>
+                  <span className="text-[10px] text-gray-400 uppercase font-mono">{familyMembers.length} member{familyMembers.length !== 1 ? 's' : ''}</span>
                 </div>
 
                 <style>{`
@@ -643,32 +890,37 @@ const Reports = () => {
                 </div>{/* end relative wrapper */}
 
                 {familyMembers.length > 0 && (
-                  <div className="px-6 py-3 bg-white border-t border-gray-200 flex flex-wrap items-center justify-end gap-3">
-                    <span className="text-[11px] text-gray-500 uppercase letter-spacing-0.05 mr-auto">Print / Export Household Registration</span>
-                    <button
-                      type="button"
-                      onClick={() => printHouseholdPdf(path.householdNo, familyMembers)}
-                      className="flex items-center gap-2 bg-gray-900 hover:bg-white hover:text-gray-900 hover:border-gray-900 border border-gray-900 text-white px-4 py-2 rounded-none font-medium transition-colors text-xs uppercase letter-spacing-0.05"
-                    >
-                      <Printer size={14} />
-                      Print PDF
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => exportHouseholdExcel(path.householdNo, familyMembers)}
-                      className="flex items-center gap-2 bg-white border border-gray-900 text-gray-900 px-4 py-2 rounded-none font-medium text-xs uppercase letter-spacing-0.05"
-                    >
-                      <FileSpreadsheet size={14} />
-                      Export Excel
-                    </button>
-                    <button
-                      type="button"
-                      onClick={exportHouseholdJson}
-                      className="flex items-center gap-2 bg-white border border-gray-900 text-gray-900 px-4 py-2 rounded-none font-medium text-xs uppercase letter-spacing-0.05"
-                    >
-                      <Download size={14} />
-                      Export JSON
-                    </button>
+                  <div className="px-4 py-3 bg-white border-t border-gray-200 flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-end gap-2">
+                    <span className="text-[11px] text-gray-400 uppercase tracking-wide sm:mr-auto">Print / Export</span>
+                    <div className="grid grid-cols-3 sm:flex sm:flex-row gap-2">
+                      <button
+                        type="button"
+                        onClick={() => printHouseholdPdf(path.householdNo, familyMembers)}
+                        className="flex items-center justify-center gap-1.5 bg-gray-900 hover:bg-white hover:text-gray-900 hover:border-gray-900 border border-gray-900 text-white px-3 py-2 font-medium transition-colors text-xs uppercase"
+                      >
+                        <Printer size={13} />
+                        <span className="hidden sm:inline">Print PDF</span>
+                        <span className="sm:hidden">Print</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => exportHouseholdExcel(path.householdNo, familyMembers)}
+                        className="flex items-center justify-center gap-1.5 bg-white border border-gray-900 text-gray-900 px-3 py-2 font-medium text-xs uppercase"
+                      >
+                        <FileSpreadsheet size={13} />
+                        <span className="hidden sm:inline">Export Excel</span>
+                        <span className="sm:hidden">Excel</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={exportHouseholdJson}
+                        className="flex items-center justify-center gap-1.5 bg-white border border-gray-900 text-gray-900 px-3 py-2 font-medium text-xs uppercase"
+                      >
+                        <Download size={13} />
+                        <span className="hidden sm:inline">Export JSON</span>
+                        <span className="sm:hidden">JSON</span>
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>

@@ -297,9 +297,9 @@ const IDCardScanner = () => {
   };
 
   return (
-    <div style={{ padding: '24px 16px', maxWidth: '768px', margin: '0 auto', boxSizing: 'border-box' }} className="scanner-page xl:max-w-3xl xl:px-10">
+    <div className="flex flex-col gap-8 p-6 sm:p-8 xl:p-10 max-w-7xl xl:max-w-[1440px] mx-auto">
       {/* Page Header */}
-      <div className="mb-8">
+      <div>
         <h2 style={{ fontSize: '20px', margin: '0 0 8px 0', color: '#1A1A1A', fontWeight: '500', letterSpacing: '0.02em' }}>
           ID CARD SCANNER
         </h2>
@@ -308,8 +308,9 @@ const IDCardScanner = () => {
         </p>
       </div>
 
-      {/* Mode Toggle */}
-      <div className="flex border border-[#E5E7EB] mb-6" style={{ borderRadius: '0px' }}>
+      <div className="max-w-3xl w-full flex flex-col">
+        {/* Mode Toggle */}
+        <div className="flex border border-[#E5E7EB] mb-6" style={{ borderRadius: '0px' }}>
         <button
           onClick={() => handleModeSwitch('manual')}
           className="flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-medium transition-colors"
@@ -653,6 +654,8 @@ const IDCardScanner = () => {
           </div>
         </div>
       )}
+
+      </div> {/* Closing max-w-3xl wrapper */}
 
       {/* Family Modal */}
       {familyModal && (

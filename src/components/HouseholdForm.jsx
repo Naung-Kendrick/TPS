@@ -757,8 +757,8 @@ const HouseholdForm = () => {
   ), [formData, dob, autoFillMessage, isCustomRelationship, isCustomReligion, handleChange, handleDobChange, checkHouseholdExists, inputStyle, labelStyle, groupStyle, days, months, years, toMyanmarNum, wardVillageError]);
 
   return (
-    <div style={{ padding: '32px' }} className="max-w-7xl xl:max-w-[1440px] mx-auto">
-      <div style={{ marginBottom: '32px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+    <div className="flex flex-col gap-8 p-6 sm:p-8 xl:p-10 max-w-7xl xl:max-w-[1440px] mx-auto">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
         <div>
           <h2 style={{ fontSize: '20px', margin: '0 0 8px 0', color: '#1A1A1A', fontWeight: '500', letterSpacing: '0.02em' }}>HOUSEHOLD REGISTRATION</h2>
           <p style={{ margin: 0, color: '#737373', fontSize: '12px' }}>Please fill out the form to register household members.</p>

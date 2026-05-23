@@ -462,7 +462,7 @@ const PopulationStatistics = () => {
   };
 
   return (
-    <div className="px-4 py-5 sm:p-8 xl:p-10 max-w-7xl xl:max-w-[1440px] mx-auto bg-white">
+    <div className="flex flex-col gap-8 p-6 sm:p-8 xl:p-10 max-w-7xl xl:max-w-[1440px] mx-auto bg-white">
       <style>{`
         .tps-stats-toolbar { display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; padding-top: 16px; border-top: 1px solid #E5E7EB; }
         @media (max-width: 639px) {

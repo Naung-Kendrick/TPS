@@ -308,9 +308,8 @@ const IDCardScanner = () => {
         </p>
       </div>
 
-      <div className="max-w-3xl w-full flex flex-col">
-        {/* Mode Toggle */}
-        <div className="flex border border-[#E5E7EB] mb-6" style={{ borderRadius: '0px' }}>
+      {/* Mode Toggle */}
+      <div className="flex border border-[#E5E7EB] mb-6" style={{ borderRadius: '0px' }}>
         <button
           onClick={() => handleModeSwitch('manual')}
           className="flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-medium transition-colors"
@@ -366,11 +365,22 @@ const IDCardScanner = () => {
             <button
               type="submit"
               disabled={loading || !inputValue.trim()}
-              className="flex items-center gap-2 px-4 py-2 bg-[#1A1A1A] text-white text-sm font-medium hover:bg-white hover:text-[#1A1A1A] border border-[#1A1A1A] transition-colors"
-              style={{ borderRadius: '0px' }}
+              className="flex items-center gap-2 hover:bg-white hover:text-[#1A1A1A] transition-colors"
+              style={{
+                padding: '10px 24px',
+                backgroundColor: '#1A1A1A',
+                color: '#FFFFFF',
+                fontSize: '12px',
+                fontWeight: '700',
+                border: '1px solid #1A1A1A',
+                borderRadius: '0px',
+                cursor: 'pointer',
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em'
+              }}
             >
-              {loading ? <Loader2 size={16} className="animate-spin" /> : <Search size={16} />}
-              {loading ? 'Searching...' : 'Search'}
+              {loading ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
+              {loading ? 'SEARCHING...' : 'SEARCH'}
             </button>
           </form>
         </div>
@@ -392,11 +402,22 @@ const IDCardScanner = () => {
               </div>
               <button
                 onClick={startCamera}
-                className="flex items-center gap-2 px-5 py-2 bg-[#1A1A1A] text-white text-sm font-medium hover:bg-white hover:text-[#1A1A1A] border border-[#1A1A1A] transition-colors"
-                style={{ borderRadius: '0px' }}
+                className="flex items-center gap-2 hover:bg-white hover:text-[#1A1A1A] transition-colors"
+                style={{
+                  padding: '10px 24px',
+                  backgroundColor: '#1A1A1A',
+                  color: '#FFFFFF',
+                  fontSize: '12px',
+                  fontWeight: '700',
+                  border: '1px solid #1A1A1A',
+                  borderRadius: '0px',
+                  cursor: 'pointer',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em'
+                }}
               >
-                <Camera size={16} />
-                Start Camera
+                <Camera size={14} />
+                START CAMERA
               </button>
             </div>
           ) : (
@@ -645,17 +666,26 @@ const IDCardScanner = () => {
           <div className="p-4">
             <button
               onClick={openFamilyModal}
-              className="flex items-center gap-2 w-full justify-center py-2.5 border border-[#1A1A1A] text-[#1A1A1A] text-sm font-medium hover:bg-[#1A1A1A] hover:text-white transition-colors"
-              style={{ borderRadius: '0px' }}
+              className="flex items-center gap-2 w-full justify-center hover:bg-[#1A1A1A] hover:text-white transition-colors"
+              style={{
+                padding: '10px 24px',
+                backgroundColor: '#FFFFFF',
+                color: '#1A1A1A',
+                fontSize: '12px',
+                fontWeight: '700',
+                border: '1px solid #1A1A1A',
+                borderRadius: '0px',
+                cursor: 'pointer',
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em'
+              }}
             >
-              <Users size={16} />
+              <Users size={14} />
               View All Family Members
             </button>
           </div>
         </div>
       )}
-
-      </div> {/* Closing max-w-3xl wrapper */}
 
       {/* Family Modal */}
       {familyModal && (

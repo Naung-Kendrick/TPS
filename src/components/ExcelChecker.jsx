@@ -899,32 +899,65 @@ const ExcelChecker = () => {
             {checkResults.validRows.length > 0 && (
               <button
                 onClick={downloadCorrectedCSV}
-                className="flex items-center gap-2 px-4 py-2 bg-[#1A1A1A] text-white hover:bg-[#737373] transition-colors"
-                style={{ borderRadius: '0px' }}
+                className="flex items-center gap-2 hover:bg-[#737373] transition-colors"
+                style={{
+                  padding: '10px 24px',
+                  backgroundColor: '#1A1A1A',
+                  color: '#FFFFFF',
+                  fontSize: '12px',
+                  fontWeight: '700',
+                  border: '1px solid #1A1A1A',
+                  borderRadius: '0px',
+                  cursor: 'pointer',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em'
+                }}
               >
-                <Download size={18} />
-                Download Corrected CSV
+                <Download size={14} />
+                DOWNLOAD CORRECTED CSV
               </button>
             )}
 
             {(checkResults.errors.length > 0 || checkResults.warnings.length > 0) && (
               <button
                 onClick={downloadErrorReport}
-                className="flex items-center gap-2 px-4 py-2 bg-[#F3F4F6] text-[#1A1A1A] border border-[#E5E7EB] hover:bg-[#E5E7EB] transition-colors"
-                style={{ borderRadius: '0px' }}
+                className="flex items-center gap-2 hover:bg-[#E5E7EB] transition-colors"
+                style={{
+                  padding: '10px 24px',
+                  backgroundColor: '#F3F4F6',
+                  color: '#1A1A1A',
+                  fontSize: '12px',
+                  fontWeight: '700',
+                  border: '1px solid #E5E7EB',
+                  borderRadius: '0px',
+                  cursor: 'pointer',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em'
+                }}
               >
-                <FileWarning size={18} />
-                Download Error Report
+                <FileWarning size={14} />
+                DOWNLOAD ERROR REPORT
               </button>
             )}
 
             <button
               onClick={resetChecker}
-              className="flex items-center gap-2 px-4 py-2 bg-white text-[#1A1A1A] border border-[#E5E7EB] hover:bg-[#F3F4F6] transition-colors ml-auto"
-              style={{ borderRadius: '0px' }}
+              className="flex items-center gap-2 hover:bg-[#F3F4F6] transition-colors ml-auto"
+              style={{
+                padding: '10px 24px',
+                backgroundColor: '#FFFFFF',
+                color: '#1A1A1A',
+                fontSize: '12px',
+                fontWeight: '700',
+                border: '1px solid #E5E7EB',
+                borderRadius: '0px',
+                cursor: 'pointer',
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em'
+              }}
             >
-              <X size={18} />
-              Check Another File
+              <X size={14} />
+              CHECK ANOTHER FILE
             </button>
           </div>
         </div>

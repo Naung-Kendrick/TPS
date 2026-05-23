@@ -842,10 +842,21 @@ const CsvUploader = ({ onUploadSuccess }) => {
             <div className="p-6 border-t border-[#E5E7EB] bg-[#FAFAFA] flex justify-end">
               <button
                 onClick={closeErrorModal}
-                className="px-6 py-2.5 bg-[#1A1A1A] text-white font-medium hover:bg-[#737373] transition-colors"
-                style={{ borderRadius: '0px' }}
+                className="hover:bg-[#737373] transition-colors"
+                style={{
+                  padding: '10px 24px',
+                  backgroundColor: '#1A1A1A',
+                  color: '#FFFFFF',
+                  fontSize: '12px',
+                  fontWeight: '700',
+                  border: '1px solid #1A1A1A',
+                  borderRadius: '0px',
+                  cursor: 'pointer',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em'
+                }}
               >
-                Cancel Upload & Fix Excel
+                CANCEL UPLOAD & FIX EXCEL
               </button>
             </div>
 

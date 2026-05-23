@@ -478,7 +478,7 @@ const Reports = () => {
   };
 
   return (
-    <div className="px-4 py-5 sm:p-8 xl:p-10 max-w-7xl xl:max-w-[1440px] mx-auto min-h-screen bg-white">
+    <div className="flex flex-col gap-8 p-6 sm:p-8 xl:p-10 max-w-7xl xl:max-w-[1440px] mx-auto bg-white">
       
       {/* HEADER & BREADCRUMBS */}
       <div className="mb-5 sm:mb-8">
@@ -495,8 +495,20 @@ const Reports = () => {
             type="button"
             onClick={exportAllJson}
             disabled={exportingJson}
-            className="flex items-center justify-center gap-2 border border-gray-300 text-gray-600 hover:border-gray-900 hover:text-gray-900 px-3 py-2 text-xs uppercase font-medium transition-colors disabled:opacity-50 w-full sm:w-auto"
-            style={{ marginTop: '4px' }}
+            className="flex items-center justify-center gap-2 hover:bg-[#1A1A1A] hover:text-white transition-colors disabled:opacity-50 w-full sm:w-auto"
+            style={{
+              padding: '10px 24px',
+              backgroundColor: '#FFFFFF',
+              color: '#1A1A1A',
+              fontSize: '12px',
+              fontWeight: '700',
+              border: '1px solid #1A1A1A',
+              borderRadius: '0px',
+              cursor: exportingJson ? 'not-allowed' : 'pointer',
+              textTransform: 'uppercase',
+              letterSpacing: '0.05em',
+              marginTop: '4px'
+            }}
           >
             {exportingJson ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
             {exportingJson ? 'Exporting...' : 'Export All JSON'}

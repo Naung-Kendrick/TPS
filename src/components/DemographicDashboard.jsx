@@ -464,6 +464,15 @@ const colors = {
   black:       '#1A1A1A',
   
   // Custom high-contrast multi-segment palettes
+  religionPalette: [
+    '#8D6E63', // Earthy Brown (Primary)
+    '#1565C0', // Cobalt Blue
+    '#E65100', // Deep Orange
+    '#2E7D32', // Forest Green
+    '#6A1B9A', // Purple
+    '#00838F', // Dark Cyan
+    '#AD1457'  // Crimson Pink
+  ],
   nationalityPalette: [
     '#2E7D32', // Forest Green (Primary)
     '#1565C0', // Cobalt Blue
@@ -836,14 +845,7 @@ const DemographicDashboard = () => {
               <div style={sectionTitleStyle}>
                 <MapPin size={13} color={colors.black} /> RELIGIOUS STATISTICS
               </div>
-              {religiousData.length === 0
-                ? <div style={{ color: '#9CA3AF', fontSize: '12px', padding: '8px 0' }}>အချက်အလက်မရှိပါ</div>
-                : religiousData.map(item => (
-                    <StatBar key={item.label} label={item.label}
-                      count={item.count} total={totalPopulation}
-                      color={colors.earthyBrown} barHeight={16} />
-                  ))
-              }
+              <CircleStatChart data={religiousData} colorsPalette={colors.religionPalette} />
             </div>
 
             {/* Nationality Statistics */}

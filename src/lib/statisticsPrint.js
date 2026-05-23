@@ -435,7 +435,7 @@ export const printStatistics = ({
     td.num { text-align: center; font-family: 'Courier New', monospace; }
     td.name { text-align: left; font-weight: 500; white-space: normal; word-break: break-word; min-width: 80px; max-width: 140px; }
     td.bold { font-weight: 700; }
-    td.green { color: #2E7D32; }
+    td.green { color: #000; }
     tr.total-row td { background: #f0f0f0 !important; font-weight: 700;
       -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
 
@@ -678,7 +678,7 @@ export const printDemographicDashboard = ({
     .stat-table td.name { font-weight: 500; min-width: 60px; max-width: 120px; word-break: break-word; }
     .stat-table td.num  { text-align: center; font-family: 'Courier New', monospace; white-space: nowrap; width: 36px; }
     .stat-table td.bold { font-weight: 700; }
-    .stat-table td.green { color: #2E7D32; }
+    .stat-table td.green { color: #000; }
     .stat-table td.bar-cell-simple { width: 120px; padding: 2px 4px; }
     .simple-bar { height: 8px; min-width: 1px;
       -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
@@ -688,7 +688,7 @@ export const printDemographicDashboard = ({
     .pyramid-table td { border: 1px solid #ddd; padding: 2px 4px; font-size: 8px; vertical-align: middle; line-height: 1.2; }
     .pyramid-table td.num          { text-align: center; font-family: 'Courier New', monospace; width: 32px; white-space: nowrap; }
     .pyramid-table td.bold         { font-weight: 700; }
-    .pyramid-table td.green        { color: #2E7D32; }
+    .pyramid-table td.green        { color: #000; }
     .pyramid-table td.bar-male     { width: 28%; padding: 2px 4px; overflow: hidden; }
     .pyramid-table td.bar-female   { width: 28%; padding: 2px 4px; overflow: hidden; }
     .pyramid-table td.age-label-cell { font-size: 7.5px; font-weight: 700; text-align: center; width: 58px; white-space: nowrap; color: #333; }

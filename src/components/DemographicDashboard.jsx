@@ -697,11 +697,14 @@ const DemographicDashboard = () => {
       {/* ─── Header ─────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-6 sm:mb-8">
         <div>
-          <h2 style={{ fontSize: '18px', margin: '0 0 4px 0', color: colors.black, fontWeight: '600', letterSpacing: '0.02em' }}>
+          <h2 style={{ fontSize: '20px', margin: '0 0 8px 0', color: '#1A1A1A', fontWeight: '500', letterSpacing: '0.02em' }}>
             DEMOGRAPHIC DASHBOARD
           </h2>
+          <p style={{ margin: 0, color: '#737373', fontSize: '12px' }}>
+            Visual analysis of functional age pyramids, gender proportions, religious statistics, and occupational metrics.
+          </p>
         </div>
-        <div className="flex gap-2 w-full sm:w-auto">
+        <div className="flex gap-2 w-full sm:w-auto" style={{ marginTop: '4px' }}>
           <button
             onClick={() => {
               if (!statsData) return;

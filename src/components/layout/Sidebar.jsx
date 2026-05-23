@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { Users, UserPlus, LineChart, PieChart, FileText, Settings, Upload, ScanLine, Menu, X, MoreHorizontal, LogOut, CircleUserRound } from 'lucide-react';
+import { Users, UserPlus, LineChart, PieChart, FileText, Settings, Upload, ScanLine, Menu, X, MoreHorizontal, LogOut, CircleUserRound, UserCheck, Database } from 'lucide-react';
 import logo from '../../assets/fonts/IDTL_logo.png';
 
 const Sidebar = ({ user, onLogout }) => {
@@ -111,13 +111,13 @@ const Sidebar = ({ user, onLogout }) => {
   }, [moreOpen]);
 
   const menuItems = [
-    { id: 'verification',     path: '/verification',     label: 'Data Verification',      icon: Users          },
+    { id: 'verification',     path: '/verification',     label: 'Data Verification',      icon: UserCheck      },
     { id: 'upload',           path: '/upload',           label: 'Data Upload',            icon: Upload         },
     { id: 'scanner',          path: '/scanner',          label: 'ID Card Scanner',        icon: ScanLine       },
     { id: 'statistics',       path: '/statistics',       label: 'Population Statistics',  icon: LineChart      },
     { id: 'demographics',     path: '/demographics',     label: 'Demographic Dashboard',  icon: PieChart       },
     { id: 'registration',     path: '/registration',     label: 'Household Registration', icon: UserPlus       },
-    { id: 'central-database', path: '/central-database', label: 'Central Database',       icon: FileText       },
+    { id: 'central-database', path: '/central-database', label: 'Central Database',       icon: Database       },
     { id: 'users',            path: '/users',            label: 'User Management',        icon: Users          },
     { id: 'settings',         path: '/settings',         label: 'Settings',               icon: Settings       },
   ];

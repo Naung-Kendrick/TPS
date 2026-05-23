@@ -482,13 +482,21 @@ const Reports = () => {
       
       {/* HEADER & BREADCRUMBS */}
       <div className="mb-5 sm:mb-8">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
-          <h2 style={{ fontSize: '18px', margin: 0, color: '#1A1A1A', fontWeight: '600', letterSpacing: '0.02em' }}>CENTRAL DATABASE</h2>
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
+          <div>
+            <h2 style={{ fontSize: '20px', margin: '0 0 8px 0', color: '#1A1A1A', fontWeight: '500', letterSpacing: '0.02em' }}>
+              CENTRAL DATABASE
+            </h2>
+            <p style={{ margin: 0, color: '#737373', fontSize: '12px' }}>
+              Browse and manage household records and family rosters across regions.
+            </p>
+          </div>
           <button
             type="button"
             onClick={exportAllJson}
             disabled={exportingJson}
             className="flex items-center justify-center gap-2 border border-gray-300 text-gray-600 hover:border-gray-900 hover:text-gray-900 px-3 py-2 text-xs uppercase font-medium transition-colors disabled:opacity-50 w-full sm:w-auto"
+            style={{ marginTop: '4px' }}
           >
             {exportingJson ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
             {exportingJson ? 'Exporting...' : 'Export All JSON'}

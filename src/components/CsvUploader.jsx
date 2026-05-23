@@ -21,6 +21,165 @@ const ensureUnicode = (text) => {
   return str;
 };
 
+// ==========================================
+// MYANMAR UNICODE DICTIONARIES & HELPER CONSTANTS
+// ==========================================
+
+// Regex to match a single Myanmar Unicode syllable
+// Standard regex handles Consonant + [Stacking mark + Consonant] + [Medial signs] + [Vowel signs] + [Asat/Killer] + [Tone marks]
+const MYANMAR_SYLLABLE_PAT = /[\u1000-\u1021\u1023-\u1027\u1029\u102A\u103F\u1040-\u1049\u104E](\u1039[\u1000-\u1021]|[\u103B-\u103E\u105A-\u105D])*\u103A?[\u1037\u1038]?/g;
+
+// Lexical Dictionaries
+const DICTS = {
+  religions: [
+    'ဗုဒ္ဓဘာသာ', // Buddhism
+    'ခရစ်ယာန်', // Christianity
+    'အစ္စလာမ်', // Islam
+    'ဟိန္ဒူ', // Hinduism
+    'နတ်ကိုးကွယ်' // Animism
+  ],
+  nationalities: [
+    'တအာင်း', // Ta'ang
+    'ဗမာ',     // Bamar
+    'ရှမ်း',    // Shan
+    'ကချင်',   // Kachin
+    'ကရင်',    // Kayin
+    'ချင်း',    // Chin
+    'မွန်',     // Mon
+    'ရခိုင်',   // Rakhine
+    'တရုတ်',    // Chinese
+    'ကုလား',    // Indian/South Asian
+    'ပြည်နယ်ခြားသား' // Out-of-state resident
+  ],
+  relationships: [
+    'ဦးစီး', // Head
+    'ဇနီး', // Wife
+    'ခင်ပွန်း', // Husband
+    'သား', // Son
+    'သမီး', // Daughter
+    'အဖေ', // Father
+    'အမေ', // Mother
+    'ညီ', // Younger brother
+    'မောင်', // Brother
+    'မမ', // Older sister
+    'ညီမ', // Younger sister
+    'အစ်ကို', // Older brother
+    'အစ်မ', // Older sister
+    'ဖိုးဖိုး', // Grandfather
+    'ဖွားဖွား', // Grandmother
+    'မြေး', // Grandchild
+    'တူ', // Nephew
+    'တူမ', // Niece
+    'ဦးလေး', // Uncle
+    'ဒေါ်လေး' // Aunt
+  ],
+  nameSyllables: [
+    'မောင်', 'အောင်', 'လှ', 'ထွန်း', 'ဦး', 'ဒေါ်', 'နန်း', 'စိုင်း', 'စိုး', 'မင်း', 'ကျော်', 'ဇော်', 
+    'အေး', 'သန်း', 'ဝင်း', 'တင်', 'ကြည်', 'မြ', 'ဟန်', 'လွင်', 'မိုး', 'သူ', 'ဆန်း', 'နိုင်', 'ထက်', 
+    'မျိုး', 'ခိုင်', 'စန္ဒာ', 'သီတာ', 'ရတနာ', 'ချို', 'ဝေ', 'ဖြိုး', 'ဇင်', 'သက်', 'နှင်း', 'ယဉ်', 'ဆွေ', 
+    'ထွန်း', 'ဆန်း', 'ကျော်', 'လှ', 'နိုင်', 'ကို', 'ဖိုး', 'နန္ဒာ', 'သော်', 'ဉာဏ်', 'ထူး', 'ရဲ', 'မြတ်',
+    'သီဟ', 'ဟိန်း', 'ကျော်', 'စည်သူ', 'နောင်', 'ဟန်', 'ဝေ', 'လင်း', 'အောင်', 'ခန့်', 'စံ', 'ကောင်း', 'မြတ်',
+    'သက်', 'ခိုင်', 'နှင်း', 'နွယ်', 'နု', 'ခင်', 'ဝါ', 'ကြည်', 'ပြုံး', 'ချစ်', 'လတ်', 'ငယ်', 'နွေး', 'ဖြူ'
+  ]
+};
+
+// Segments Myanmar text into individual syllables
+const segmentSyllables = (text) => {
+  if (!text) return [];
+  const matches = text.match(MYANMAR_SYLLABLE_PAT);
+  return matches || [];
+};
+
+// Calculates Levenshtein Distance between two words for spelling suggestions
+const getLevenshteinDistance = (a, b) => {
+  const tmp = [];
+  let i, j;
+  for (i = 0; i <= a.length; i++) {
+    tmp[i] = [i];
+  }
+  for (j = 0; j <= b.length; j++) {
+    tmp[0][j] = j;
+  }
+  for (i = 1; i <= a.length; i++) {
+    for (j = 1; j <= b.length; j++) {
+      tmp[i][j] = Math.min(
+        tmp[i - 1][j] + 1, // deletion
+        tmp[i][j - 1] + 1, // insertion
+        tmp[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1) // substitution
+      );
+    }
+  }
+  return tmp[a.length][b.length];
+};
+
+// Scans dictionary and returns closest match if within threshold (edit distance <= 2)
+const getSpellingSuggestion = (word, dict) => {
+  if (!word || !dict) return null;
+  let minDistance = 999;
+  let closestMatch = null;
+  
+  for (const entry of dict) {
+    // If edit distance is close (<= 2 and within 50% of word length)
+    const dist = getLevenshteinDistance(word, entry);
+    if (dist > 0 && dist <= 2 && dist < minDistance) {
+      minDistance = dist;
+      closestMatch = entry;
+    }
+  }
+  return closestMatch;
+};
+
+// Strict diacritic ordering validator per syllable
+// Medial signs (ျ ြ ွ ှ) -> Vowels (ါ ာ ိ ီ ု ူ ေ ဲ) -> Asat (်) -> Tone marks (့ း)
+const validateDiacriticOrdering = (syllable) => {
+  if (!syllable) return null;
+  
+  const medials = 'ျြွှ';
+  const vowels = 'ါာိီုူေဲ';
+  const asat = '်';
+  const tones = '့း';
+  
+  // Create mapping of characters in syllable to their respective indices
+  let maxMedialIdx = -1;
+  let minVowelIdx = 999;
+  let maxVowelIdx = -1;
+  let asatIdx = -1;
+  let minToneIdx = 999;
+  
+  for (let i = 0; i < syllable.length; i++) {
+    const char = syllable[i];
+    if (medials.includes(char)) maxMedialIdx = Math.max(maxMedialIdx, i);
+    if (vowels.includes(char)) {
+      minVowelIdx = Math.min(minVowelIdx, i);
+      maxVowelIdx = Math.max(maxVowelIdx, i);
+    }
+    if (char === asat) asatIdx = i;
+    if (tones.includes(char)) minToneIdx = Math.min(minToneIdx, i);
+  }
+  
+  // Rule 1: Medials must appear before Vowels
+  if (maxMedialIdx !== -1 && minVowelIdx !== 999 && maxMedialIdx > minVowelIdx) {
+    return 'မီးစွဲသင်္ကေတများသည် သရသင်္ကေတများ၏ ရှေ့တွင်ရှိရမည် (Medial signs must appear before vowel signs)';
+  }
+  
+  // Rule 2: Vowels must appear before Asat
+  if (maxVowelIdx !== -1 && asatIdx !== -1 && maxVowelIdx > asatIdx) {
+    return 'သရသင်္ကေတများသည် အသတ် (်) ၏ ရှေ့တွင်ရှိရမည် (Vowel signs must appear before asat)';
+  }
+  
+  // Rule 3: Asat must appear before Tone marks
+  if (asatIdx !== -1 && minToneIdx !== 999 && asatIdx > minToneIdx) {
+    return 'အသတ် (်) သည် အောက်ကမြစ်/ဝစ္စပေါက်တို့၏ ရှေ့တွင်ရှိရမည် (Asat must appear before tone marks)';
+  }
+  
+  // Rule 4: Vowels must appear before Tone marks
+  if (maxVowelIdx !== -1 && minToneIdx !== 999 && maxVowelIdx > minToneIdx) {
+    return 'သရသင်္ကေတများသည် အောက်ကမြစ်/ဝစ္စပေါက်တို့၏ ရှေ့တွင်ရှိရမည် (Vowel signs must appear before tone marks)';
+  }
+
+  return null;
+};
+
 // Recursively walk any object/array and convert every Myanmar string to Unicode
 export const deepEnsureUnicode = (value) => {
   if (typeof value === 'string') return ensureUnicode(value);
@@ -36,7 +195,7 @@ export const deepEnsureUnicode = (value) => {
 };
 
 // Myanmar text quality validator — detects garbled/misspelled Myanmar text
-const validateMyanmarText = (text) => {
+const validateMyanmarText = (text, fieldKey = null) => {
   if (!text || typeof text !== 'string') return null;
   const str = text.trim();
   if (str === '' || str === '-') return null;
@@ -47,29 +206,88 @@ const validateMyanmarText = (text) => {
 
   const issues = [];
 
-  // 1. Duplicate/repeated medials & vowel signs that should never repeat
-  // ှ (U+103E), ျ (U+103B), ြ (U+103C), ွ (U+103D)
+  // 1. Basic structural checks
   if (/([\u103B-\u103E])\1/.test(str)) issues.push('Duplicate medial/modifier');
-  // Duplicate vowel signs: ါ (U+102B), ာ (U+102C), ိ (U+102D), ီ (U+102E), ု (U+102F), ူ (U+1030), ေ (U+1031), ဲ (U+1032)
   if (/([\u102B-\u1032])\1/.test(str)) issues.push('Duplicate vowel sign');
-  // Duplicate asat ်(U+1039) or killer ့(U+1037) or visarga း(U+1038)
   if (/(\u1039)\1/.test(str)) issues.push('Duplicate virama');
   if (/(\u1037)\1+/.test(str)) issues.push('Repeated dot below (့)');
   if (/(\u1038)\1+/.test(str)) issues.push('Repeated visarga (း)');
-
-  // 2. Invalid sequences: vowel sign before consonant without proper structure
-  // ေ (U+1031) should appear before a consonant cluster in display but in Unicode it comes after
-  // In proper Unicode, ေ is stored AFTER the consonant. If we see ေ followed by non-Myanmar or end, it's wrong
-
-  // 3. Multiple ေ in one syllable
   if (/\u1031[^\u1000-\u102A\u1040-\u1049]*\u1031/.test(str)) issues.push('Multiple ေ in sequence');
-
-  // 4. Stacking mark ္ (U+1039) not followed by a valid consonant
   if (/\u1039[^\u1000-\u102A]/.test(str)) issues.push('Invalid stacking (္ not followed by consonant)');
   if (/\u1039$/.test(str)) issues.push('Stacking mark at end of text');
 
-  // 5. Mixed encoding artifacts — Latin characters mixed into Myanmar words
-  // (exclude common separators like -, /, .)
+  // 2. Syllable-level orthography checks
+  const syllables = segmentSyllables(str);
+  for (const syl of syllables) {
+    const orderingError = validateDiacriticOrdering(syl);
+    if (orderingError) {
+      issues.push(`Orthography Error in syllable "${syl}": ${orderingError}`);
+    }
+  }
+
+  // 3. Dictionary & Lexicon checks with Levenshtein-based spelling suggestions
+  if (fieldKey) {
+    if (fieldKey === 'religious') {
+      const matched = DICTS.religions.some(r => r === str);
+      if (!matched) {
+        const sugg = getSpellingSuggestion(str, DICTS.religions);
+        if (sugg) issues.push(`Did you mean "${sugg}"?`);
+      }
+    }
+    else if (fieldKey === 'household_relationship') {
+      const matched = DICTS.relationships.some(r => r === str);
+      if (!matched) {
+        const sugg = getSpellingSuggestion(str, DICTS.relationships);
+        if (sugg) {
+          issues.push(`Did you mean "${sugg}"?`);
+        } else {
+          issues.push(`Relationship is unusual`);
+        }
+      }
+    }
+    else if (fieldKey === 'nationality') {
+      const matched = DICTS.nationalities.some(r => r === str);
+      if (!matched) {
+        const sugg = getSpellingSuggestion(str, DICTS.nationalities);
+        if (sugg) issues.push(`Did you mean "${sugg}"?`);
+      }
+    }
+    else if (fieldKey === 'resident_status') {
+      const matched = DICTS.nationalities.some(r => r === str);
+      if (!matched) {
+        const sugg = getSpellingSuggestion(str, DICTS.nationalities);
+        if (sugg) issues.push(`Did you mean "${sugg}"?`);
+      }
+    }
+    else if (fieldKey === 'township') {
+      const matched = DICTS.townships.some(t => t === str);
+      if (!matched) {
+        const sugg = getSpellingSuggestion(str, DICTS.townships);
+        if (sugg) issues.push(`Did you mean "${sugg}"?`);
+      }
+    }
+    else if (fieldKey === 'district') {
+      const matched = DICTS.districts.some(d => d === str);
+      if (!matched) {
+        const sugg = getSpellingSuggestion(str, DICTS.districts);
+        if (sugg) issues.push(`Did you mean "${sugg}"?`);
+      }
+    }
+    else if (fieldKey === 'name' || fieldKey === 'fathers_name' || fieldKey === 'mothers_name') {
+      for (const syl of syllables) {
+        if (syl.length <= 1) continue; // skip single letter particles
+        const found = DICTS.nameSyllables.some(s => s === syl);
+        if (!found) {
+          const sugg = getSpellingSuggestion(syl, DICTS.nameSyllables);
+          if (sugg) {
+            issues.push(`Unusual syllable "${syl}" - Did you mean "${sugg}"?`);
+          }
+        }
+      }
+    }
+  }
+
+  // 4. Mixed encoding checking
   const myanmarSegments = str.split(/[\s,\-\/\.\(\)0-9၀-၉]+/);
   for (const seg of myanmarSegments) {
     if (/[\u1000-\u109F]/.test(seg) && /[a-zA-Z]/.test(seg)) {
@@ -318,7 +536,7 @@ const processAndUpload = async (formattedData, setValidationErrors, setShowModal
     ];
     const spellingIssues = [];
     for (const field of myanmarFieldsToCheck) {
-      const issue = validateMyanmarText(parsedRow[field.key]);
+      const issue = validateMyanmarText(parsedRow[field.key], field.key);
       if (issue) spellingIssues.push(`${field.label}: "${parsedRow[field.key]}" (${issue})`);
     }
 
@@ -631,7 +849,7 @@ const CsvUploader = ({ onUploadSuccess }) => {
             ];
             const spellingIssues = [];
             for (const field of myanmarFieldsToCheck) {
-              const issue = validateMyanmarText(parsedRow[field.key]);
+              const issue = validateMyanmarText(parsedRow[field.key], field.key);
               if (issue) {
                 spellingIssues.push(`${field.label}: "${parsedRow[field.key]}" (${issue})`);
               }

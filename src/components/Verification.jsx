@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { exportHouseholdExcel, printHouseholdPdf } from '../lib/householdPrint';
 import { Search, RotateCcw, AlertCircle, CheckCircle2, X, Loader2, Printer, FileSpreadsheet } from 'lucide-react';
 import EmptyState from './EmptyState';
+import TpsScrollWrapper from './layout/TpsScrollWrapper';
 
 // Convert Myanmar numerals to Arabic and calculate age from DOB string (format: day.month.year)
 const myanmarToArabic = (str) => {
@@ -427,7 +428,7 @@ const Verification = () => {
                 <h3 className="font-semibold text-gray-900 text-sm uppercase">Verification Successful: {results.length} Match(es) Found</h3>
               </div>
               
-              <div className="tps-responsive-table">
+              <TpsScrollWrapper>
                   <table className="w-full text-left border-collapse whitespace-nowrap text-xs">
                     <thead>
                       <tr className="bg-gray-50 border-b border-gray-200">
@@ -519,7 +520,7 @@ const Verification = () => {
                                         <span className="font-medium text-xs">Loading family members...</span>
                                       </div>
                                     ) : (
-                                      <div className="overflow-x-auto">
+                                      <TpsScrollWrapper>
                                         {familyMembers.length === 0 ? (
                                           <div className="text-center text-gray-500 py-8 text-xs">No family members found for this household.</div>
                                         ) : (
@@ -621,7 +622,7 @@ const Verification = () => {
                                             </div>
                                           </>
                                         )}
-                                      </div>
+                                      </TpsScrollWrapper>
                                     )}
                                   </div>
                                 </div>
@@ -632,7 +633,7 @@ const Verification = () => {
                       ))}
                     </tbody>
                   </table>
-                </div>
+                </TpsScrollWrapper>
               </div>
             )}
           </div>

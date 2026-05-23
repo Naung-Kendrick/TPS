@@ -151,6 +151,8 @@ Every page-level component is **lazy-loaded** using `React.lazy()` + `Suspense`,
 
 ### Layout System
 
+- **Responsive Alignment**: Unified sizing across all main modules (`CsvUploader`, `ExcelChecker`, `IDCardScanner`, `DemographicDashboard`, `HouseholdForm`, and `Verification` components use exactly `max-w-7xl xl:max-w-[1440px] mx-auto` and spacing `p-6 sm:p-8 xl:p-10`).
+- **Interactive Horizontal Scroll Wrapper** (`TpsScrollWrapper`): Wide tables in `Verification.jsx` and `Reports.jsx` automatically feature flanking overlay scroll buttons (chevrons) for smooth mouse-based horizontal scrolling without needing to drag touchpads or scrollbars.
 - **Desktop**: Sticky 240px sidebar with navigation + IDTL branding
 - **Mobile** (`< 768px`):
   - Fixed top branding bar (48px)
@@ -161,6 +163,7 @@ Every page-level component is **lazy-loaded** using `React.lazy()` + `Suspense`,
 ### Design System
 
 - **Monochrome government aesthetic**: `#1A1A1A` primary, `#737373` secondary, `#E5E7EB` borders
+- **Unified Button Styling**: Standardized primary and secondary buttons to uppercase, bold `12px` font style with exact `10px 24px` padding and sharp corners.
 - **No border-radius** — all elements use sharp 0px corners (official document style)
 - **Watermark**: IDTL logo displayed at 8% opacity in bottom-right corner
 - **Myanmar numerals** (၀-၉) used throughout statistics and date displays
@@ -353,26 +356,32 @@ Auto-save draft to localStorage (restored on page reload)
 ### 6. Central Database (`/central-database`)
 
 ```
-Level 1: All Districts (card grid)
-  → Click district
-Level 2: Townships in that district
-  → Click township
-Level 3: Wards/Villages/Groups in that township
-  → Click ward/village/group
-Level 4: Household Heads (table: name, HH no., gender, occupation)
-  → Click "View Family"
-Level 5: Full family roster (inline editable table)
-  → Edit any field inline
-  → Delete member (with confirmation modal)
-  → Print PDF / Export Excel / Export JSON
+Common Hierarchy:
+Level 1: All Districts (card grid) ──► Level 2: Townships (card grid) ──► Level 3: Wards & Groups selector
+
+Split Navigation Paths:
+A. Ward Path (Wards don't have villages, bypassing Level 5):
+   Level 3 ──► Level 4: Ward Household Heads list
+           ──► Level 6: Family Roster (inline editable table)
+
+B. Group Path (Groups contain villages):
+   Level 3 ──► Level 4: Group Villages list
+           ──► Level 5: Village Household Heads list
+           ──► Level 6: Family Roster (inline editable table)
+
+Features per Family Roster (Level 6):
+  - Edit any field inline
+  - Delete member (with confirmation modal)
+  - Print PDF / Export Excel / Export JSON
 ```
 
 **Special features:**
-- Breadcrumb navigation with clickable levels
-- Search filter at every level
-- Real-time subscription at Level 5 (live updates when another user adds/edits/deletes)
-- Offline cache with stale-while-revalidate pattern
-- Export All JSON (bulk export of all records at current filter level)
+- **Dynamic Backtracking Optimization**: Clicking the `◀ BACK` button on a Ward path at Level 6 automatically bypasses the empty Level 5 screen and jumps directly to Level 4 (Ward Household Heads). Group paths correctly step back L6 ──► L5 ──► L4.
+- **Breadcrumb Navigation**: Live breadcrumbs matching the selected administrative path with smart level jumps.
+- **Search filter** at every hierarchy level.
+- **Real-time subscription** at Level 6 (live updates when another officer adds/edits/deletes a family member).
+- **Offline cache** with stale-while-revalidate pattern.
+- **Export All JSON** (bulk export of all records at current filter level).
 
 ---
 
@@ -458,7 +467,8 @@ TPS/
 │   │   │   ├── Layout.jsx          # App shell (sidebar + main + watermark + swipe)
 │   │   │   ├── Sidebar.jsx         # Desktop sidebar + mobile bottom nav + drawer
 │   │   │   ├── Topbar.jsx          # Top bar component
-│   │   │   └── DashboardOverview.jsx # Dashboard overview component
+│   │   │   ├── DashboardOverview.jsx # Dashboard overview component
+│   │   │   └── TpsScrollWrapper.jsx # Scroll wrapper overlaying chevrons to scroll wide tables
 │   │   │
 │   │   ├── Verification.jsx        # Data verification search & results
 │   │   ├── CsvUploader.jsx         # CSV/JSON bulk upload with validation
@@ -466,7 +476,7 @@ TPS/
 │   │   ├── IDCardScanner.jsx       # QR camera scanner + manual ID lookup
 │   │   ├── PopulationStatistics.jsx # Statistics dashboard with charts & tables
 │   │   ├── HouseholdForm.jsx       # Manual household registration form
-│   │   ├── Reports.jsx             # Central database browser (5-level drill-down)
+│   │   ├── Reports.jsx             # Central database browser (6-level drill-down with dynamic backtracking)
 │   │   ├── HouseholdTable.jsx      # Reusable household table component
 │   │   ├── EditHouseholdModal.jsx   # Household editing modal
 │   │   ├── EmptyState.jsx          # Empty/error/offline state placeholder

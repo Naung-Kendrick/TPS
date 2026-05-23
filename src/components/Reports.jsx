@@ -4,6 +4,7 @@ import { cacheGet, cacheSet } from '../lib/offlineCache';
 import { SkeletonTable, SkeletonBar } from './Skeleton';
 import { ChevronRight, Search, Map as MapIcon, MapPin, Home, Users, User, ArrowLeft, Loader2, AlertCircle, Printer, FileSpreadsheet, Pencil, Trash2, Check, X, Download } from 'lucide-react';
 import EmptyState from './EmptyState';
+import TpsScrollWrapper from './layout/TpsScrollWrapper';
 import { exportHouseholdExcel, printHouseholdPdf } from '../lib/householdPrint';
 import { deepEnsureUnicode } from './CsvUploader';
 import { buildExportFilename } from '../lib/exportFilename';
@@ -292,7 +293,13 @@ const Reports = () => {
   };
 
   const goBack = () => {
-    if (level > 1) jumpToLevel(level - 1);
+    if (level > 1) {
+      if (level === 6 && path.locationType === 'ward') {
+        jumpToLevel(4);
+      } else {
+        jumpToLevel(level - 1);
+      }
+    }
   };
 
   // ── JSON EXPORT helpers ───────────────────────────────────────────────────────────
@@ -657,7 +664,7 @@ const Reports = () => {
             {level === 4 && (
               path.locationType === 'ward' ? (
                 // Ward path: show household heads — always table
-                <div className="overflow-x-auto">
+                <TpsScrollWrapper>
                   <table className="w-full text-left border-collapse">
                     <thead>
                       <tr>
@@ -691,7 +698,7 @@ const Reports = () => {
                       )}
                     </tbody>
                   </table>
-                </div>
+                </TpsScrollWrapper>
               ) : (
                 // Group path: show villages as cards
                 <div className="p-3 sm:p-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 xl:gap-4 bg-white min-h-[300px]">
@@ -720,7 +727,7 @@ const Reports = () => {
 
             {/* LEVEL 5: VILLAGE HOUSEHOLD HEADS (group path only) */}
             {level === 5 && path.locationType === 'group' && (
-              <div className="overflow-x-auto">
+              <TpsScrollWrapper>
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr>
@@ -754,7 +761,7 @@ const Reports = () => {
                     )}
                   </tbody>
                 </table>
-              </div>
+              </TpsScrollWrapper>
             )}
 
             {/* LEVEL 6: FAMILY MEMBERS TABLE (for both ward and group/village paths) */}
@@ -791,8 +798,7 @@ const Reports = () => {
                   .family-table-scroll::-webkit-scrollbar-thumb:hover { background: #9CA3AF; }
                   .family-table-scroll { scrollbar-width: auto; scrollbar-color: #C4C4C4 #F3F4F6; }
                 `}</style>
-                <div style={{ position: 'relative' }}>
-                  <div ref={tableScrollRef} className="family-table-scroll" style={{ overflowX: 'auto', scrollBehavior: 'smooth', paddingBottom: '4px' }}>
+                <TpsScrollWrapper>
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px', tableLayout: 'auto' }}>
                     <thead>
                       <tr style={{ backgroundColor: '#FAFAFA' }}>
@@ -866,8 +872,7 @@ const Reports = () => {
                       )}
                     </tbody>
                   </table>
-                  </div>{/* end ref scroll div */}
-                </div>{/* end relative wrapper */}
+                </TpsScrollWrapper>
 
                 {familyMembers.length > 0 && (
                   <div className="px-4 py-3 bg-white border-t border-gray-200 flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-end gap-2">

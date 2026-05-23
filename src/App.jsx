@@ -1,6 +1,7 @@
-import { Suspense, lazy, useState } from 'react'
+import { Suspense, lazy, useState, useEffect } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import Layout from './components/layout/Layout'
+import { supabase } from './lib/supabase'
 import './App.css'
 
 // Route-level code splitting — each page is a separate JS chunk
@@ -63,6 +64,15 @@ function App() {
   const handleLogin = (data) => {
     setUser(data);
   };
+
+  // Heartbeat: refresh last_seen_at every 2 minutes while logged in
+  useEffect(() => {
+    if (!user?.id) return;
+    const ping = () =>
+      supabase.from('profiles').update({ last_seen_at: new Date().toISOString() }).eq('id', user.id);
+    const timer = setInterval(ping, 2 * 60 * 1000);
+    return () => clearInterval(timer);
+  }, [user?.id]);
 
   const handleLogout = () => {
     setUser(null);

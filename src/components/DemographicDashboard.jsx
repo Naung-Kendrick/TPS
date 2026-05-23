@@ -105,7 +105,7 @@ const CircleStatChart = ({ data, colorsPalette = [] }) => {
   });
 
   return (
-    <div className="flex flex-col sm:flex-row items-center gap-6 xl:gap-8" style={{ width: '100%' }}>
+    <div className="flex flex-col sm:flex-row items-start gap-6 xl:gap-8" style={{ width: '100%' }}>
       {/* Donut Container */}
       <div style={{ position: 'relative', width: '136px', height: '136px', flexShrink: 0 }}>
         <svg width="136" height="136" viewBox="0 0 120 120" style={{ transform: 'rotate(-90deg)' }}>
@@ -362,6 +362,7 @@ const AGE_GROUPS = [
 ];
 
 const AgePyramid = ({ stats }) => {
+  const [hoveredRow, setHoveredRow] = useState(null);
   const total = stats.total || 1;
   const rows = AGE_GROUPS.map(g => ({
     ...g,
@@ -370,6 +371,8 @@ const AgePyramid = ({ stats }) => {
     t: (stats[g.mKey] || 0) + (stats[g.fKey] || 0),
   }));
   const maxSide = Math.max(...rows.map(r => Math.max(r.m, r.f)), 1);
+
+  const anyHovered = hoveredRow !== null;
 
   return (
     <div>
@@ -391,14 +394,30 @@ const AgePyramid = ({ stats }) => {
           const mPct  = (row.m / maxSide * 100).toFixed(1);
           const fPct  = (row.f / maxSide * 100).toFixed(1);
           const tPct  = (row.t / total * 100).toFixed(1);
+          const isHovered = hoveredRow === row.key;
+
           return (
-            <div key={row.key}>
+            <div
+              key={row.key}
+              style={{
+                cursor: 'pointer',
+                transition: 'opacity 0.25s cubic-bezier(0.25, 0.8, 0.25, 1), transform 0.25s cubic-bezier(0.25, 0.8, 0.25, 1), background-color 0.25s ease',
+                opacity: anyHovered && !isHovered ? 0.45 : 1,
+                transform: isHovered ? 'scale(1.008)' : 'scale(1)',
+                padding: '4px 6px',
+                margin: '0 -6px',
+                borderRadius: '4px',
+                backgroundColor: isHovered ? `${row.color}08` : 'transparent',
+              }}
+              onMouseEnter={() => setHoveredRow(row.key)}
+              onMouseLeave={() => setHoveredRow(null)}
+            >
               <div style={{ display: 'flex', alignItems: 'stretch', gap: '0', minHeight: '36px' }}>
 
                 {/* Male bar (grows LEFT) */}
                 <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '6px', paddingRight: '8px' }}>
-                  <span style={{ fontSize: '10px', color: '#737373', fontFamily: 'var(--font-mono)', flexShrink: 0 }}>{row.m.toLocaleString()}</span>
-                  <div style={{ width: `${mPct}%`, maxWidth: '100%', height: 'clamp(24px, 2.2vw, 36px)', backgroundColor: '#4A6572', transition: 'width 0.6s ease-out', flexShrink: 0 }} />
+                  <span style={{ fontSize: '10px', color: isHovered ? '#1A1A1A' : '#737373', fontFamily: 'var(--font-mono)', flexShrink: 0, fontWeight: isHovered ? '700' : 'normal', transition: 'color 0.2s, font-weight 0.2s' }}>{row.m.toLocaleString()}</span>
+                  <div style={{ width: `${mPct}%`, maxWidth: '100%', height: 'clamp(24px, 2.2vw, 36px)', backgroundColor: '#4A6572', transition: 'width 0.6s ease-out, filter 0.2s', filter: isHovered ? 'brightness(1.1)' : 'brightness(1)', flexShrink: 0 }} />
                 </div>
 
                 {/* Center: age label */}
@@ -406,22 +425,23 @@ const AgePyramid = ({ stats }) => {
                   width: 'clamp(72px, 7vw, 96px)', flexShrink: 0, textAlign: 'center', padding: '0 4px',
                   borderLeft: `3px solid ${row.color}`, borderRight: `3px solid ${row.color}`,
                   display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                  backgroundColor: `${row.color}12`,
+                  backgroundColor: isHovered ? `${row.color}22` : `${row.color}12`,
+                  transition: 'background-color 0.25s ease',
                 }}>
-                  <span style={{ fontSize: '12px', fontWeight: '700', color: row.color, lineHeight: 1 }}>{row.label}</span>
-                  <span style={{ fontSize: '9px', color: '#9CA3AF', lineHeight: 1.2, marginTop: '1px' }}>{row.labelEn}</span>
+                  <span style={{ fontSize: '12px', fontWeight: '700', color: row.color, lineHeight: 1, transform: isHovered ? 'scale(1.06)' : 'scale(1)', transition: 'transform 0.25s ease' }}>{row.label}</span>
+                  <span style={{ fontSize: '9px', color: isHovered ? '#1A1A1A' : '#9CA3AF', lineHeight: 1.2, marginTop: '1px', transition: 'color 0.25s ease' }}>{row.labelEn}</span>
                 </div>
 
                 {/* Female bar (grows RIGHT) */}
                 <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '6px', paddingLeft: '8px' }}>
-                  <div style={{ width: `${fPct}%`, maxWidth: '100%', height: 'clamp(24px, 2.2vw, 36px)', backgroundColor: '#A1887F', transition: 'width 0.6s ease-out', flexShrink: 0 }} />
-                  <span style={{ fontSize: '10px', color: '#737373', fontFamily: 'var(--font-mono)', flexShrink: 0 }}>{row.f.toLocaleString()}</span>
+                  <div style={{ width: `${fPct}%`, maxWidth: '100%', height: 'clamp(24px, 2.2vw, 36px)', backgroundColor: '#A1887F', transition: 'width 0.6s ease-out, filter 0.2s', filter: isHovered ? 'brightness(1.1)' : 'brightness(1)', flexShrink: 0 }} />
+                  <span style={{ fontSize: '10px', color: isHovered ? '#1A1A1A' : '#737373', fontFamily: 'var(--font-mono)', flexShrink: 0, fontWeight: isHovered ? '700' : 'normal', transition: 'color 0.2s, font-weight 0.2s' }}>{row.f.toLocaleString()}</span>
                 </div>
               </div>
 
               {/* Use-case annotation + total */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '2px', paddingLeft: 'calc(50% - 36px)', paddingBottom: '4px', borderBottom: '1px dashed #F3F4F6' }}>
-                <span style={{ fontSize: '9px', color: '#9CA3AF' }}>Total {row.t.toLocaleString()} ({tPct}%)</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '2px', paddingLeft: 'calc(50% - 36px)', paddingBottom: '4px', borderBottom: isHovered ? '1px dashed rgba(0,0,0,0.15)' : '1px dashed #F3F4F6', transition: 'border-bottom-color 0.2s' }}>
+                <span style={{ fontSize: '9px', color: isHovered ? '#1A1A1A' : '#9CA3AF', fontWeight: isHovered ? '600' : 'normal', transition: 'color 0.2s' }}>Total {row.t.toLocaleString()} ({tPct}%)</span>
               </div>
             </div>
           );

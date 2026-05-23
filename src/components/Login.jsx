@@ -54,7 +54,11 @@ const Login = ({ onLogin }) => {
         throw profileError;
       }
 
-      // 3. (TI Number verification removed)
+      // 3. Stamp last_seen_at so the user list shows accurate online status
+      await supabase
+        .from('profiles')
+        .update({ last_seen_at: new Date().toISOString() })
+        .eq('id', authData.user.id);
 
       // 4. Success - pass full user data including role to App
       onLogin?.({

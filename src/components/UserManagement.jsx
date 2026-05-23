@@ -184,7 +184,7 @@ const UserManagement = ({ user }) => {
 
   // ─────────────────────────────────────────────────────────────────────────
   return (
-    <div className="flex flex-col gap-8 p-6 sm:p-8 xl:p-10 max-w-5xl xl:max-w-6xl mx-auto">
+    <div className="flex flex-col gap-8 p-6 sm:p-8 xl:p-10 max-w-7xl xl:max-w-[1440px] mx-auto">
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div>

@@ -32,10 +32,10 @@ const PageFallback = () => (
 )
 
 const UploadPage = () => (
-  <div className="p-6 sm:p-8 xl:p-10 max-w-5xl xl:max-w-6xl 2xl:max-w-7xl mx-auto space-y-8">
+  <div className="flex flex-col gap-8 p-6 sm:p-8 xl:p-10 max-w-7xl xl:max-w-[1440px] mx-auto">
     <div>
       <h2 style={{ fontSize: '20px', margin: '0 0 8px 0', color: '#1A1A1A', fontWeight: '500', letterSpacing: '0.02em' }}>DATA UPLOAD</h2>
-      <p style={{ margin: '0 0 32px 0', color: '#737373', fontSize: '12px' }}>Bulk import household records from CSV, JSON, or Excel files.</p>
+      <p style={{ margin: 0, color: '#737373', fontSize: '12px' }}>Bulk import household records from CSV, JSON, or Excel files.</p>
     </div>
     <CsvUploader />
     <ExcelChecker />

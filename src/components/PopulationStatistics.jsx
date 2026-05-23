@@ -599,26 +599,26 @@ const PopulationStatistics = () => {
           <BarChart2 size={14} color={colors.black} /> AGE DISTRIBUTION
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4 xl:gap-5">
-          <div style={{ padding: '24px', border: `1px solid ${colors.oliveGreen}`, textAlign: 'center' }}>
+          <div style={{ padding: '24px', border: `1px solid ${colors.slateGray}`, textAlign: 'center' }}>
             <div style={{ fontSize: '10px', color: '#737373', fontWeight: '600', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Under 16</div>
             <div style={{ fontSize: '11px', color: '#737373', marginBottom: '12px' }}>အသက် ၁၆ နှစ်အောက်</div>
-            <div style={{ fontSize: '32px', fontWeight: '500', color: colors.oliveGreen, fontFamily: 'var(--font-mono)' }}>{toMyanmarNum(under16)}</div>
+            <div style={{ fontSize: '32px', fontWeight: '500', color: colors.slateGray, fontFamily: 'var(--font-mono)' }}>{toMyanmarNum(under16)}</div>
           </div>
-          <div style={{ padding: '24px', border: `1px solid ${colors.tealDusk}`, textAlign: 'center' }}>
+          <div style={{ padding: '24px', border: `1px solid ${colors.forestGreen}`, textAlign: 'center' }}>
             <div style={{ fontSize: '10px', color: '#737373', fontWeight: '600', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>16 – 60</div>
             <div style={{ fontSize: '11px', color: '#737373', marginBottom: '12px' }}>အသက် ၁၆ - ၆၀ နှစ်</div>
-            <div style={{ fontSize: '32px', fontWeight: '500', color: colors.tealDusk, fontFamily: 'var(--font-mono)' }}>{toMyanmarNum(between16and60)}</div>
+            <div style={{ fontSize: '32px', fontWeight: '500', color: colors.forestGreen, fontFamily: 'var(--font-mono)' }}>{toMyanmarNum(between16and60)}</div>
           </div>
-          <div style={{ padding: '24px', border: `1px solid ${colors.rustSienna}`, textAlign: 'center' }}>
+          <div style={{ padding: '24px', border: `1px solid ${colors.earthyBrown}`, textAlign: 'center' }}>
             <div style={{ fontSize: '10px', color: '#737373', fontWeight: '600', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Above 60</div>
             <div style={{ fontSize: '11px', color: '#737373', marginBottom: '12px' }}>အသက် ၆၀ နှစ်အထက်</div>
-            <div style={{ fontSize: '32px', fontWeight: '500', color: colors.rustSienna, fontFamily: 'var(--font-mono)' }}>{toMyanmarNum(above60)}</div>
+            <div style={{ fontSize: '32px', fontWeight: '500', color: colors.earthyBrown, fontFamily: 'var(--font-mono)' }}>{toMyanmarNum(above60)}</div>
           </div>
           {unknownAge > 0 && (
-            <div style={{ padding: '24px', border: `1px solid ${colors.stoneGray}`, textAlign: 'center' }}>
+            <div style={{ padding: '24px', border: `1px solid ${colors.mutedClay}`, textAlign: 'center' }}>
               <div style={{ fontSize: '10px', color: '#737373', fontWeight: '600', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Unknown</div>
               <div style={{ fontSize: '11px', color: '#737373', marginBottom: '12px' }}>အသက်မသိ</div>
-              <div style={{ fontSize: '32px', fontWeight: '400', color: colors.stoneGray, fontFamily: 'var(--font-mono)' }}>{toMyanmarNum(unknownAge)}</div>
+              <div style={{ fontSize: '32px', fontWeight: '400', color: colors.mutedClay, fontFamily: 'var(--font-mono)' }}>{toMyanmarNum(unknownAge)}</div>
             </div>
           )}
         </div>
@@ -702,13 +702,13 @@ const PopulationStatistics = () => {
             <td style={{ ...tdMonoS, fontWeight: '600', color: colors.forestGreen }}>{toMyanmarNum(w.total)}</td>
             <td style={tdMonoS}>{toMyanmarNum(w.u16m)}</td>
             <td style={tdMonoS}>{toMyanmarNum(w.u16f)}</td>
-            <td style={tdMonoS}>{toMyanmarNum(w.u16m + w.u16f)}</td>
+            <td style={{ ...tdMonoS, fontWeight: '600', color: colors.slateGray }}>{toMyanmarNum(w.u16m + w.u16f)}</td>
             <td style={tdMonoS}>{toMyanmarNum(w.b1660m)}</td>
             <td style={tdMonoS}>{toMyanmarNum(w.b1660f)}</td>
-            <td style={tdMonoS}>{toMyanmarNum(w.b1660m + w.b1660f)}</td>
+            <td style={{ ...tdMonoS, fontWeight: '600', color: colors.forestGreen }}>{toMyanmarNum(w.b1660m + w.b1660f)}</td>
             <td style={tdMonoS}>{toMyanmarNum(w.a60m)}</td>
             <td style={tdMonoS}>{toMyanmarNum(w.a60f)}</td>
-            <td style={tdMonoS}>{toMyanmarNum(w.a60m + w.a60f)}</td>
+            <td style={{ ...tdMonoS, fontWeight: '600', color: colors.earthyBrown }}>{toMyanmarNum(w.a60m + w.a60f)}</td>
             {allReligions.map(r => <td key={r} style={tdMonoS}>{w.relCounts[r] ? toMyanmarNum(w.relCounts[r]) : '-'}</td>)}
           </tr>
         );
@@ -819,13 +819,13 @@ const PopulationStatistics = () => {
                       <td style={{ ...tdBold, color: colors.forestGreen }}>{toMyanmarNum(totalStats.total)}</td>
                       <td style={tdBold}>{toMyanmarNum(totalStats.u16m)}</td>
                       <td style={tdBold}>{toMyanmarNum(totalStats.u16f)}</td>
-                      <td style={tdBold}>{toMyanmarNum(totalStats.u16m + totalStats.u16f)}</td>
+                      <td style={{ ...tdBold, color: colors.slateGray }}>{toMyanmarNum(totalStats.u16m + totalStats.u16f)}</td>
                       <td style={tdBold}>{toMyanmarNum(totalStats.b1660m)}</td>
                       <td style={tdBold}>{toMyanmarNum(totalStats.b1660f)}</td>
-                      <td style={tdBold}>{toMyanmarNum(totalStats.b1660m + totalStats.b1660f)}</td>
+                      <td style={{ ...tdBold, color: colors.forestGreen }}>{toMyanmarNum(totalStats.b1660m + totalStats.b1660f)}</td>
                       <td style={tdBold}>{toMyanmarNum(totalStats.a60m)}</td>
                       <td style={tdBold}>{toMyanmarNum(totalStats.a60f)}</td>
-                      <td style={tdBold}>{toMyanmarNum(totalStats.a60m + totalStats.a60f)}</td>
+                      <td style={{ ...tdBold, color: colors.earthyBrown }}>{toMyanmarNum(totalStats.a60m + totalStats.a60f)}</td>
                       {allReligions.map(r => <td key={r} style={tdBold}>{totalStats.relCounts[r] ? toMyanmarNum(totalStats.relCounts[r]) : '-'}</td>)}
                     </tr>
                   </tbody>
@@ -899,13 +899,13 @@ const PopulationStatistics = () => {
                         <td style={{ ...tdMonoS, fontWeight: '600', color: colors.forestGreen }}>{toMyanmarNum(w.total)}</td>
                         <td style={tdMonoS}>{toMyanmarNum(w.u16m)}</td>
                         <td style={tdMonoS}>{toMyanmarNum(w.u16f)}</td>
-                        <td style={tdMonoS}>{toMyanmarNum(w.u16m + w.u16f)}</td>
+                        <td style={{ ...tdMonoS, fontWeight: '600', color: colors.slateGray }}>{toMyanmarNum(w.u16m + w.u16f)}</td>
                         <td style={tdMonoS}>{toMyanmarNum(w.b1660m)}</td>
                         <td style={tdMonoS}>{toMyanmarNum(w.b1660f)}</td>
-                        <td style={tdMonoS}>{toMyanmarNum(w.b1660m + w.b1660f)}</td>
+                        <td style={{ ...tdMonoS, fontWeight: '600', color: colors.forestGreen }}>{toMyanmarNum(w.b1660m + w.b1660f)}</td>
                         <td style={tdMonoS}>{toMyanmarNum(w.a60m)}</td>
                         <td style={tdMonoS}>{toMyanmarNum(w.a60f)}</td>
-                        <td style={tdMonoS}>{toMyanmarNum(w.a60m + w.a60f)}</td>
+                        <td style={{ ...tdMonoS, fontWeight: '600', color: colors.earthyBrown }}>{toMyanmarNum(w.a60m + w.a60f)}</td>
                         {allReligions.map(r => <td key={r} style={tdMonoS}>{w.relCounts[r] ? toMyanmarNum(w.relCounts[r]) : '-'}</td>)}
                       </tr>
                     ))}
@@ -919,13 +919,13 @@ const PopulationStatistics = () => {
                       <td style={{ ...tdBold, color: colors.forestGreen }}>{toMyanmarNum(totalStats.total)}</td>
                       <td style={tdBold}>{toMyanmarNum(totalStats.u16m)}</td>
                       <td style={tdBold}>{toMyanmarNum(totalStats.u16f)}</td>
-                      <td style={tdBold}>{toMyanmarNum(totalStats.u16m + totalStats.u16f)}</td>
+                      <td style={{ ...tdBold, color: colors.slateGray }}>{toMyanmarNum(totalStats.u16m + totalStats.u16f)}</td>
                       <td style={tdBold}>{toMyanmarNum(totalStats.b1660m)}</td>
                       <td style={tdBold}>{toMyanmarNum(totalStats.b1660f)}</td>
-                      <td style={tdBold}>{toMyanmarNum(totalStats.b1660m + totalStats.b1660f)}</td>
+                      <td style={{ ...tdBold, color: colors.forestGreen }}>{toMyanmarNum(totalStats.b1660m + totalStats.b1660f)}</td>
                       <td style={tdBold}>{toMyanmarNum(totalStats.a60m)}</td>
                       <td style={tdBold}>{toMyanmarNum(totalStats.a60f)}</td>
-                      <td style={tdBold}>{toMyanmarNum(totalStats.a60m + totalStats.a60f)}</td>
+                      <td style={{ ...tdBold, color: colors.earthyBrown }}>{toMyanmarNum(totalStats.a60m + totalStats.a60f)}</td>
                       {allReligions.map(r => <td key={r} style={tdBold}>{totalStats.relCounts[r] ? toMyanmarNum(totalStats.relCounts[r]) : '-'}</td>)}
                     </tr>
                   </tbody>

@@ -89,8 +89,14 @@ body {
   background-image: url('./assets/theme-bg.svg');
   background-position: center center;
   background-repeat: no-repeat;
-  background-size: 100% auto;
+  background-size: cover;
   background-attachment: fixed;
+}
+
+@media (max-width: 767px) {
+  body {
+    background-position: 70% center; /* Shift horizontal focus on portrait viewports to center the halftone dots and waves */
+  }
 }
 
 #root {

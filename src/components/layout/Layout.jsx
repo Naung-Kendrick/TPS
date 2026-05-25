@@ -86,7 +86,7 @@ const Layout = ({ user, onLogout }) => {
   }, [location.pathname, navigate]);
 
   return (
-    <div style={{ display: 'flex', width: '100%', minHeight: '100vh', backgroundColor: '#FFFFFF' }}>
+    <div style={{ display: 'flex', width: '100%', minHeight: '100vh', backgroundColor: 'transparent' }}>
       <Sidebar user={user} onLogout={onLogout} />
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden', position: 'relative' }}>
         {/* Watermark — corner stamp seal */}

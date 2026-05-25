@@ -97,7 +97,7 @@ const TpsAuthenticator = ({ onPassed }) => {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: '#F3F4F6',
+      backgroundColor: 'transparent',
       padding: '16px',
     }}>
       <style>{`

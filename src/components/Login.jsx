@@ -92,7 +92,7 @@ const Login = ({ onLogin }) => {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: '#F3F4F6',
+      backgroundColor: 'transparent',
       padding: '1rem',
       fontFamily: 'Inter, system-ui, sans-serif'
     }}>

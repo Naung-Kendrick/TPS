@@ -457,6 +457,44 @@ const AgePyramid = ({ stats }) => {
         })}
       </div>
 
+      {/* Total Male / Female summary row */}
+      <div style={{
+        marginTop: '20px',
+        paddingTop: '16px',
+        borderTop: '2px solid #E5E7EB',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '40px'
+      }}>
+        {/* Total Male */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{ width: '36px', height: '12px', backgroundColor: '#4A6572' }} />
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: '10px', color: '#737373', fontWeight: '600' }}>ကျား စုစုပေါင်း</div>
+            <div style={{ fontSize: '10px', color: '#9CA3AF' }}>Total Male</div>
+            <div style={{ fontSize: '20px', fontWeight: '700', color: '#1A1A1A', fontFamily: 'var(--font-mono)' }}>
+              {stats.male?.toLocaleString() || 0}
+            </div>
+          </div>
+        </div>
+
+        {/* Divider */}
+        <div style={{ width: '1px', height: '50px', backgroundColor: '#E5E7EB' }} />
+
+        {/* Total Female */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: '10px', color: '#737373', fontWeight: '600' }}>မ စုစုပေါင်း</div>
+            <div style={{ fontSize: '10px', color: '#9CA3AF' }}>Total Female</div>
+            <div style={{ fontSize: '20px', fontWeight: '700', color: '#1A1A1A', fontFamily: 'var(--font-mono)' }}>
+              {stats.female?.toLocaleString() || 0}
+            </div>
+          </div>
+          <div style={{ width: '36px', height: '12px', backgroundColor: '#A1887F' }} />
+        </div>
+      </div>
+
       {/* X-axis scale hint */}
       <div style={{ marginTop: '12px', display: 'flex', justifyContent: 'center', gap: '4px', fontSize: '9px', color: '#C0C0C0' }}>
         <span>← ကျား</span>

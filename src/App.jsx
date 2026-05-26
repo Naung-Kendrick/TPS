@@ -6,7 +6,6 @@ import './App.css'
 
 // Route-level code splitting — each page is a separate JS chunk
 const CsvUploader        = lazy(() => import('./components/CsvUploader'))
-const ExcelChecker       = lazy(() => import('./components/ExcelChecker'))
 const Verification       = lazy(() => import('./components/Verification'))
 const Reports            = lazy(() => import('./components/Reports'))
 const PopulationStatistics  = lazy(() => import('./components/PopulationStatistics'))
@@ -35,10 +34,9 @@ const UploadPage = () => (
   <div className="flex flex-col gap-8 p-6 sm:p-8 xl:p-10 max-w-7xl xl:max-w-[1440px] mx-auto">
     <div>
       <h2 style={{ fontSize: '20px', margin: '0 0 8px 0', color: '#1A1A1A', fontWeight: '500', letterSpacing: '0.02em' }}>DATA UPLOAD</h2>
-      <p style={{ margin: 0, color: '#737373', fontSize: '12px' }}>Bulk import household records from CSV, JSON, or Excel files.</p>
+      <p style={{ margin: 0, color: '#737373', fontSize: '12px' }}>Bulk import household records from Excel, CSV, or JSON files.</p>
     </div>
     <CsvUploader />
-    <ExcelChecker />
   </div>
 )
 

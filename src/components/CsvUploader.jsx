@@ -1,9 +1,10 @@
 import React, { useState, useRef } from 'react';
 import Papa from 'papaparse';
+import * as XLSX from 'xlsx';
 import { supabase } from '../lib/supabase';
 import { zg2uni } from 'rabbit-node';
 import { pushNotification, NOTIF_TYPES } from '../lib/notifications';
-import { AlertCircle, X, CheckCircle2, Upload, FileSpreadsheet, Loader2, FileJson } from 'lucide-react';
+import { AlertCircle, X, CheckCircle2, Upload, FileSpreadsheet, Loader2, FileJson, Table } from 'lucide-react';
 
 // Basic Zawgyi detector regex
 const isZawgyi = (text) => {
@@ -22,6 +23,214 @@ const ensureUnicode = (text) => {
 };
 
 // ==========================================
+// WHITESPACE NORMALIZATION
+// Match the DB's stored format regardless of how the user typed it.
+//
+// Fixes the most common user mistakes:
+//   • Leading / trailing spaces           "  အောင်ထွန်း  "  →  "အောင်ထွန်း"
+//   • Multiple consecutive spaces         "ဦး   အောင်"      →  "ဦး အောင်"
+//   • Tabs and newlines pasted from Excel "ဦး\tအောင်"       →  "ဦး အောင်"
+//   • Non-breaking spaces (U+00A0)        produced by Word  →  regular space
+//   • Zero-width chars (U+200B, U+200C,
+//     U+200D, U+FEFF) accidentally
+//     pasted from Word/Browser            stripped silently
+//   • Myanmar comma (၊) treated as
+//     equivalent to "," for list fields
+// ==========================================
+const normalizeWhitespace = (text) => {
+  if (text === null || text === undefined) return '';
+  let s = String(text);
+
+  // Strip zero-width characters that look invisible but break equality checks
+  s = s.replace(/[\u200B-\u200D\uFEFF]/g, '');
+
+  // Convert non-breaking space (U+00A0) and other Unicode spaces to regular space
+  s = s.replace(/[\u00A0\u2000-\u200A\u202F\u205F\u3000]/g, ' ');
+
+  // Collapse all runs of whitespace (spaces, tabs, newlines) into a single space
+  s = s.replace(/\s+/g, ' ');
+
+  return s.trim();
+};
+
+// Normalize a comma-separated list (e.g. "ကောင်းတပ်ရွာ,အောင်ချမ်းသာအုပ်စု")
+// → split by "," or Myanmar comma "၊"
+// → trim each item
+// → rejoin with ", " (the DB-canonical separator)
+const normalizeCommaList = (text) => {
+  if (!text) return text;
+  const parts = String(text)
+    .split(/[,၊]/)
+    .map(p => normalizeWhitespace(p))
+    .filter(p => p !== '');
+  return parts.join(', ');
+};
+
+// ==========================================
+// ID NUMBER NORMALIZATION
+// ==========================================
+
+// Ta'ang Land ID — canonical form: "No-01001812000123456"
+//   • prefix "No-" (capital N, lowercase o, hyphen)
+//   • followed by digits, no spaces anywhere
+//
+// Fixes the most common user mistakes (separator and case):
+//   • "No - 01001812000123456"   (spaces around hyphen)     → "No-01001812000123456"
+//   • "No 01001812000123456"     (space, no hyphen)          → "No-01001812000123456"
+//   • "No.01001812000123456"     (dot)                       → "No-01001812000123456"
+//   • "No,01001812000123456"     (comma)                     → "No-01001812000123456"
+//   • "No;01001812000123456"     (semicolon)                 → "No-01001812000123456"
+//   • "No:01001812000123456"     (colon)                     → "No-01001812000123456"
+//   • "No/01001812000123456"     (slash)                     → "No-01001812000123456"
+//   • "No\01001812000123456"     (backslash)                 → "No-01001812000123456"
+//   • "No|01001812000123456"     (pipe)                      → "No-01001812000123456"
+//   • "No_01001812000123456"     (underscore)                → "No-01001812000123456"
+//   • "no-01001812000123456"     (lowercase prefix)          → "No-01001812000123456"
+//   • "NO-01001812000123456"     (uppercase prefix)          → "No-01001812000123456"
+//   • "No-01001 812000 123456"   (spaces inside number)      → "No-01001812000123456"
+//   • "No—01001812000123456"     (em-dash instead of hyphen) → "No-01001812000123456"
+//   • "01001812000123456"        (no prefix at all)          → "No-01001812000123456"
+const normalizeTaangLandId = (text) => {
+  if (text === null || text === undefined) return '';
+  let s = String(text);
+
+  // Strip zero-width / non-breaking / regular whitespace — canonical has none
+  s = s.replace(/[\u200B-\u200D\uFEFF\u00A0\s]/g, '');
+  if (s === '') return '';
+
+  // Normalize any em-dash / en-dash to plain hyphen
+  s = s.replace(/[–—]/g, '-');
+
+  // If it starts with "no" / "No" / "NO", absorb ANY combination of
+  // separator characters that follow (dash, dot, comma, semicolon, colon,
+  // slash, backslash, pipe, underscore, equals, hash, tilde) and replace
+  // the whole prefix block with the canonical "No-".
+  if (/^[Nn][Oo]/.test(s)) {
+    s = s.replace(/^[Nn][Oo][-.,;:|\\/_=#~]*/, 'No-');
+  } else if (/^\d/.test(s)) {
+    // Bare number with no prefix → add canonical prefix
+    s = 'No-' + s;
+  }
+
+  return s;
+};
+
+// Previous ID (Myanmar NRC) — canonical form: "၁၃/နခန(နိုင်)၀၉၆၉၁၅"
+//   • region "/" township "(" type ")" serial
+//   • no spaces around the structural separators
+//
+// Fixes the most common user mistakes:
+//   • "13 / နခန (နိုင်) 096915"  (spaces around / ( ))     → "13/နခန(နိုင်)096915"
+//   • "13/ နခန ( နိုင် ) 096915"  (asymmetric spaces)       → "13/နခန(နိုင်)096915"
+//   • "  13/နခန(နိုင်)096915  "  (leading/trailing space)  → "13/နခန(နိုင်)096915"
+//
+// Conservative — does NOT strip spaces inside the township/type segments
+// because some legitimate codes might contain spaces.
+const normalizePreviousId = (text) => {
+  if (text === null || text === undefined) return '';
+  let s = String(text);
+
+  // Strip zero-width chars and convert NBSP to regular space
+  s = s.replace(/[\u200B-\u200D\uFEFF]/g, '');
+  s = s.replace(/[\u00A0\u2000-\u200A\u202F\u205F\u3000]/g, ' ');
+
+  // Remove whitespace immediately around the structural separators
+  s = s.replace(/\s*\/\s*/g, '/');
+  s = s.replace(/\s*\(\s*/g, '(');
+  s = s.replace(/\s*\)\s*/g, ')');
+
+  // Collapse any remaining whitespace runs and trim
+  s = s.replace(/\s+/g, ' ').trim();
+
+  return s;
+};
+
+// ==========================================
+// DATE OF BIRTH NORMALIZATION + VALIDATION
+// ==========================================
+
+// Convert Myanmar digits (၀-၉) to Arabic digits (0-9) for parsing.
+const myanmarToArabicDigits = (text) => {
+  if (!text) return text;
+  return String(text).replace(/[၀-၉]/g, ch => String('၀၁၂၃၄၅၆၇၈၉'.indexOf(ch)));
+};
+
+// Convert Arabic digits (0-9) to Myanmar digits (၀-၉).
+const arabicToMyanmarDigits = (text) => {
+  if (!text) return text;
+  return String(text).replace(/[0-9]/g, ch => '၀၁၂၃၄၅၆၇၈၉'[parseInt(ch, 10)]);
+};
+
+// Auto-correct common separator mistakes:
+//   "15-06-1985"  →  "15.06.1985"
+//   "15/06/1985"  →  "15.06.1985"
+//   "15 . 06 . 1985"  →  "15.06.1985"
+//   "1.6.1985"  →  "01.06.1985"  (zero-pad day & month)
+// Returns the canonicalised string, or empty string if input is empty.
+const normalizeDateOfBirth = (text) => {
+  if (text === null || text === undefined) return '';
+  let s = String(text).trim();
+  if (s === '') return '';
+
+  // Strip zero-width / NBSP and normalise whitespace
+  s = s.replace(/[\u200B-\u200D\uFEFF]/g, '');
+  s = s.replace(/[\u00A0\u2000-\u200A\u202F\u205F\u3000]/g, ' ');
+  s = s.replace(/\s+/g, '');
+
+  // Convert any separator (-, /, space) to "." for canonical form
+  s = s.replace(/[-\/]/g, '.');
+
+  // If exactly 3 numeric parts, zero-pad day and month to 2 digits each.
+  // Year is left as-is (rejected later if not 4 digits).
+  const parts = s.split('.');
+  if (parts.length === 3 && parts.every(p => /^\d+$/.test(myanmarToArabicDigits(p)))) {
+    const [d, m, y] = parts;
+    const padArabic = (v) => {
+      const arabic = myanmarToArabicDigits(v);
+      return arabic.length === 1 ? '0' + arabic : arabic;
+    };
+    // Format to standard English date first, then map everything to Myanmar digits
+    const englishDob = `${padArabic(d)}.${padArabic(m)}.${myanmarToArabicDigits(y)}`;
+    return arabicToMyanmarDigits(englishDob);
+  }
+
+  return arabicToMyanmarDigits(s);
+};
+
+// Strict validator. Returns an error string if invalid, or null if valid.
+const validateDateOfBirth = (text) => {
+  if (text === null || text === undefined) return 'မွေးသက္ကရာဇ် ဖြည့်စွက်ရန် လိုအပ်ပါသည် (Date of Birth is required, format: dd.mm.yyyy)';
+  const raw = String(text).trim();
+  if (raw === '' || raw === '-') return 'မွေးသက္ကရာဇ် ဖြည့်စွက်ရန် လိုအပ်ပါသည် (Date of Birth is required, format: dd.mm.yyyy)';
+
+  // Convert Myanmar digits to Arabic digits so that the English regex match works!
+  const s = myanmarToArabicDigits(raw);
+
+  // Must match dd.mm.yyyy exactly (after normalisation)
+  const match = s.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
+  if (!match) {
+    return `မွေးသက္ကရာဇ် "${text}" ပုံစံမမှန်ပါ။ စံပုံစံ - dd.mm.yyyy ဖြစ်ရမည် ဥပမာ - ၁၅.၀၆.၁၉၈၅ (Date of Birth "${text}" is incomplete or wrong format. Required: dd.mm.yyyy)`;
+  }
+
+  const day   = parseInt(match[1], 10);
+  const month = parseInt(match[2], 10);
+  const year  = parseInt(match[3], 10);
+  const currentYear = new Date().getFullYear();
+
+  if (month < 1 || month > 12) return `မွေးသက္ကရာဇ် "${text}" တွင် လအမှားဖြစ်နေသည် (Month must be 01-12)`;
+  if (day   < 1 || day   > 31) return `မွေးသက္ကရာဇ် "${text}" တွင် ရက်အမှားဖြစ်နေသည် (Day must be 01-31)`;
+  if (year  < 1900 || year > currentYear) {
+    return `မွေးသက္ကရာဇ် "${text}" တွင် ခုနှစ်အမှားဖြစ်နေသည် (Year must be 1900-${currentYear})`;
+  }
+
+  // Check calendar dates
+  const dt = new Date(year, month - 1, day);
+  if (dt.getFullYear() !== year || dt.getMonth() !== month - 1 || dt.getDate() !== day) {
+    return `မွေးသက္ကရာဇ် "${text}" သည် ပြက္ခဒိန်အရ မှန်ကန်သောရက်စွဲမဟုတ်ပါ (Not a real calendar date)`;
+  }
+
+  return null;
+};
 // MYANMAR UNICODE DICTIONARIES & HELPER CONSTANTS
 // ==========================================
 
@@ -52,26 +261,102 @@ const DICTS = {
     'ပြည်နယ်ခြားသား' // Out-of-state resident
   ],
   relationships: [
-    'ဦးစီး', // Head
-    'ဇနီး', // Wife
-    'ခင်ပွန်း', // Husband
-    'သား', // Son
-    'သမီး', // Daughter
-    'အဖေ', // Father
-    'အမေ', // Mother
-    'ညီ', // Younger brother
-    'မောင်', // Brother
-    'မမ', // Older sister
-    'ညီမ', // Younger sister
-    'အစ်ကို', // Older brother
-    'အစ်မ', // Older sister
-    'ဖိုးဖိုး', // Grandfather
-    'ဖွားဖွား', // Grandmother
-    'မြေး', // Grandchild
-    'တူ', // Nephew
-    'တူမ', // Niece
-    'ဦးလေး', // Uncle
-    'ဒေါ်လေး' // Aunt
+    // ── Head / Spouse ──
+    'ဦးစီး',           // Head of household
+    'အိမ်ထောင်ဦးစီး',  // Head of household (formal)
+    'ဇနီး',            // Wife
+    'ခင်ပွန်း',         // Husband
+    'ခင်ပွန်းသည်',     // Husband (formal)
+    'ဇနီးမယား',         // Wife (formal)
+    // ── Parents ──
+    'အဖေ',             // Father
+    'အမေ',             // Mother
+    'ဖခင်',             // Father (formal)
+    'မိခင်',             // Mother (formal)
+    'ခမည်း',            // Father (formal/elderly)
+    'မယ်တော်',          // Mother (formal)
+    // ── Children ──
+    'သား',              // Son
+    'သမီး',             // Daughter
+    'သားကြီး',         // Eldest son
+    'သားလတ်',          // Middle son
+    'သားငယ်',          // Youngest son
+    'သမီးကြီး',         // Eldest daughter
+    'သမီးလတ်',          // Middle daughter
+    'သမီးငယ်',         // Youngest daughter
+    'သားမက်',          // Son-in-law
+    'ချွေးမ',            // Daughter-in-law
+    // ── Siblings ──
+    'ညီ',              // Younger brother
+    'မောင်',           // Brother
+    'မောင်လေး',        // Younger brother
+    'အစ်ကို',          // Older brother
+    'အကို',            // Older brother (variant)
+    'မမ',              // Older sister
+    'အစ်မ',            // Older sister
+    'ညီမ',             // Younger sister
+    'နှမ',             // Sister
+    // ── Grandparents ──
+    'ဖိုးဖိုး',          // Grandfather
+    'ဖွားဖွား',         // Grandmother
+    'အဘိုး',            // Grandfather (formal)
+    'အဘွား',            // Grandmother (formal)
+    // ── Grandchildren ──
+    'မြေး',             // Grandchild
+    'မြေးယောက်ျား',    // Grandson
+    'မြေးမိန်းမ',       // Granddaughter
+    'မြစ်',             // Great-grandchild
+    // ── Aunts / Uncles ──
+    'ဦးလေး',           // Uncle
+    'ဒေါ်လေး',          // Aunt
+    'ဦးကြီး',           // Older uncle
+    'ဒေါ်ကြီး',         // Older aunt
+    'ဘကြီး',            // Uncle (father's older brother)
+    'အရီး',             // Aunt
+    // ── Nieces / Nephews / Cousins ──
+    'တူ',               // Nephew
+    'တူမ',              // Niece
+    'ဝမ်းကွဲ',          // Cousin
+    'ဝမ်းကွဲမောင်နှမ', // Cousin (formal)
+    // ── In-laws ──
+    'ယောက္ခမ',          // Parent-in-law
+    'ယောက္ခမယောကျ်ား', // Father-in-law
+    'ယောက္ခမမိန်းမ',   // Mother-in-law
+    'ခဲအို',             // Brother-in-law / sister-in-law
+    'ခယ်မ',             // Sister-in-law (wife's younger sister)
+    // ── Step / Other ──
+    'ထွေးအဖ',           // Stepfather
+    'ထွေးအမ',           // Stepmother
+    'မယားသား',          // Stepson (wife's son from previous marriage)
+    'မယားပါသား',         // Stepson (variant spelling)
+    'မယားသမီး',         // Stepdaughter (wife's daughter from previous marriage)
+    'ခင်ပွန်းသား',       // Stepson (husband's son from previous marriage)
+    'ခင်ပွန်းသမီး',      // Stepdaughter (husband's daughter from previous marriage)
+    'ဆွေမျိုး',         // Relative
+    'အိမ်ဖော်',         // Helper / domestic
+    'ဧည့်သည်',          // Guest
+    // ── Extended / Rare ──
+    'မရီး',             // Aunt (mother's sister)
+    'ယောက်ဖ',           // Brother-in-law (older sister's husband)
+    'ယောက်ဖလေး',        // Younger brother-in-law (younger sister's husband)
+    'ခေါင်းမ',           // Sister-in-law (husband's sister)
+    'သမီးတော်',          // Niece (brother's daughter)
+    'သားတော်',           // Nephew (brother's son)
+    'အရီးမ',             // Aunt (father's younger sister)
+    'အရီးကြီး',          // Aunt (father's older sister)
+    'ဘကြီးလေး',          // Uncle (father's younger brother)
+    'ဘ',                 // Uncle (general)
+    'မြေးသား',           // Grandson (formal)
+    'မြေးသမီး',          // Granddaughter (formal)
+    'မြစ်ယောက်ျား',     // Great-grandson
+    'မြစ်မိန်းမ',        // Great-granddaughter
+    'မြေးချွေးမ',        // Granddaughter-in-law
+    'မြေးသားမက်',        // Grandson-in-law
+    'တူသား',             // Nephew (formal)
+    'တူသမီး',            // Niece (formal)
+    'ဝမ်းကြ',             // Second cousin
+    'ဆွေကြီး',            // Elder relative
+    'ဆွေငယ်',             // Younger relative
   ],
   nameSyllables: [
     'မောင်', 'အောင်', 'လှ', 'ထွန်း', 'ဦး', 'ဒေါ်', 'နန်း', 'စိုင်း', 'စိုး', 'မင်း', 'ကျော်', 'ဇော်', 
@@ -204,6 +489,27 @@ const validateMyanmarText = (text, fieldKey = null) => {
   const hasMyanmarChars = /[\u1000-\u109F]/.test(str);
   if (!hasMyanmarChars) return null;
 
+  // ── NAME FIELDS: LIGHTWEIGHT VALIDATION ──
+  // Skip heavy dictionary/orthography checks (too many false positives),
+  // BUT catch critical data quality issues:
+  //   1. Latin characters mixed with Myanmar (paste mistakes)
+  //   2. Duplicate ေ (e-vowel) in a single syllable — catches garbled
+  //      input like "လှေးအီရှှဌေေး" while allowing valid "လေးအလေး"
+  if (fieldKey === 'name' || fieldKey === 'fathers_name' || fieldKey === 'mothers_name') {
+    if (/[\u1000-\u109F]/.test(str) && /[a-zA-Z]/.test(str)) {
+      return 'Latin characters mixed with Myanmar';
+    }
+    // Check for duplicate ေ in any single syllable (garbled text indicator)
+    const syllablesCheck = segmentSyllables(str);
+    for (const syl of syllablesCheck) {
+      const eCount = (syl.match(/\u1031/g) || []).length;
+      if (eCount > 1) {
+        return `Syllable "${syl}" has duplicate ေ (${eCount} times) — check your input`;
+      }
+    }
+    return null;
+  }
+
   const issues = [];
 
   // 1. Basic structural checks
@@ -212,7 +518,18 @@ const validateMyanmarText = (text, fieldKey = null) => {
   if (/(\u1039)\1/.test(str)) issues.push('Duplicate virama');
   if (/(\u1037)\1+/.test(str)) issues.push('Repeated dot below (့)');
   if (/(\u1038)\1+/.test(str)) issues.push('Repeated visarga (း)');
+  // Multiple ေ (e-vowel) check: catches ေ‌ေ with or without other chars between
+  // This is a critical data quality check — prevents garbled input like "လှေးအီရှှဌေေး"
   if (/\u1031[^\u1000-\u102A\u1040-\u1049]*\u1031/.test(str)) issues.push('Multiple ေ in sequence');
+  // Additional strict check: two ေ in same syllable (consecutive or with zero-width chars)
+  const syllablesForECheck = segmentSyllables(str);
+  for (const syl of syllablesForECheck) {
+    const eCount = (syl.match(/\u1031/g) || []).length;
+    if (eCount > 1) {
+      issues.push(`Syllable "${syl}" has duplicate ေ (${eCount} times)`);
+      break; // Only report once per string
+    }
+  }
   if (/\u1039[^\u1000-\u102A]/.test(str)) issues.push('Invalid stacking (္ not followed by consonant)');
   if (/\u1039$/.test(str)) issues.push('Stacking mark at end of text');
 
@@ -235,14 +552,14 @@ const validateMyanmarText = (text, fieldKey = null) => {
       }
     }
     else if (fieldKey === 'household_relationship') {
+      // Match the soft pattern used by Nationality / Religion: only flag if
+      // the value LOOKS like a typo (close spelling match in dictionary).
+      // Unknown-but-legitimate relationships (e.g. uncommon kinship terms)
+      // pass through without blocking the upload.
       const matched = DICTS.relationships.some(r => r === str);
       if (!matched) {
         const sugg = getSpellingSuggestion(str, DICTS.relationships);
-        if (sugg) {
-          issues.push(`Did you mean "${sugg}"?`);
-        } else {
-          issues.push(`Relationship is unusual`);
-        }
+        if (sugg) issues.push(`Did you mean "${sugg}"?`);
       }
     }
     else if (fieldKey === 'nationality') {
@@ -260,16 +577,20 @@ const validateMyanmarText = (text, fieldKey = null) => {
       }
     }
     else if (fieldKey === 'township') {
-      const matched = DICTS.townships.some(t => t === str);
-      if (!matched) {
-        const sugg = getSpellingSuggestion(str, DICTS.townships);
+      // Optional dictionary lookup — skip silently if no township list is defined.
+      // Suffix correctness is already enforced separately by the " မြို့နယ်" check.
+      const dict = DICTS.townships;
+      if (Array.isArray(dict) && dict.length > 0 && !dict.some(t => t === str)) {
+        const sugg = getSpellingSuggestion(str, dict);
         if (sugg) issues.push(`Did you mean "${sugg}"?`);
       }
     }
     else if (fieldKey === 'district') {
-      const matched = DICTS.districts.some(d => d === str);
-      if (!matched) {
-        const sugg = getSpellingSuggestion(str, DICTS.districts);
+      // Optional dictionary lookup — skip silently if no district list is defined.
+      // Suffix correctness is already enforced separately by the " ခရိုင်" check.
+      const dict = DICTS.districts;
+      if (Array.isArray(dict) && dict.length > 0 && !dict.some(d => d === str)) {
+        const sugg = getSpellingSuggestion(str, dict);
         if (sugg) issues.push(`Did you mean "${sugg}"?`);
       }
     }
@@ -368,6 +689,61 @@ const formatHouseholdNo = (value) => {
   v = v.replace(/-/g, ' - ');
   v = v.replace(/  +/g, ' ').trim();
   return v;
+};
+
+// Strict validation for Household No.
+// Returns error string if invalid, null if valid.
+// Rules:
+//   • Cannot be blank/empty
+//   • Cannot be "UNKNOWN" or "UNKNOWN-1" (system fallback only)
+//   • Should not use separators other than hyphen (-)
+//   • Must follow standard "Name - Number" or "Name-Number" format (e.g., ကောင်းတပ်-၁)
+const validateHouseholdNo = (value) => {
+  if (!value || typeof value !== 'string') {
+    return 'Household No. is required';
+  }
+  const str = value.trim();
+  if (str === '') {
+    return 'Household No. is required';
+  }
+  if (str === 'UNKNOWN' || str === 'UNKNOWN-1') {
+    return 'Household No. cannot be "UNKNOWN"';
+  }
+  if (/[/.,၊၊]/.test(str)) {
+    return 'Separators like /, ., or , are not allowed. Use hyphen (-) only';
+  }
+  const hhNoRegex = /^[a-zA-Z\u1000-\u109F\s]+(?:\s*[-–—]\s*)[0-9၀-၉]+$/;
+  if (!hhNoRegex.test(str)) {
+    return 'Invalid format — must follow "Name-Number" or "Name - Number" (e.g., ကောင်းတပ်-၁)';
+  }
+  return null;
+};
+
+// Strict validation for Ta'ang Land ID No. format (between 4 and 19 digits)
+const validateTaangLandId = (value) => {
+  if (!value || typeof value !== 'string' || value.trim() === '') return null; // Optional
+  
+  const str = value.trim();
+  let normalized = str.replace(/[\u200B-\u200D\uFEFF\u00A0\s]/g, '').replace(/[–—]/g, '-');
+  let numericPart = '';
+  if (/^[Nn][Oo]/.test(normalized)) {
+    numericPart = normalized.replace(/^[Nn][Oo][-.,;:|\\/_=#~]*/, '');
+  } else {
+    numericPart = normalized;
+  }
+  
+  if (!/^[0-9၀-၉]+$/.test(numericPart)) {
+    return "Ta'ang Land ID No. must contain digits only";
+  }
+  
+  const len = numericPart.length;
+  if (len <= 3) {
+    return "Ta'ang Land ID No. must have more than 3 digits";
+  }
+  if (len >= 20) {
+    return "Ta'ang Land ID No. must have less than 20 digits";
+  }
+  return null;
 };
 
 // Detect Ward/Village/Group type from value
@@ -480,7 +856,7 @@ const validateHouseholdIDRequirements = (data) => {
 };
 
 // Shared: run validation + Supabase upsert for a flat array of parsed rows
-const processAndUpload = async (formattedData, setValidationErrors, setShowModal, setLoading, setSuccessMsg, onUploadSuccess, fileInputRef) => {
+const processAndUpload = async (formattedData, setValidationErrors, setShowModal, setLoading, setSuccessMsg, onUploadSuccess, fileInputRef, setProgress) => {
   const errorsFound = [];
   
   // Check household-level ID requirements first
@@ -545,6 +921,18 @@ const processAndUpload = async (formattedData, setValidationErrors, setShowModal
       spellingIssues.push(`Ward/Village/Group: ${wardVillageError}`);
     }
 
+    // Date of Birth must be a complete dd.mm.yyyy
+    const dobError = validateDateOfBirth(parsedRow.date_of_birth);
+    if (dobError) {
+      spellingIssues.push(dobError);
+    }
+
+    // Household No. must be valid (not UNKNOWN, not empty, proper format)
+    const hnError = validateHouseholdNo(parsedRow.household_no);
+    if (hnError) {
+      spellingIssues.push(hnError);
+    }
+
     // District must end with " ခရိုင်"
     if (parsedRow.district && !parsedRow.district.endsWith(' ခရိုင်')) {
       spellingIssues.push(`ခရိုင် (District): "${parsedRow.district}" — " ခရိုင်" ဟူသောစကားလုံးဖြင့် အဆုံးသတ်ရမည်။ ဥပမာ — "မန်တုံ ခရိုင်"`);
@@ -553,6 +941,12 @@ const processAndUpload = async (formattedData, setValidationErrors, setShowModal
     // Township must end with " မြို့နယ်"
     if (parsedRow.township && !parsedRow.township.endsWith(' မြို့နယ်')) {
       spellingIssues.push(`မြို့နယ် (Township): "${parsedRow.township}" — " မြို့နယ်" ဟူသောစကားလုံးဖြင့် အဆုံးသတ်ရမည်။ ဥပမာ — "နမ္မတူ မြို့နယ်"`);
+    }
+
+    // Ta'ang Land ID No. must be valid format and length (more than 3 and less than 20 digits)
+    const tlidError = validateTaangLandId(parsedRow.taang_land_id_no);
+    if (tlidError) {
+      spellingIssues.push(`Ta'ang Land ID No.: ${tlidError}`);
     }
 
     if (missingFields.length > 0 || spellingIssues.length > 0) {
@@ -592,22 +986,50 @@ const processAndUpload = async (formattedData, setValidationErrors, setShowModal
     processedData.map(r => r.household_no || '').filter(Boolean)
   )];
 
-  // 2. Fetch existing rows from DB in chunks (Postgres IN() handles ~1000 items fine,
-  //    but chunk to 500 to keep URL length safe)
+  // Progress: duplicate check phase
+  if (setProgress) {
+    setProgress({ current: 0, total: uniqueHouseholdNos.length, stage: 'Checking for duplicates...' });
+  }
+
+  // 2. Fetch existing rows from DB in chunks
+  // OPTIMIZATION: Reduced chunk size to 25, added logging & timeout protection
   const existingFingerprints = new Set();
-  const SELECT_CHUNK = 500;
+  const SELECT_CHUNK = 25;
+  console.log(`[processAndUpload] Starting duplicate check for ${uniqueHouseholdNos.length} unique households...`);
+
   for (let i = 0; i < uniqueHouseholdNos.length; i += SELECT_CHUNK) {
     const slice = uniqueHouseholdNos.slice(i, i + SELECT_CHUNK);
+    const startTime = Date.now();
+
+    console.log(`[processAndUpload] Querying households ${i+1}-${Math.min(i+SELECT_CHUNK, uniqueHouseholdNos.length)} of ${uniqueHouseholdNos.length}...`);
+
     const { data: existingRows, error: selErr } = await supabase
       .from('households')
       .select(DUP_FIELDS.join(','))
       .in('household_no', slice);
+
+    const duration = Date.now() - startTime;
+    console.log(`[processAndUpload] Query completed in ${duration}ms, found ${existingRows?.length || 0} existing rows`);
+
     if (selErr) {
+      console.error(`[processAndUpload] Duplicate check query failed:`, selErr);
       dbErrors.push(`Duplicate check failed: ${selErr.message}`);
       continue;
     }
     (existingRows || []).forEach(r => existingFingerprints.add(fingerprint(r)));
+
+    // Update progress during duplicate check
+    if (setProgress) {
+      const checked = Math.min(i + SELECT_CHUNK, uniqueHouseholdNos.length);
+      setProgress({ current: checked, total: uniqueHouseholdNos.length, stage: `Checking duplicates... ${checked}/${uniqueHouseholdNos.length} households` });
+    }
+
+    // Small delay between queries to prevent overwhelming the DB
+    if (i + SELECT_CHUNK < uniqueHouseholdNos.length) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
   }
+  console.log(`[processAndUpload] Duplicate check complete. ${existingFingerprints.size} unique fingerprints found.`);
 
   // 3. Partition: new rows go to insert queue, duplicates are counted
   const rowsToInsert = [];
@@ -628,6 +1050,16 @@ const processAndUpload = async (formattedData, setValidationErrors, setShowModal
   const INSERT_BATCH = 200;
   for (let i = 0; i < rowsToInsert.length; i += INSERT_BATCH) {
     const batch = rowsToInsert.slice(i, i + INSERT_BATCH);
+
+    // Update progress for upload phase
+    if (setProgress) {
+      setProgress({
+        current: Math.min(i + INSERT_BATCH, rowsToInsert.length),
+        total: rowsToInsert.length,
+        stage: `Uploading to database... ${Math.min(i + INSERT_BATCH, rowsToInsert.length)}/${rowsToInsert.length}`
+      });
+    }
+
     const { error: batchErr } = await supabase.from('households').insert(batch);
     if (!batchErr) {
       successCount += batch.length;
@@ -665,6 +1097,7 @@ const processAndUpload = async (formattedData, setValidationErrors, setShowModal
 
 const CsvUploader = ({ onUploadSuccess }) => {
   const [loading, setLoading] = useState(false);
+  const [progress, setProgress] = useState({ current: 0, total: 0, stage: '' });
   const [successMsg, setSuccessMsg] = useState(null);
   const [validationErrors, setValidationErrors] = useState([]); // Modal state
   const [showModal, setShowModal] = useState(false);
@@ -683,6 +1116,9 @@ const CsvUploader = ({ onUploadSuccess }) => {
         const parsed = deepEnsureUnicode(rawParsed);
         const households = Array.isArray(parsed) ? parsed : [parsed];
 
+        // Helper: normalize whitespace + ensure Unicode in one step.
+        const norm = (v) => normalizeWhitespace(ensureUnicode(v || ''));
+
         const formattedData = [];
         for (const hh of households) {
           const hhId = hh.household_id || hh.household_no || 'UNKNOWN';
@@ -690,25 +1126,25 @@ const CsvUploader = ({ onUploadSuccess }) => {
           const members = Array.isArray(hh.members) ? hh.members : [];
           for (const m of members) {
             formattedData.push({
-              household_no: formatHouseholdNo(ensureUnicode(String(hhId).trim())),
-              name: ensureUnicode(m.name || ''),
-              date_of_birth: m.dob || m.date_of_birth || '',
-              gender: ensureUnicode(m.gender || ''),
-              fathers_name: ensureUnicode(m.fathers_name || ''),
-              mothers_name: ensureUnicode(m.mothers_name || ''),
-              household_relationship: ensureUnicode(m.relationship || m.household_relationship || ''),
-              occupation: ensureUnicode(m.occupation || ''),
-              previous_id_no: ensureUnicode(m.previous_id_no || ''),
-              taang_land_id_no: ensureUnicode(m.taang_land_id_no || ''),
-              nationality: ensureUnicode(m.nationality || ''),
-              resident_status: ensureUnicode(m.resident_status || ''),
-              religious: ensureUnicode(m.religious || ''),
-              house_no: ensureUnicode(loc.house_no || m.house_no || ''),
-              ward_village_group: ensureUnicode(loc.ward_village || loc.ward_village_group || m.ward_village_group || ''),
-              township: autoCorrectTownship(ensureUnicode(loc.township || m.township || '')),
-              district: autoCorrectDistrict(ensureUnicode(loc.district || m.district || '')),
-              submission_date: m.submission_date || '',
-              address: ensureUnicode(`${loc.house_no || ''}, ${loc.ward_village || ''}, ${loc.township || ''}, ${loc.district || ''}`),
+              household_no: formatHouseholdNo(norm(hhId)),
+              name: norm(m.name),
+              date_of_birth: normalizeDateOfBirth(m.dob || m.date_of_birth),
+              gender: norm(m.gender),
+              fathers_name: norm(m.fathers_name),
+              mothers_name: norm(m.mothers_name),
+              household_relationship: norm(m.relationship || m.household_relationship),
+              occupation: norm(m.occupation),
+              previous_id_no: normalizePreviousId(ensureUnicode(m.previous_id_no || '')),
+              taang_land_id_no: normalizeTaangLandId(m.taang_land_id_no || ''),
+              nationality: norm(m.nationality),
+              resident_status: norm(m.resident_status),
+              religious: norm(m.religious),
+              house_no: norm(loc.house_no || m.house_no),
+              ward_village_group: normalizeCommaList(norm(loc.ward_village || loc.ward_village_group || m.ward_village_group)),
+              township: autoCorrectTownship(norm(loc.township || m.township)),
+              district: autoCorrectDistrict(norm(loc.district || m.district)),
+              submission_date: normalizeWhitespace(m.submission_date),
+              address: norm(`${loc.house_no || ''}, ${loc.ward_village || ''}, ${loc.township || ''}, ${loc.district || ''}`),
             });
           }
         }
@@ -733,7 +1169,7 @@ const CsvUploader = ({ onUploadSuccess }) => {
 
         await processAndUpload(
           formattedData,
-          setValidationErrors, setShowModal, setLoading, setSuccessMsg, onUploadSuccess, fileInputRef
+          setValidationErrors, setShowModal, setLoading, setSuccessMsg, onUploadSuccess, fileInputRef, setProgress
         );
       } catch (err) {
         console.error('JSON upload error:', err);
@@ -745,26 +1181,22 @@ const CsvUploader = ({ onUploadSuccess }) => {
     reader.readAsText(file, 'UTF-8');
   };
 
-  const handleFileUpload = (event) => {
-    const file = event.target.files[0];
-    if (!file) return;
+  // Shared pipeline: takes already-parsed rows (CSV or Excel) and runs forward-fill,
+  // validation, and the upload — single source of truth for both formats.
+  // Now with batch processing + progress tracking for large files (1000+ rows).
+  const processRowsLikeCsv = async (rows, sourceLabel = 'file') => {
+    try {
+          // Filter out completely empty trailing rows to prevent browser freezes
+          const activeRows = (rows || []).filter(row => {
+            if (!row) return false;
+            return Object.values(row).some(val => val !== undefined && val !== null && String(val).trim() !== '');
+          });
 
-    if (file.name.endsWith('.json')) {
-      handleJsonUpload(file);
-      return;
-    }
+          const totalRows = activeRows.length;
+          console.log(`[${sourceLabel}] Processing ${totalRows} rows...`);
 
-    setLoading(true);
-    setSuccessMsg(null);
-    setValidationErrors([]);
-
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: 'greedy',
-      encoding: "UTF-8",
-      transformHeader: (header) => header.trim().replace(/\s+/g, ' '),
-      complete: async (results) => {
-        try {
+          // Mirror Papa.parse output shape
+          const results = { data: activeRows, errors: [] };
           if (results.errors.length > 0) {
             console.warn("PapaParse parsing warnings:", results.errors);
           }
@@ -775,29 +1207,48 @@ const CsvUploader = ({ onUploadSuccess }) => {
           let currentDistrict = '';
 
           const errorsFound = [];
+          const formattedData = [];
 
-          // 1. Mapping and Forward-Filling
-          const formattedData = results.data.map((row, index) => {
-            // Forward Fill Variables
-            const rawHn = row['Household No.'];
-            const rawWard = row['Ward / Village / Group'];
-            const rawTownship = row['Township'];
-            const rawDistrict = row['District'];
+          // BATCH PROCESSING: Process in chunks of 50 rows to keep UI responsive
+          const BATCH_SIZE = 50;
+          setProgress({ current: 0, total: totalRows, stage: 'Reading and validating rows...' });
+
+          for (let i = 0; i < results.data.length; i += BATCH_SIZE) {
+            const batch = results.data.slice(i, i + BATCH_SIZE);
+
+            // Process this batch
+            const batchResults = batch.map((row, batchIndex) => {
+              const index = i + batchIndex;
+            // Forward Fill Variables — normalize whitespace at the source so
+            // forward-filled values are clean for every downstream row.
+            const rawHn       = normalizeWhitespace(row['Household No.']);
+            const rawWard     = normalizeWhitespace(row['Ward / Village / Group']);
+            const rawTownship = normalizeWhitespace(row['Township']);
+            const rawDistrict = normalizeWhitespace(row['District']);
 
             // Household Number forward-fill (auto-format spacing around hyphens)
-            if (rawHn && rawHn.trim() !== '') currentHouseholdNo = formatHouseholdNo(ensureUnicode(rawHn.trim()));
-            else if (index === 0 && (!rawHn || rawHn.trim() === '')) currentHouseholdNo = 'UNKNOWN-1';
+            if (rawHn !== '') currentHouseholdNo = formatHouseholdNo(ensureUnicode(rawHn));
+            else if (index === 0 && rawHn === '') currentHouseholdNo = 'UNKNOWN-1';
 
             // Region forward-fills (auto-correct suffixes + Unicode)
-            if (rawWard && rawWard.trim() !== '') currentWard = rawWard.trim();
-            if (rawTownship && rawTownship.trim() !== '') currentTownship = autoCorrectTownship(ensureUnicode(rawTownship.trim()));
-            if (rawDistrict && rawDistrict.trim() !== '') currentDistrict = autoCorrectDistrict(ensureUnicode(rawDistrict.trim()));
+            if (rawWard !== '')     currentWard     = rawWard;
+            if (rawTownship !== '') currentTownship = autoCorrectTownship(ensureUnicode(rawTownship));
+            if (rawDistrict !== '') currentDistrict = autoCorrectDistrict(ensureUnicode(rawDistrict));
 
-            const cell = (key) => (row[key] || '').trim();
-            
-            // Auto-correct ward_village_group during CSV parsing
-            let wardValue = ensureUnicode(currentWard);
-            wardValue = autoCorrectWardVillageGroup(wardValue);
+            // Generic cell reader — every field passes through normalizeWhitespace
+            // (trims, collapses double spaces, strips zero-width chars, fixes NBSPs).
+            const cell = (key) => normalizeWhitespace(row[key]);
+
+            // Ward/Village/Group: normalize comma-list separators ("," or "၊" → ", "),
+            // run Unicode + per-segment suffix auto-correction.
+            let wardValue = normalizeCommaList(ensureUnicode(currentWard));
+            // Apply suffix auto-correction to each segment separately so that
+            // "ကောင်းတပ်ရွာ, အောင်ချမ်းသာအုပ်စု" becomes
+            // "ကောင်းတပ် ရွာ, အောင်ချမ်းသာ အုပ်စု".
+            wardValue = wardValue
+              .split(', ')
+              .map(seg => autoCorrectWardVillageGroup(seg))
+              .join(', ');
             
             // Get all types (handles comma-separated values)
             const wardTypes = getWardVillageGroupTypes(wardValue);
@@ -805,14 +1256,14 @@ const CsvUploader = ({ onUploadSuccess }) => {
             const parsedRow = {
               household_no: currentHouseholdNo,
               name: ensureUnicode(cell('Name')),
-              date_of_birth: cell('Date of birth'),
+              date_of_birth: normalizeDateOfBirth(cell('Date of birth')),
               gender: ensureUnicode(cell('Gender')),
               fathers_name: ensureUnicode(cell("Father's Name")),
               mothers_name: ensureUnicode(cell("Mother's Name")),
               household_relationship: ensureUnicode(cell('Household Relationship')),
               occupation: ensureUnicode(cell('Occupation')),
-              previous_id_no: ensureUnicode(cell('Previous ID No.')),
-              taang_land_id_no: ensureUnicode(cell("Ta'ang Land ID No.")),
+              previous_id_no: normalizePreviousId(ensureUnicode(cell('Previous ID No.'))),
+              taang_land_id_no: normalizeTaangLandId(cell("Ta'ang Land ID No.")),
               nationality: ensureUnicode(cell('Nationality')),
               resident_status: ensureUnicode(cell('Resident Status')),
               religious: ensureUnicode(cell('Religious')),
@@ -833,7 +1284,15 @@ const CsvUploader = ({ onUploadSuccess }) => {
             if (!parsedRow.gender) missingFields.push('Gender');
             if (!parsedRow.household_relationship) missingFields.push('Household Relationship');
 
-            // 2b. Myanmar Text Quality Validation
+            const spellingIssues = [];
+
+            // 2b. Household No. Validation
+            const hnError = validateHouseholdNo(parsedRow.household_no);
+            if (hnError) {
+              spellingIssues.push(hnError);
+            }
+
+            // 2c. Myanmar Text Quality Validation
             const myanmarFieldsToCheck = [
               { key: 'name', label: 'Name' },
               { key: 'fathers_name', label: "Father's Name" },
@@ -847,7 +1306,6 @@ const CsvUploader = ({ onUploadSuccess }) => {
               { key: 'district', label: 'District' },
               { key: 'resident_status', label: 'Resident Status' },
             ];
-            const spellingIssues = [];
             for (const field of myanmarFieldsToCheck) {
               const issue = validateMyanmarText(parsedRow[field.key], field.key);
               if (issue) {
@@ -855,7 +1313,13 @@ const CsvUploader = ({ onUploadSuccess }) => {
               }
             }
 
-            // 2c. Ward/Village/Group Format Validation
+            // 2c. Date of Birth Validation — MUST be a complete dd.mm.yyyy
+            const dobError = validateDateOfBirth(parsedRow.date_of_birth);
+            if (dobError) {
+              spellingIssues.push(dobError);
+            }
+
+            // 2d. Ward/Village/Group Format Validation
             const wardVillageError = validateWardVillageGroup(parsedRow.ward_village_group);
             if (wardVillageError) {
               spellingIssues.push(`Ward/Village/Group: ${wardVillageError}`);
@@ -875,6 +1339,12 @@ const CsvUploader = ({ onUploadSuccess }) => {
               }
             }
 
+            // 2f. Ta'ang Land ID No. Validation (more than 3 and less than 20 digits)
+            const tlidError = validateTaangLandId(parsedRow.taang_land_id_no);
+            if (tlidError) {
+              spellingIssues.push(`Ta'ang Land ID No.: ${tlidError}`);
+            }
+
             // 3. Error Tracking
             if (missingFields.length > 0 || spellingIssues.length > 0) {
               errorsFound.push({
@@ -888,11 +1358,27 @@ const CsvUploader = ({ onUploadSuccess }) => {
             return parsedRow;
           });
 
-          if (formattedData.length === 0) {
-            throw new Error('The CSV file is empty or formatted incorrectly.');
+          // Add batch results to main data array
+          formattedData.push(...batchResults);
+
+          // Update progress
+          const processed = Math.min(i + BATCH_SIZE, totalRows);
+          setProgress({ current: processed, total: totalRows, stage: `Processing rows... ${processed}/${totalRows}` });
+
+          // Yield to UI to prevent freezing (every 50 rows)
+          if (i + BATCH_SIZE < totalRows) {
+            await new Promise(resolve => setTimeout(resolve, 0));
           }
+        }
+
+        if (formattedData.length === 0) {
+          throw new Error('The CSV file is empty or formatted incorrectly.');
+        }
+
+        console.log(`[${sourceLabel}] Validation complete. ${formattedData.length} rows formatted, ${errorsFound.length} errors found so far.`);
 
           // 4. Validate household-level ID requirements
+          setProgress({ current: 0, total: 0, stage: 'Validating household IDs...' });
           const householdIDErrors = validateHouseholdIDRequirements(formattedData);
           if (householdIDErrors.length > 0) {
             const householdErrors = householdIDErrors.map(err => ({
@@ -905,32 +1391,142 @@ const CsvUploader = ({ onUploadSuccess }) => {
           }
 
           if (errorsFound.length > 0) {
+            console.log(`[${sourceLabel}] ${errorsFound.length} validation errors — showing modal.`);
             setValidationErrors(errorsFound);
             setShowModal(true);
             setLoading(false);
+            setProgress({ current: 0, total: 0, stage: '' });
             if (fileInputRef.current) fileInputRef.current.value = '';
             return;
           }
 
+          console.log(`[${sourceLabel}] No errors — proceeding to upload ${formattedData.length} rows.`);
+
           // 5. Delegate to shared upload processor
           await processAndUpload(
             formattedData,
-            setValidationErrors, setShowModal, setLoading, setSuccessMsg, onUploadSuccess, fileInputRef
+            setValidationErrors, setShowModal, setLoading, setSuccessMsg, onUploadSuccess, fileInputRef, setProgress
           );
 
-        } catch (err) {
-          console.error("Upload error:", err);
-          alert(err.message || 'An error occurred during upload.');
-          setLoading(false);
-          if (fileInputRef.current) fileInputRef.current.value = "";
-        }
-      },
+    } catch (err) {
+      console.error("Upload error:", err);
+      alert(err.message || `An error occurred during ${sourceLabel} upload.`);
+      setLoading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  // CSV handler — uses PapaParse for streaming UTF-8 parsing
+  const handleCsvUpload = (file) => {
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: 'greedy',
+      encoding: "UTF-8",
+      transformHeader: (header) => header.trim().replace(/\s+/g, ' '),
+      complete: (results) => processRowsLikeCsv(results.data, 'CSV'),
       error: (err) => {
         setLoading(false);
         alert(`Error reading CSV file: ${err.message}`);
         if (fileInputRef.current) fileInputRef.current.value = "";
       }
     });
+  };
+
+  // Helper to crop Excel sheet range to actual populated cells only,
+  // preventing SheetJS from freezing the browser when parsing large empty cells.
+  const cropSheetRange = (worksheet) => {
+    if (!worksheet || !worksheet['!ref']) return;
+    const range = XLSX.utils.decode_range(worksheet['!ref']);
+    let maxRow = range.s.r;
+    for (const key of Object.keys(worksheet)) {
+      if (key.startsWith('!')) continue;
+      const cell = worksheet[key];
+      if (cell && cell.v !== undefined && cell.v !== null && String(cell.v).trim() !== '') {
+        const coord = XLSX.utils.decode_cell(key);
+        if (coord.r > maxRow) {
+          maxRow = coord.r;
+        }
+      }
+    }
+    range.e.r = maxRow;
+    worksheet['!ref'] = XLSX.utils.encode_range(range);
+  };
+
+  // Excel handler — reads .xlsx / .xls via SheetJS, converts first sheet
+  // to the same row shape Papa would produce (header-keyed objects), then
+  // routes through the shared processRowsLikeCsv pipeline.
+  const handleExcelUpload = (file) => {
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const data = new Uint8Array(e.target.result);
+        // cellDates:true  → real Excel date cells become JS Date objects (not serial numbers).
+        // cellNF:false    → don't carry over Excel cell formatting strings.
+        const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+        const firstSheetName = workbook.SheetNames[0];
+        if (!firstSheetName) throw new Error('Excel file has no sheets.');
+        const worksheet = workbook.Sheets[firstSheetName];
+
+        // Crop the range to only active populated rows before parsing
+        cropSheetRange(worksheet);
+
+        // raw:false       → values come out as formatted strings (matches CSV behaviour).
+        // defval:''       → missing cells become empty strings (matches PapaParse + header:true).
+        // dateNF:dd.mm.yyyy → all date cells render as "15.11.1985" — matches the format
+        //                    used by HouseholdForm.jsx and householdPrint.js elsewhere
+        //                    in the system, so age calculations and editing keep working.
+        const rawRows = XLSX.utils.sheet_to_json(worksheet, {
+          raw: false,
+          defval: '',
+          dateNF: 'dd.mm.yyyy',
+        });
+
+        // Normalize header whitespace exactly like PapaParse's transformHeader does,
+        // so the same column-name lookups (`row['Household No.']` etc.) work.
+        const rows = rawRows.map(row => {
+          const cleaned = {};
+          for (const key of Object.keys(row)) {
+            const cleanKey = String(key).trim().replace(/\s+/g, ' ');
+            cleaned[cleanKey] = row[key];
+          }
+          return cleaned;
+        });
+
+        if (rows.length === 0) throw new Error('Excel file has no data rows.');
+
+        await processRowsLikeCsv(rows, 'Excel');
+      } catch (err) {
+        console.error('Excel upload error:', err);
+        alert(err.message || 'Failed to parse Excel file.');
+        setLoading(false);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
+  // Single entry point — dispatches to the right parser based on file extension.
+  const handleFileUpload = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    setLoading(true);
+    setProgress({ current: 0, total: 0, stage: '' });
+    setSuccessMsg(null);
+    setValidationErrors([]);
+
+    const name = file.name.toLowerCase();
+    if (name.endsWith('.json')) {
+      handleJsonUpload(file);
+    } else if (name.endsWith('.xlsx') || name.endsWith('.xls')) {
+      handleExcelUpload(file);
+    } else if (name.endsWith('.csv')) {
+      handleCsvUpload(file);
+    } else {
+      setLoading(false);
+      alert('Unsupported file type. Please upload a .csv, .xlsx, .xls, or .json file.');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
   };
 
   const closeErrorModal = () => {
@@ -945,8 +1541,8 @@ const CsvUploader = ({ onUploadSuccess }) => {
           <Upload size={24} />
         </div>
         <div>
-          <h2 className="text-xl font-bold text-[#1A1A1A]">Bulk Upload Households (CSV / JSON)</h2>
-          <p className="text-sm text-[#737373]">Upload a CSV file or a previously exported JSON backup.</p>
+          <h2 className="text-xl font-bold text-[#1A1A1A]">Bulk Upload Households (Excel / CSV / JSON)</h2>
+          <p className="text-sm text-[#737373]">Upload an Excel workbook, CSV file, or a previously exported JSON backup.</p>
         </div>
       </div>
 
@@ -955,15 +1551,16 @@ const CsvUploader = ({ onUploadSuccess }) => {
         <label className="flex flex-col items-center justify-center w-full h-32 border border-dashed border-[#E5E7EB] cursor-pointer bg-[#FAFAFA] hover:bg-[#F3F4F6] transition-colors" style={{ borderRadius: '0px' }}>
           <div className="flex flex-col items-center justify-center pt-5 pb-6">
             <div className="flex gap-2 mb-2">
+              <Table size={28} className="text-[#737373]" />
               <FileSpreadsheet size={28} className="text-[#737373]" />
               <FileJson size={28} className="text-[#737373]" />
             </div>
             <p className="text-sm text-[#737373] font-medium">Click to upload or drag and drop</p>
-            <p className="text-xs text-[#737373]">.CSV or .JSON files</p>
+            <p className="text-xs text-[#737373]">.XLSX, .XLS, .CSV, or .JSON files</p>
           </div>
           <input
             type="file"
-            accept=".csv,.json"
+            accept=".csv,.json,.xlsx,.xls"
             className="hidden"
             onChange={handleFileUpload}
             disabled={loading}
@@ -972,9 +1569,32 @@ const CsvUploader = ({ onUploadSuccess }) => {
         </label>
 
         {loading && (
-          <div className="flex items-center gap-3 font-medium p-4" style={{ borderRadius: '0px', backgroundColor: '#EEF2F5', border: '1px solid #B0BEC5', color: '#4A6572' }}>
-            <Loader2 className="animate-spin" size={20} style={{ color: '#4A6572' }} />
-            Processing and validating your file...
+          <div className="flex flex-col gap-3 p-4" style={{ borderRadius: '0px', backgroundColor: '#EEF2F5', border: '1px solid #B0BEC5', color: '#4A6572' }}>
+            <div className="flex items-center gap-3 font-medium">
+              <Loader2 className="animate-spin" size={20} style={{ color: '#4A6572' }} />
+              {progress.total > 0 ? (
+                <span>{progress.stage}</span>
+              ) : (
+                <span>Processing and validating your file...</span>
+              )}
+            </div>
+            {progress.total > 0 && (
+              <div className="w-full">
+                <div className="flex justify-between text-sm mb-1" style={{ color: '#4A6572' }}>
+                  <span>Row {progress.current} of {progress.total}</span>
+                  <span>{Math.round((progress.current / progress.total) * 100)}%</span>
+                </div>
+                <div className="w-full h-2 bg-gray-300 rounded-full overflow-hidden">
+                  <div
+                    className="h-full transition-all duration-300 ease-out"
+                    style={{
+                      width: `${(progress.current / progress.total) * 100}%`,
+                      backgroundColor: '#2E7D32'
+                    }}
+                  />
+                </div>
+              </div>
+            )}
           </div>
         )}
 

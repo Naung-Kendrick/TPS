@@ -761,20 +761,6 @@ const DemographicDashboard = () => {
         </div>
         <div className="flex gap-2 w-full sm:w-auto" style={{ marginTop: '4px' }}>
           <button
-            onClick={() => {
-              if (!statsData) return;
-              printDemographicDashboard({
-                totalStats, allReligions, allNationalities, allOccupations,
-                selectedDistrict, selectedTownship, selectedWard, selectedGroup, selectedVillage,
-              });
-            }}
-            disabled={!statsData || loading}
-            className="flex-1 sm:flex-none flex items-center justify-center gap-1.5"
-            style={{ fontSize: '11px', border: '1px solid #1A1A1A', background: '#1A1A1A', color: '#fff', padding: '6px 14px', cursor: !statsData || loading ? 'not-allowed' : 'pointer', textTransform: 'uppercase', letterSpacing: '0.05em', flexShrink: 0, opacity: !statsData || loading ? 0.45 : 1 }}
-          >
-            <Printer size={12} /> Print
-          </button>
-          <button
             onClick={() => { try { sessionStorage.removeItem(CACHE_KEY); } catch {} loadDistricts(); loadStats(true); }}
             className="flex-1 sm:flex-none flex items-center justify-center gap-1.5"
             style={{ fontSize: '11px', border: '1px solid #E5E7EB', background: 'none', color: '#737373', padding: '6px 14px', cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.05em', flexShrink: 0 }}
@@ -945,6 +931,34 @@ const DemographicDashboard = () => {
               <Users size={13} color={colors.black} /> FUNCTIONAL AGE GROUPS
             </div>
             <AgePyramid stats={totalStats} />
+          </div>
+
+          {/* ── Print / Export toolbar ─────────────────────── */}
+          <div className="tps-stats-toolbar" style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '8px' }}>
+            <button
+              type="button"
+              onClick={() => {
+                if (!statsData) return;
+                printDemographicDashboard({
+                  totalStats, allReligions, allNationalities, allOccupations,
+                  selectedDistrict, selectedTownship, selectedWard, selectedGroup, selectedVillage,
+                });
+              }}
+              onMouseOver={e => { e.currentTarget.style.backgroundColor = '#FFFFFF'; e.currentTarget.style.color = '#1A1A1A'; }}
+              onMouseOut={e => { e.currentTarget.style.backgroundColor = '#1A1A1A'; e.currentTarget.style.color = '#FFFFFF'; }}
+              disabled={!statsData || loading}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '6px',
+                padding: '8px 16px', border: '1px solid #1A1A1A', backgroundColor: '#1A1A1A', color: '#FFFFFF',
+                fontSize: '11px', fontWeight: '500', cursor: !statsData || loading ? 'not-allowed' : 'pointer',
+                textTransform: 'uppercase', letterSpacing: '0.05em', flexShrink: 0,
+                opacity: !statsData || loading ? 0.45 : 1,
+                transition: 'background-color 120ms cubic-bezier(0.23,1,0.32,1), color 120ms cubic-bezier(0.23,1,0.32,1)',
+              }}
+            >
+              <Printer size={13} />
+              Print (Legal)
+            </button>
           </div>
         </>
       )}

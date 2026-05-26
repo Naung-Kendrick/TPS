@@ -15,6 +15,39 @@ const toMM = (num) => {
   return String(num).replace(/[0-9]/g, d => map[d]);
 };
 
+// Normalize mixed nationalities for display (e.g., 'ဗမာ+ရှမ်း' → 'ဗမာ')
+// Database keeps original, UI/Print shows only first nationality
+const normalizeNationalityDisplay = (nationality) => {
+  if (!nationality || typeof nationality !== 'string') return nationality;
+  // Split by + or / and take the first part, then trim
+  const firstPart = nationality.split(/[+\/]/)[0];
+  return firstPart ? firstPart.trim() : nationality;
+};
+
+// Get unique normalized nationalities sorted by total count desc
+const getUniqueNormalizedNats = (allNationalities, natCounts) => {
+  const aggregated = allNationalities.reduce((acc, n) => {
+    const normalized = normalizeNationalityDisplay(n);
+    const count = natCounts?.[n] || 0;
+    acc[normalized] = (acc[normalized] || 0) + count;
+    return acc;
+  }, {});
+  return Object.entries(aggregated)
+    .sort((a, b) => b[1] - a[1])
+    .map(([label]) => label);
+};
+
+// Get aggregated count for a normalized nationality
+const getAggregatedNatCount = (natCounts, normalizedNat, allNationalities) => {
+  if (!natCounts) return 0;
+  return allNationalities.reduce((sum, n) => {
+    if (normalizeNationalityDisplay(n) === normalizedNat) {
+      return sum + (natCounts[n] || 0);
+    }
+    return sum;
+  }, 0);
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
 // EXCEL EXPORT
 // ─────────────────────────────────────────────────────────────────────────────
@@ -90,7 +123,9 @@ export const exportStatisticsExcel = ({
   XLSX.utils.book_append_sheet(wb, ws1, 'Population, Age, Religion');
 
   // ── Sheet 2: Nationality ─────────────────────────────────────────────────────
-  const natHeaders = allNationalities.map(n => n);
+  // Use normalized aggregated nationalities (same as UI display)
+  const uniqueNormalizedNats = getUniqueNormalizedNats(allNationalities, totalStats.natCounts);
+  const natHeaders = uniqueNormalizedNats;
   const hdr4b = [
     'No.', groupLabel, 'Male', 'Female', 'Total',
     ...natHeaders
@@ -98,12 +133,20 @@ export const exportStatisticsExcel = ({
 
   const dataRows2 = wardStats.map((w, i) => [
     i + 1, w.name, w.male, w.female, w.total,
-    ...allNationalities.map(n => w.natCounts[n] || 0)
+    ...uniqueNormalizedNats.map(n => getAggregatedNatCount(w.natCounts, n, allNationalities))
   ]);
 
   const totalRow2 = [
     '', 'TOTAL', totalStats.male, totalStats.female, totalStats.total,
-    ...allNationalities.map(n => totalStats.natCounts[n] || 0)
+    ...uniqueNormalizedNats.map(n => {
+      const aggregated = allNationalities.reduce((sum, raw) => {
+        if (normalizeNationalityDisplay(raw) === n) {
+          return sum + (totalStats.natCounts?.[raw] || 0);
+        }
+        return sum;
+      }, 0);
+      return aggregated;
+    })
   ];
 
   const aoa2 = [
@@ -122,7 +165,7 @@ export const exportStatisticsExcel = ({
   ];
   ws2['!cols'] = [
     { wch: 5 }, { wch: 22 }, { wch: 9 }, { wch: 9 }, { wch: 10 },
-    ...allNationalities.map(() => ({ wch: 18 })),
+    ...uniqueNormalizedNats.map(() => ({ wch: 18 })),
     { wch: 14 }
   ];
   ws2['!rows'] = [{ hpt: 24 }, { hpt: 18 }, { hpt: 12 }, { hpt: 36 }];
@@ -286,7 +329,9 @@ export const printStatistics = ({
        <table>${table1Header}<tbody>${wardStats.map((w, i) => makeTable1Row(w, i)).join('')}${table1TotalRow}</tbody></table>`;
 
   // ── Table 2: Nationality ─────────────────────────────────────────────────────
-  const natThs = allNationalities.map(n => `<th class="vertical">${safeHtml(n)}</th>`).join('');
+  // Use normalized aggregated nationalities (same as UI display)
+  const uniqueNormalizedNats = getUniqueNormalizedNats(allNationalities, totalStats.natCounts);
+  const natThs = uniqueNormalizedNats.map(n => `<th class="vertical">${safeHtml(n)}</th>`).join('');
 
   const makeTable2Block = (title, colLabel, statsArr) => {
     if (!statsArr || statsArr.length === 0) return '';
@@ -296,7 +341,7 @@ export const printStatistics = ({
           <th rowspan="2" style="width:3%">စဉ်</th>
           <th rowspan="2" style="min-width:70px">${safeHtml(colLabel)}</th>
           <th colspan="3" class="group-header">လူဦးရေပေါင်း</th>
-          ${allNationalities.length > 0 ? `<th colspan="${allNationalities.length}" class="group-header">လူမျိုးအလိုက်</th>` : ''}
+          ${uniqueNormalizedNats.length > 0 ? `<th colspan="${uniqueNormalizedNats.length}" class="group-header">လူမျိုးအလိုက်</th>` : ''}
         </tr>
         <tr>
           <th>ကျား</th><th>မ</th><th>ပေါင်း</th>
@@ -310,7 +355,7 @@ export const printStatistics = ({
         <td class="num">${toMM(w.male)}</td>
         <td class="num">${toMM(w.female)}</td>
         <td class="num bold green">${toMM(w.total)}</td>
-        ${allNationalities.map(n => `<td class="num">${w.natCounts[n] ? toMM(w.natCounts[n]) : '-'}</td>`).join('')}
+        ${uniqueNormalizedNats.map(n => `<td class="num">${toMM(getAggregatedNatCount(w.natCounts, n, allNationalities)) || '-'}</td>`).join('')}
       </tr>`).join('');
     const totR = `
       <tr class="total-row">
@@ -319,7 +364,7 @@ export const printStatistics = ({
         <td class="num bold">${toMM(totalStats.male)}</td>
         <td class="num bold">${toMM(totalStats.female)}</td>
         <td class="num bold green">${toMM(totalStats.total)}</td>
-        ${allNationalities.map(n => `<td class="num bold">${totalStats.natCounts[n] ? toMM(totalStats.natCounts[n]) : '-'}</td>`).join('')}
+        ${uniqueNormalizedNats.map(n => `<td class="num bold">${toMM(getAggregatedNatCount(totalStats.natCounts, n, allNationalities)) || '-'}</td>`).join('')}
       </tr>`;
     return `<div class="section-title">${safeHtml(title)}</div><table>${hdr}<tbody>${rows}${totR}</tbody></table>`;
   };
@@ -331,7 +376,7 @@ export const printStatistics = ({
       <td class="num">${toMM(w.male)}</td>
       <td class="num">${toMM(w.female)}</td>
       <td class="num bold green">${toMM(w.total)}</td>
-      ${allNationalities.map(n => `<td class="num">${w.natCounts[n] ? toMM(w.natCounts[n]) : '-'}</td>`).join('')}
+      ${uniqueNormalizedNats.map(n => `<td class="num">${toMM(getAggregatedNatCount(w.natCounts, n, allNationalities)) || '-'}</td>`).join('')}
     </tr>`;
 
   const table2TotalRow = `
@@ -341,7 +386,7 @@ export const printStatistics = ({
       <td class="num bold">${toMM(totalStats.male)}</td>
       <td class="num bold">${toMM(totalStats.female)}</td>
       <td class="num bold green">${toMM(totalStats.total)}</td>
-      ${allNationalities.map(n => `<td class="num bold">${totalStats.natCounts[n] ? toMM(totalStats.natCounts[n]) : '-'}</td>`).join('')}
+      ${uniqueNormalizedNats.map(n => `<td class="num bold">${toMM(getAggregatedNatCount(totalStats.natCounts, n, allNationalities)) || '-'}</td>`).join('')}
     </tr>`;
 
   const table2Header = `
@@ -350,7 +395,7 @@ export const printStatistics = ({
         <th rowspan="2" style="width:3%">စဉ်</th>
         <th rowspan="2" style="min-width:70px">${safeHtml(groupLabel)}</th>
         <th colspan="3" class="group-header">လူဦးရေပေါင်း</th>
-        ${allNationalities.length > 0 ? `<th colspan="${allNationalities.length}" class="group-header">လူမျိုးအလိုက်</th>` : ''}
+        ${uniqueNormalizedNats.length > 0 ? `<th colspan="${uniqueNormalizedNats.length}" class="group-header">လူမျိုးအလိုက်</th>` : ''}
       </tr>
       <tr>
         <th>ကျား</th><th>မ</th><th>ပေါင်း</th>
@@ -587,8 +632,19 @@ export const printDemographicDashboard = ({
     }).join('');
   };
 
+  // Use normalized aggregated nationalities (same as UI display)
+  const uniqueNormalizedNats = getUniqueNormalizedNats(allNationalities, totalStats.natCounts);
+
   const relData  = allReligions    .map(r => ({ label: r, c: totalStats.relCounts?.[r] || 0 }));
-  const natData  = allNationalities.map(n => ({ label: n, c: totalStats.natCounts?.[n] || 0 }));
+  const natData  = uniqueNormalizedNats.map(n => ({
+    label: n,
+    c: allNationalities.reduce((sum, raw) => {
+      if (normalizeNationalityDisplay(raw) === n) {
+        return sum + (totalStats.natCounts?.[raw] || 0);
+      }
+      return sum;
+    }, 0)
+  }));
   const occData  = allOccupations  .map(o => ({ label: o, c: totalStats.occCounts?.[o] || 0 }));
 
   const relRows  = makeStatRows(relData,  '#8D6E63');

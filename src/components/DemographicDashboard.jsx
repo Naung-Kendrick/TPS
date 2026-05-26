@@ -877,41 +877,36 @@ const DemographicDashboard = () => {
             ))}
           </div>
 
-          {/* ── Row 1: Religion + Nationality ─────────────── */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 xl:gap-5 mb-4">
-
-            {/* Religious Statistics */}
-            <div style={sectionCardStyle}>
-              <div style={sectionTitleStyle}>
-                <MapPin size={13} color={colors.black} /> RELIGIOUS STATISTICS
-              </div>
-              <CircleStatChart data={religiousData} colorsPalette={colors.religionPalette} />
-            </div>
-
-            {/* Nationality Statistics */}
-            <div style={sectionCardStyle}>
-              <div style={sectionTitleStyle}>
-                <Globe size={13} color={colors.black} /> NATIONALITY STATISTICS
-              </div>
-              <CircleStatChart data={nationalityData} colorsPalette={colors.nationalityPalette} />
-            </div>
-
-          </div>
-
-          {/* ── Age Pyramid ────────────────────────────────── */}
-          <div style={{ ...sectionCardStyle, marginBottom: '16px' }}>
+          {/* ── Religious Statistics (full width) ──────────── */}
+          <div style={sectionCardStyle}>
             <div style={sectionTitleStyle}>
-              <Users size={13} color={colors.black} /> FUNCTIONAL AGE GROUPS
+              <MapPin size={13} color={colors.black} /> RELIGIOUS STATISTICS
             </div>
-            <AgePyramid stats={totalStats} />
+            <CircleStatChart data={religiousData} colorsPalette={colors.religionPalette} />
           </div>
 
-          {/* ── Occupation (full width) ───────────────────── */}
+          {/* ── Nationality Statistics (full width) ───────── */}
+          <div style={sectionCardStyle}>
+            <div style={sectionTitleStyle}>
+              <Globe size={13} color={colors.black} /> NATIONALITY STATISTICS
+            </div>
+            <CircleStatChart data={nationalityData} colorsPalette={colors.nationalityPalette} />
+          </div>
+
+          {/* ── Occupation Statistics (full width) ────────── */}
           <div style={sectionCardStyle}>
             <div style={sectionTitleStyle}>
               <Briefcase size={13} color={colors.black} /> OCCUPATION STATISTICS
             </div>
             <CircleStatChart data={occupationData} colorsPalette={colors.occupationPalette} />
+          </div>
+
+          {/* ── Age Pyramid (full width) ───────────────────── */}
+          <div style={{ ...sectionCardStyle, marginBottom: '16px' }}>
+            <div style={sectionTitleStyle}>
+              <Users size={13} color={colors.black} /> FUNCTIONAL AGE GROUPS
+            </div>
+            <AgePyramid stats={totalStats} />
           </div>
         </>
       )}

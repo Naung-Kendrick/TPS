@@ -11,6 +11,15 @@ const toMyanmarNum = (num) => {
   return num.toString().split('').map(digit => myanmarNumbers[parseInt(digit)] || digit).join('');
 };
 
+// Normalize mixed nationalities for display (e.g., 'ဗမာ+ရှမ်း' → 'ဗမာ')
+// Database keeps original, UI shows only first nationality
+const normalizeNationalityDisplay = (nationality) => {
+  if (!nationality || typeof nationality !== 'string') return nationality;
+  // Split by + or / and take the first part, then trim
+  const firstPart = nationality.split(/[+/]/)[0];
+  return firstPart ? firstPart.trim() : nationality;
+};
+
 const parseMyanmarDate = (dateStr) => {
   if (!dateStr) return null;
   const myanmarToArabic = { '၀': '0', '၁': '1', '၂': '2', '၃': '3', '၄': '4', '၅': '5', '၆': '6', '၇': '7', '၈': '8', '၉': '9' };
@@ -392,11 +401,32 @@ const PopulationStatistics = () => {
     count: totalStats.relCounts?.[r] || 0
   })).sort((a, b) => b.count - a.count);
 
-  // Nationality data for bar chart
-  const nationalityData = allNationalities.map(n => ({
-    label: n,
-    count: totalStats.natCounts?.[n] || 0
-  })).sort((a, b) => b.count - a.count);
+  // Aggregate nationality counts by normalized name
+  // e.g., "ဗမာ" (50) + "ဗမာ+ရှမ်း" (30) + "ရှမ်း+ဗမာ" (20) → "ဗမာ": 100
+  const aggregatedNatCounts = allNationalities.reduce((acc, n) => {
+    const normalized = normalizeNationalityDisplay(n);
+    const count = totalStats.natCounts?.[n] || 0;
+    acc[normalized] = (acc[normalized] || 0) + count;
+    return acc;
+  }, {});
+  const nationalityData = Object.entries(aggregatedNatCounts)
+    .map(([label, count]) => ({ label, count }))
+    .sort((a, b) => b.count - a.count);
+
+  // Unique normalized nationalities for table headers (sorted by count desc)
+  const uniqueNormalizedNats = nationalityData.map(n => n.label);
+
+  // Helper: Get aggregated nationality count for a row (ward/group/village)
+  // Aggregates counts from all nationalities that normalize to the same name
+  const getAggregatedNatCount = (natCounts, normalizedNat) => {
+    if (!natCounts) return 0;
+    return allNationalities.reduce((sum, n) => {
+      if (normalizeNationalityDisplay(n) === normalizedNat) {
+        return sum + (natCounts[n] || 0);
+      }
+      return sum;
+    }, 0);
+  };
 
   const selectStyle = {
     width: '100%', padding: '6px 28px 6px 10px', borderRadius: '0px',
@@ -730,11 +760,11 @@ const PopulationStatistics = () => {
                       <th rowSpan={2} style={{ ...thS, width: '3%' }}>စဉ်</th>
                       <th rowSpan={2} style={{ ...thS, minWidth: '120px', maxWidth: '180px', whiteSpace: 'normal', wordBreak: 'break-word' }}>အမည်</th>
                       <th colSpan={3} style={thS}>လူဦးရေပေါင်း</th>
-                      {allNationalities.length > 0 && <th colSpan={allNationalities.length} style={thS}>လူမျိုးအလိုက်</th>}
+                      {uniqueNormalizedNats.length > 0 && <th colSpan={uniqueNormalizedNats.length} style={thS}>လူမျိုးအလိုက်</th>}
                     </tr>
                     <tr>
                       <th style={thS}>ကျား</th><th style={thS}>မ</th><th style={thS}>ပေါင်း</th>
-                      {allNationalities.map(n => <th key={n} style={thS}>{n}</th>)}
+                      {uniqueNormalizedNats.map(n => <th key={n} style={thS}>{n}</th>)}
                     </tr>
                   </thead>
                   <tbody>
@@ -745,7 +775,7 @@ const PopulationStatistics = () => {
                         <td style={tdMonoS}>{toMyanmarNum(w.male)}</td>
                         <td style={tdMonoS}>{toMyanmarNum(w.female)}</td>
                         <td style={{ ...tdMonoS, fontWeight: '600', color: colors.black }}>{toMyanmarNum(w.total)}</td>
-                        {allNationalities.map(n => <td key={n} style={tdMonoS}>{w.natCounts[n] ? toMyanmarNum(w.natCounts[n]) : '-'}</td>)}
+                        {uniqueNormalizedNats.map(n => <td key={n} style={tdMonoS}>{toMyanmarNum(getAggregatedNatCount(w.natCounts, n)) || '-'}</td>)}
                       </tr>
                     ))}
                     <tr>
@@ -754,7 +784,7 @@ const PopulationStatistics = () => {
                       <td style={tdBold}>{toMyanmarNum(totalStats.male)}</td>
                       <td style={tdBold}>{toMyanmarNum(totalStats.female)}</td>
                       <td style={{ ...tdBold, color: colors.black }}>{toMyanmarNum(totalStats.total)}</td>
-                      {allNationalities.map(n => <td key={n} style={tdBold}>{totalStats.natCounts[n] ? toMyanmarNum(totalStats.natCounts[n]) : '-'}</td>)}
+                      {uniqueNormalizedNats.map(n => <td key={n} style={tdBold}>{toMyanmarNum(aggregatedNatCounts[n]) || '-'}</td>)}
                     </tr>
                   </tbody>
                 </table>
@@ -974,11 +1004,11 @@ const PopulationStatistics = () => {
                       <th rowSpan={2} style={thS}>စဉ်</th>
                       <th rowSpan={2} style={thS}>{groupLabel}</th>
                       <th colSpan={3} style={thS}>လူဦးရေပေါင်း</th>
-                      {allNationalities.length > 0 && <th colSpan={allNationalities.length} style={thS}>လူမျိုးအလိုက်</th>}
+                      {uniqueNormalizedNats.length > 0 && <th colSpan={uniqueNormalizedNats.length} style={thS}>လူမျိုးအလိုက်</th>}
                     </tr>
                     <tr>
                       <th style={thS}>ကျား</th><th style={thS}>မ</th><th style={thS}>ပေါင်း</th>
-                      {allNationalities.map(n => <th key={n} style={thS}>{n}</th>)}
+                      {uniqueNormalizedNats.map(n => <th key={n} style={thS}>{n}</th>)}
                     </tr>
                   </thead>
                   <tbody>
@@ -989,7 +1019,7 @@ const PopulationStatistics = () => {
                         <td style={tdMonoS}>{toMyanmarNum(w.male)}</td>
                         <td style={tdMonoS}>{toMyanmarNum(w.female)}</td>
                         <td style={{ ...tdMonoS, fontWeight: '600', color: colors.black }}>{toMyanmarNum(w.total)}</td>
-                        {allNationalities.map(n => <td key={n} style={tdMonoS}>{w.natCounts[n] ? toMyanmarNum(w.natCounts[n]) : '-'}</td>)}
+                        {uniqueNormalizedNats.map(n => <td key={n} style={tdMonoS}>{toMyanmarNum(getAggregatedNatCount(w.natCounts, n)) || '-'}</td>)}
                       </tr>
                     ))}
                     {/* Total Row */}
@@ -999,7 +1029,7 @@ const PopulationStatistics = () => {
                       <td style={tdBold}>{toMyanmarNum(totalStats.male)}</td>
                       <td style={tdBold}>{toMyanmarNum(totalStats.female)}</td>
                       <td style={{ ...tdBold, color: colors.black }}>{toMyanmarNum(totalStats.total)}</td>
-                      {allNationalities.map(n => <td key={n} style={tdBold}>{totalStats.natCounts[n] ? toMyanmarNum(totalStats.natCounts[n]) : '-'}</td>)}
+                      {uniqueNormalizedNats.map(n => <td key={n} style={tdBold}>{toMyanmarNum(aggregatedNatCounts[n]) || '-'}</td>)}
                     </tr>
                   </tbody>
                 </table>

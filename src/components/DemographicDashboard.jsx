@@ -11,6 +11,15 @@ const toMyanmarNum = (num) => {
   return num.toString().split('').map(digit => myanmarNumbers[parseInt(digit)] || digit).join('');
 };
 
+// Normalize mixed nationalities for display (e.g., 'ဗမာ+ရှမ်း' → 'ဗမာ')
+// Database keeps original, UI shows only first nationality
+const normalizeNationalityDisplay = (nationality) => {
+  if (!nationality || typeof nationality !== 'string') return nationality;
+  // Split by + or / and take the first part, then trim
+  const firstPart = nationality.split(/[+/]/)[0];
+  return firstPart ? firstPart.trim() : nationality;
+};
+
 // ─── Stat Bar Row (label + bar + count + pct) ──────────────
 const StatBar = ({ label, count, total, color, barHeight = 18 }) => {
   const pct = total > 0 ? (count / total) * 100 : 0;
@@ -672,9 +681,17 @@ const DemographicDashboard = () => {
     label: r, count: totalStats.relCounts?.[r] || 0,
   })).sort((a, b) => b.count - a.count);
 
-  const nationalityData = allNationalities.map(n => ({
-    label: n, count: totalStats.natCounts?.[n] || 0,
-  })).sort((a, b) => b.count - a.count);
+  // Aggregate nationality counts by normalized name
+  // e.g., "ဗမာ" (50) + "ဗမာ+ရှမ်း" (30) + "ရှမ်း+ဗမာ" (20) → "ဗမာ": 100
+  const aggregatedNatCounts = allNationalities.reduce((acc, n) => {
+    const normalized = normalizeNationalityDisplay(n);
+    const count = totalStats.natCounts?.[n] || 0;
+    acc[normalized] = (acc[normalized] || 0) + count;
+    return acc;
+  }, {});
+  const nationalityData = Object.entries(aggregatedNatCounts)
+    .map(([label, count]) => ({ label, count }))
+    .sort((a, b) => b.count - a.count);
 
   const occupationData = allOccupations.map(o => ({
     label: o, count: totalStats.occCounts?.[o] || 0,

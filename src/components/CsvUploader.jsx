@@ -330,6 +330,7 @@ const DICTS = {
     'မယားသား',          // Stepson (wife's son from previous marriage)
     'မယားပါသား',         // Stepson (variant spelling)
     'မယားသမီး',         // Stepdaughter (wife's daughter from previous marriage)
+    'မယားပါသမီး',        // Stepdaughter (variant spelling)
     'ခင်ပွန်းသား',       // Stepson (husband's son from previous marriage)
     'ခင်ပွန်းသမီး',      // Stepdaughter (husband's daughter from previous marriage)
     'ဆွေမျိုး',         // Relative

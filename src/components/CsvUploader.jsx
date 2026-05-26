@@ -812,48 +812,11 @@ const validateWardVillageGroup = (value) => {
 };
 
 // Validate household-level ID requirements
-// Rule 1: At least one member per household must have Ta'ang Land ID
-// Rule 2: At least 1-2 members per household must have Previous ID
+// Note: Neither Ta'ang Land ID nor Previous ID (NRC) is required.
+// Some households may not have applied for IDs yet.
 const validateHouseholdIDRequirements = (data) => {
-  const errors = [];
-  
-  // Group by household
-  const households = data.reduce((acc, row) => {
-    const hn = row.household_no || 'UNKNOWN';
-    if (!acc[hn]) acc[hn] = [];
-    acc[hn].push(row);
-    return acc;
-  }, {});
-  
-  Object.entries(households).forEach(([householdNo, members]) => {
-    const hasTaangLandID = members.some(m => m.taang_land_id_no && m.taang_land_id_no.trim() !== '');
-    const previousIDCount = members.filter(m => m.previous_id_no && m.previous_id_no.trim() !== '').length;
-    
-    if (!hasTaangLandID) {
-      errors.push({
-        householdNo,
-        issue: 'No Ta\'ang Land ID',
-        detail: 'At least one family member must have a Ta\'ang Land ID No.',
-        rowNumbers: members.map((m, i) => i + 2).slice(0, 3) // First 3 rows as reference
-      });
-    }
-    
-    if (previousIDCount < 1) {
-      errors.push({
-        householdNo,
-        issue: 'No Previous ID',
-        detail: 'At least one family member must have a Previous ID No. (NRC).',
-        rowNumbers: members.map((m, i) => i + 2).slice(0, 3)
-      });
-    }
-    
-    // Warning if more than 2 previous IDs (soft rule, just log)
-    if (previousIDCount > 2) {
-      // This is allowed but unusual - no error, just informational
-    }
-  });
-  
-  return errors;
+  // No ID requirements enforced - allows households without any IDs
+  return [];
 };
 
 // Shared: run validation + Supabase upsert for a flat array of parsed rows

@@ -10,7 +10,6 @@
     "lucide-react": "^1.14.0",
     "papaparse": "^5.5.3",
     "qrcode": "^1.5.4",
-    "rabbit-node": "^1.0.4",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
     "react-router-dom": "^7.15.0",

@@ -1,44 +1,19 @@
 import React, { useState, useRef, useMemo } from 'react';
 import * as XLSX from 'xlsx';
 import Papa from 'papaparse';
-import { zg2uni } from 'rabbit-node';
 import {
   AlertCircle, X, CheckCircle2, Upload, FileSpreadsheet,
   Loader2, Download, FileCheck, AlertTriangle, ChevronDown,
   ChevronUp, FileWarning, Table, ClipboardCheck
 } from 'lucide-react';
 
-// ============ SHARED UTILITIES FROM CsvUploader ============
+// ============ SHARED UTILITIES ============
 
-// Basic Zawgyi detector regex
-const isZawgyi = (text) => {
-  if (!text) return false;
-  const zawgyiRegex = /\u1031[\u1000-\u102A]|\u1039[^\u1000-\u102A]/;
-  return zawgyiRegex.test(text);
-};
+// Unicode only - no Zawgyi conversion
+const ensureUnicode = (text) => text;
 
-const ensureUnicode = (text) => {
-  if (!text) return text;
-  const str = String(text);
-  if (isZawgyi(str)) {
-    return zg2uni(str);
-  }
-  return str;
-};
-
-// Recursively walk any object/array and convert every Myanmar string to Unicode
-export const deepEnsureUnicode = (value) => {
-  if (typeof value === 'string') return ensureUnicode(value);
-  if (Array.isArray(value)) return value.map(deepEnsureUnicode);
-  if (value !== null && typeof value === 'object') {
-    const result = {};
-    for (const key of Object.keys(value)) {
-      result[key] = deepEnsureUnicode(value[key]);
-    }
-    return result;
-  }
-  return value;
-};
+// Pass-through (Unicode only, no conversion needed)
+export const deepEnsureUnicode = (value) => value;
 
 // Myanmar text quality validator — detects garbled/misspelled Myanmar text
 const validateMyanmarText = (text) => {
@@ -122,6 +97,55 @@ const formatHouseholdNo = (value) => {
   v = v.replace(/-/g, ' - ');
   v = v.replace(/  +/g, ' ').trim();
   return v;
+};
+
+// Strict validation for Household No. format
+const validateHouseholdNo = (value) => {
+  if (!value || typeof value !== 'string') {
+    return 'Household No. is required';
+  }
+  const str = value.trim();
+  if (str === '') {
+    return 'Household No. is required';
+  }
+  if (str === 'UNKNOWN' || str === 'UNKNOWN-1') {
+    return 'Household No. cannot be "UNKNOWN"';
+  }
+  if (/[/.,၊၊]/.test(str)) {
+    return 'Separators like /, ., or , are not allowed. Use hyphen (-) only';
+  }
+  const hhNoRegex = /^[a-zA-Z\u1000-\u109F\s]+(?:\s*[-–—]\s*)[0-9၀-၉]+$/;
+  if (!hhNoRegex.test(str)) {
+    return 'Invalid format — must follow "Name-Number" or "Name - Number" (e.g., ကောင်းတပ်-၁)';
+  }
+  return null;
+};
+
+// Strict validation for Ta'ang Land ID No. format (between 4 and 19 digits)
+const validateTaangLandId = (value) => {
+  if (!value || typeof value !== 'string' || value.trim() === '') return null; // Optional
+  
+  const str = value.trim();
+  let normalized = str.replace(/[\u200B-\u200D\uFEFF\u00A0\s]/g, '').replace(/[–—]/g, '-');
+  let numericPart = '';
+  if (/^[Nn][Oo]/.test(normalized)) {
+    numericPart = normalized.replace(/^[Nn][Oo][-.,;:|\\/_=#~]*/, '');
+  } else {
+    numericPart = normalized;
+  }
+  
+  if (!/^[0-9၀-၉]+$/.test(numericPart)) {
+    return "Ta'ang Land ID No. must contain digits only";
+  }
+  
+  const len = numericPart.length;
+  if (len <= 3) {
+    return "Ta'ang Land ID No. must have more than 3 digits";
+  }
+  if (len >= 20) {
+    return "Ta'ang Land ID No. must have less than 20 digits";
+  }
+  return null;
 };
 
 // Detect Ward/Village/Group type
@@ -223,6 +247,83 @@ const ExcelHeaderMap = {
   'Submission Date': 'submission_date',
 };
 
+// Convert Myanmar digits (၀-၉) to Arabic digits (0-9) for parsing.
+const myanmarToArabicDigits = (text) => {
+  if (!text) return text;
+  return String(text).replace(/[၀-၉]/g, ch => String('၀၁၂၃၄၅၆၇၈၉'.indexOf(ch)));
+};
+
+// Convert Arabic digits (0-9) to Myanmar digits (၀-၉).
+const arabicToMyanmarDigits = (text) => {
+  if (!text) return text;
+  return String(text).replace(/[0-9]/g, ch => '၀၁၂၃၄၅၆၇၈၉'[parseInt(ch, 10)]);
+};
+
+// Normalizes and zero-pads dates (e.g. ၃.၆.၁၉၉၇ -> ၀၃.၀၆.၁၉၉၇) in Myanmar numerals
+const normalizeDateOfBirth = (text) => {
+  if (text === null || text === undefined) return '';
+  let s = String(text).trim();
+  if (s === '') return '';
+
+  // Strip zero-width / NBSP and normalise whitespace
+  s = s.replace(/[\u200B-\u200D\uFEFF]/g, '');
+  s = s.replace(/[\u00A0\u2000-\u200A\u202F\u205F\u3000]/g, ' ');
+  s = s.replace(/\s+/g, '');
+
+  // Convert any separator (-, /, space) to "." for canonical form
+  s = s.replace(/[-\/]/g, '.');
+
+  // If exactly 3 numeric parts, zero-pad day and month to 2 digits each.
+  const parts = s.split('.');
+  if (parts.length === 3 && parts.every(p => /^\d+$/.test(myanmarToArabicDigits(p)))) {
+    const [d, m, y] = parts;
+    const padArabic = (v) => {
+      const arabic = myanmarToArabicDigits(v);
+      return arabic.length === 1 ? '0' + arabic : arabic;
+    };
+    // Format to standard English date first, then map everything to Myanmar digits
+    const englishDob = `${padArabic(d)}.${padArabic(m)}.${myanmarToArabicDigits(y)}`;
+    return arabicToMyanmarDigits(englishDob);
+  }
+
+  return arabicToMyanmarDigits(s);
+};
+
+// Validate standard date format and real-world existence
+const validateDateOfBirth = (text) => {
+  if (text === null || text === undefined) return 'မွေးသက္ကရာဇ် ဖြည့်စွက်ရန် လိုအပ်ပါသည် (Date of Birth is required, format: dd.mm.yyyy)';
+  const raw = String(text).trim();
+  if (raw === '' || raw === '-') return 'မွေးသက္ကရာဇ် ဖြည့်စွက်ရန် လိုအပ်ပါသည် (Date of Birth is required, format: dd.mm.yyyy)';
+
+  // Convert Myanmar digits to Arabic digits so that the English regex match works!
+  const s = myanmarToArabicDigits(raw);
+
+  // Must match dd.mm.yyyy exactly (after normalisation)
+  const match = s.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
+  if (!match) {
+    return `မွေးသက္ကရာဇ် "${text}" ပုံစံမမှန်ပါ။ စံပုံစံ - dd.mm.yyyy ဖြစ်ရမည် ဥပမာ - ၁၅.၀၆.၁၉၈၅ (Date of Birth "${text}" is incomplete or wrong format. Required: dd.mm.yyyy)`;
+  }
+
+  const day   = parseInt(match[1], 10);
+  const month = parseInt(match[2], 10);
+  const year  = parseInt(match[3], 10);
+  const currentYear = new Date().getFullYear();
+
+  if (month < 1 || month > 12) return `မွေးသက္ကရာဇ် "${text}" တွင် လအမှားဖြစ်နေသည် (Month must be 01-12)`;
+  if (day   < 1 || day   > 31) return `မွေးသက္ကရာဇ် "${text}" တွင် ရက်အမှားဖြစ်နေသည် (Day must be 01-31)`;
+  if (year  < 1900 || year > currentYear) {
+    return `မွေးသက္ကရာဇ် "${text}" တွင် ခုနှစ်အမှားဖြစ်နေသည် (Year must be 1900-${currentYear})`;
+  }
+
+  // Check calendar dates
+  const dt = new Date(year, month - 1, day);
+  if (dt.getFullYear() !== year || dt.getMonth() !== month - 1 || dt.getDate() !== day) {
+    return `မွေးသက္ကရာဇ် "${text}" သည် ပြက္ခဒိန်အရ မှန်ကန်သောရက်စွဲမဟုတ်ပါ (Not a real calendar date)`;
+  }
+
+  return null;
+};
+
 const ExcelChecker = () => {
   const [loading, setLoading] = useState(false);
   const [fileName, setFileName] = useState(null);
@@ -240,6 +341,26 @@ const ExcelChecker = () => {
     setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
   };
 
+  // Helper to crop Excel sheet range to actual populated cells only,
+  // preventing SheetJS from freezing the browser when parsing large empty cells.
+  const cropSheetRange = (worksheet) => {
+    if (!worksheet || !worksheet['!ref']) return;
+    const range = XLSX.utils.decode_range(worksheet['!ref']);
+    let maxRow = range.s.r;
+    for (const key of Object.keys(worksheet)) {
+      if (key.startsWith('!')) continue;
+      const cell = worksheet[key];
+      if (cell && cell.v !== undefined && cell.v !== null && String(cell.v).trim() !== '') {
+        const coord = XLSX.utils.decode_cell(key);
+        if (coord.r > maxRow) {
+          maxRow = coord.r;
+        }
+      }
+    }
+    range.e.r = maxRow;
+    worksheet['!ref'] = XLSX.utils.encode_range(range);
+  };
+
   // Convert Excel file to array of arrays (CSV-like)
   const excelToJson = (file) => {
     return new Promise((resolve, reject) => {
@@ -249,6 +370,10 @@ const ExcelChecker = () => {
           const data = new Uint8Array(e.target.result);
           const workbook = XLSX.read(data, { type: 'array', cellText: true, cellDates: true });
           const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+          
+          // Crop sheet range before parsing empty rows
+          cropSheetRange(firstSheet);
+
           const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1, defval: '' });
           resolve(jsonData);
         } catch (err) {
@@ -267,7 +392,13 @@ const ExcelChecker = () => {
     }
 
     const headers = rawData[0].map(h => String(h).trim());
-    const rows = rawData.slice(1);
+    const rawRows = rawData.slice(1);
+    
+    // Filter out completely empty trailing rows
+    const rows = rawRows.filter(row => {
+      if (!row) return false;
+      return row.some(cell => cell !== undefined && cell !== null && String(cell).trim() !== '');
+    });
 
     let currentHouseholdNo = '';
     let currentWard = '';
@@ -309,7 +440,7 @@ const ExcelChecker = () => {
       const parsedRow = {
         household_no: currentHouseholdNo,
         name: ensureUnicode(rowData.name || ''),
-        date_of_birth: rowData.date_of_birth || '',
+        date_of_birth: normalizeDateOfBirth(rowData.date_of_birth || ''),
         gender: ensureUnicode(rowData.gender || ''),
         fathers_name: ensureUnicode(rowData.fathers_name || ''),
         mothers_name: ensureUnicode(rowData.mothers_name || ''),
@@ -344,7 +475,22 @@ const ExcelChecker = () => {
       if (!parsedRow.gender) missingFields.push('Gender');
       if (!parsedRow.household_relationship) missingFields.push('Household Relationship');
 
-      // Validate Ward/Village/Group format
+      // Validate Household No format
+      const hhNoFormatError = validateHouseholdNo(parsedRow.household_no);
+      if (hhNoFormatError) {
+        missingFields.push(`Household No format: ${hhNoFormatError}`);
+      }
+    // Validate Ta'ang Land ID No format (between 4 and 19 digits)
+    const tlidError = validateTaangLandId(parsedRow.taang_land_id_no);
+    if (tlidError) {
+      missingFields.push(`Ta'ang Land ID No format: ${tlidError}`);
+    }
+
+    // Validate Date of Birth format and real-world existence
+    const dobError = validateDateOfBirth(parsedRow.date_of_birth);
+    if (dobError) {
+      missingFields.push(dobError);
+    }
       const wardFormatError = validateWardVillageGroup(parsedRow.ward_village_group);
       if (wardFormatError && parsedRow.ward_village_group) missingFields.push(`Ward format: ${wardFormatError}`);
 

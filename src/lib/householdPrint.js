@@ -239,6 +239,12 @@ export const printHouseholdPdf = (householdNo, members) => {
   <title>Household Registration — ${safeHtml(householdNo)}</title>
   <style>
     @page { size: legal landscape; margin: 8mm 10mm; }
+    @font-face {
+      font-family: 'Pyidaungsu';
+      src: url('/assets/fonts/Pyidaungsu.ttf') format('truetype');
+      font-weight: normal;
+      font-style: normal;
+    }
     * { box-sizing: border-box; }
     html, body { margin: 0; padding: 0; width: 100%; }
     body {

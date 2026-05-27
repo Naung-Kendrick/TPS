@@ -2,25 +2,11 @@ import React, { useState, useRef } from 'react';
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
 import { supabase } from '../lib/supabase';
-import { zg2uni } from 'rabbit-node';
 import { pushNotification, NOTIF_TYPES } from '../lib/notifications';
 import { AlertCircle, X, CheckCircle2, Upload, FileSpreadsheet, Loader2, FileJson, Table } from 'lucide-react';
 
-// Basic Zawgyi detector regex
-const isZawgyi = (text) => {
-  if (!text) return false;
-  const zawgyiRegex = /\u1031[\u1000-\u102A]|\u1039[^\u1000-\u102A]/;
-  return zawgyiRegex.test(text);
-};
-
-const ensureUnicode = (text) => {
-  if (!text) return text;
-  const str = String(text);
-  if (isZawgyi(str)) {
-    return zg2uni(str);
-  }
-  return str;
-};
+// Text normalization placeholder - no Zawgyi conversion (removed per request)
+const ensureUnicode = (text) => text;
 
 // ==========================================
 // WHITESPACE NORMALIZATION
@@ -466,19 +452,9 @@ const validateDiacriticOrdering = (syllable) => {
   return null;
 };
 
-// Recursively walk any object/array and convert every Myanmar string to Unicode
-export const deepEnsureUnicode = (value) => {
-  if (typeof value === 'string') return ensureUnicode(value);
-  if (Array.isArray(value)) return value.map(deepEnsureUnicode);
-  if (value !== null && typeof value === 'object') {
-    const result = {};
-    for (const key of Object.keys(value)) {
-      result[key] = deepEnsureUnicode(value[key]);
-    }
-    return result;
-  }
-  return value;
-};
+// Recursively walk any object/array (no conversion - just pass through)
+// Exported for backward compatibility with other components
+export const deepEnsureUnicode = (value) => value;
 
 // Myanmar text quality validator — detects garbled/misspelled Myanmar text
 const validateMyanmarText = (text, fieldKey = null) => {

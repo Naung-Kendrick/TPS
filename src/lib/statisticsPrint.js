@@ -433,6 +433,12 @@ export const printStatistics = ({
   <title>Population Statistics — ${safeHtml(filterLine)}</title>
   <style>
     @page { size: legal landscape; margin: 5mm 6mm; }
+    @font-face {
+      font-family: 'Pyidaungsu';
+      src: url('/assets/fonts/Pyidaungsu.ttf') format('truetype');
+      font-weight: normal;
+      font-style: normal;
+    }
     * { box-sizing: border-box; }
     html, body { margin: 0; padding: 0; }
     body {
@@ -748,6 +754,12 @@ export const printDemographicDashboard = ({
   <title>Demographic Dashboard — ${safeHtml(filterLine)}</title>
   <style>
     @page { size: legal landscape; margin: 5mm 6mm; }
+    @font-face {
+      font-family: 'Pyidaungsu';
+      src: url('/assets/fonts/Pyidaungsu.ttf') format('truetype');
+      font-weight: normal;
+      font-style: normal;
+    }
     * { box-sizing: border-box; }
     html, body { margin: 0; padding: 0; }
     body {

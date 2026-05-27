@@ -1,0 +1,325 @@
+[1mdiff --git a/src/components/HouseholdForm.jsx b/src/components/HouseholdForm.jsx[m
+[1mindex bc2751f..58213c9 100644[m
+[1m--- a/src/components/HouseholdForm.jsx[m
+[1m+++ b/src/components/HouseholdForm.jsx[m
+[36m@@ -145,6 +145,83 @@[m [mconst MyanmarCalendar = ({ value, onChange }) => {[m
+   );[m
+ };[m
+ [m
+[32m+[m[32m// Convert Myanmar digits (၀-၉) to Arabic digits (0-9) for parsing.[m
+[32m+[m[32mconst myanmarToArabicDigits = (text) => {[m
+[32m+[m[32m  if (!text) return text;[m
+[32m+[m[32m  return String(text).replace(/[၀-၉]/g, ch => String('၀၁၂၃၄၅၆၇၈၉'.indexOf(ch)));[m
+[32m+[m[32m};[m
+[32m+[m
+[32m+[m[32m// Convert Arabic digits (0-9) to Myanmar digits (၀-၉).[m
+[32m+[m[32mconst arabicToMyanmarDigits = (text) => {[m
+[32m+[m[32m  if (!text) return text;[m
+[32m+[m[32m  return String(text).replace(/[0-9]/g, ch => '၀၁၂၃၄၅၆၇၈၉'[parseInt(ch, 10)]);[m
+[32m+[m[32m};[m
+[32m+[m
+[32m+[m[32m// Normalizes and zero-pads dates (e.g. ၃.၆.၁၉၉၇ -> ၀၃.၀၆.၁၉၉၇) in Myanmar numerals[m
+[32m+[m[32mconst normalizeDateOfBirth = (text) => {[m
+[32m+[m[32m  if (text === null || text === undefined) return '';[m
+[32m+[m[32m  let s = String(text).trim();[m
+[32m+[m[32m  if (s === '') return '';[m
+[32m+[m
+[32m+[m[32m  // Strip zero-width / NBSP and normalise whitespace[m
+[32m+[m[32m  s = s.replace(/[\u200B-\u200D\uFEFF]/g, '');[m
+[32m+[m[32m  s = s.replace(/[\u00A0\u2000-\u200A\u202F\u205F\u3000]/g, ' ');[m
+[32m+[m[32m  s = s.replace(/\s+/g, '');[m
+[32m+[m
+[32m+[m[32m  // Convert any separator (-, /, space) to "." for canonical form[m
+[32m+[m[32m  s = s.replace(/[-\/]/g, '.');[m
+[32m+[m
+[32m+[m[32m  // If exactly 3 numeric parts, zero-pad day and month to 2 digits each.[m
+[32m+[m[32m  const parts = s.split('.');[m
+[32m+[m[32m  if (parts.length === 3 && parts.every(p => /^\d+$/.test(myanmarToArabicDigits(p)))) {[m
+[32m+[m[32m    const [d, m, y] = parts;[m
+[32m+[m[32m    const padArabic = (v) => {[m
+[32m+[m[32m      const arabic = myanmarToArabicDigits(v);[m
+[32m+[m[32m      return arabic.length === 1 ? '0' + arabic : arabic;[m
+[32m+[m[32m    };[m
+[32m+[m[32m    // Format to standard English date first, then map everything to Myanmar digits[m
+[32m+[m[32m    const englishDob = `${padArabic(d)}.${padArabic(m)}.${myanmarToArabicDigits(y)}`;[m
+[32m+[m[32m    return arabicToMyanmarDigits(englishDob);[m
+[32m+[m[32m  }[m
+[32m+[m
+[32m+[m[32m  return arabicToMyanmarDigits(s);[m
+[32m+[m[32m};[m
+[32m+[m
+[32m+[m[32m// Validate standard date format and real-world existence[m
+[32m+[m[32mconst validateDateOfBirth = (text) => {[m
+[32m+[m[32m  if (text === null || text === undefined) return 'မွေးသက္ကရာဇ် ဖြည့်စွက်ရန် လိုအပ်ပါသည် (Date of Birth is required, format: dd.mm.yyyy)';[m
+[32m+[m[32m  const raw = String(text).trim();[m
+[32m+[m[32m  if (raw === '' || raw === '-') return 'မွေးသက္ကရာဇ် ဖြည့်စွက်ရန် လိုအပ်ပါသည် (Date of Birth is required, format: dd.mm.yyyy)';[m
+[32m+[m
+[32m+[m[32m  // Convert Myanmar digits to Arabic digits so that the English regex match works![m
+[32m+[m[32m  const s = myanmarToArabicDigits(raw);[m
+[32m+[m
+[32m+[m[32m  // Must match dd.mm.yyyy exactly (after normalisation)[m
+[32m+[m[32m  const match = s.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);[m
+[32m+[m[32m  if (!match) {[m
+[32m+[m[32m    return `မွေးသက္ကရာဇ် "${text}" ပုံစံမမှန်ပါ။ စံပုံစံ - dd.mm.yyyy ဖြစ်ရမည် ဥပမာ - ၁၅.၀၆.၁၉၈၅ (Date of Birth "${text}" is incomplete or wrong format. Required: dd.mm.yyyy)`;[m
+[32m+[m[32m  }[m
+[32m+[m
+[32m+[m[32m  const day   = parseInt(match[1], 10);[m
+[32m+[m[32m  const month = parseInt(match[2], 10);[m
+[32m+[m[32m  const year  = parseInt(match[3], 10);[m
+[32m+[m[32m  const currentYear = new Date().getFullYear();[m
+[32m+[m
+[32m+[m[32m  if (month < 1 || month > 12) return `မွေးသက္ကရာဇ် "${text}" တွင် လအမှားဖြစ်နေသည် (Month must be 01-12)`;[m
+[32m+[m[32m  if (day   < 1 || day   > 31) return `မွေးသက္ကရာဇ် "${text}" တွင် ရက်အမှားဖြစ်နေသည် (Day must be 01-31)`;[m
+[32m+[m[32m  if (year  < 1900 || year > currentYear) {[m
+[32m+[m[32m    return `မွေးသက္ကရာဇ် "${text}" တွင် ခုနှစ်အမှားဖြစ်နေသည် (Year must be 1900-${currentYear})`;[m
+[32m+[m[32m  }[m
+[32m+[m
+[32m+[m[32m  // Check calendar dates[m
+[32m+[m[32m  const dt = new Date(year, month - 1, day);[m
+[32m+[m[32m  if (dt.getFullYear() !== year || dt.getMonth() !== month - 1 || dt.getDate() !== day) {[m
+[32m+[m[32m    return `မွေးသက္ကရာဇ် "${text}" သည် ပြက္ခဒိန်အရ မှန်ကန်သောရက်စွဲမဟုတ်ပါ (Not a real calendar date)`;[m
+[32m+[m[32m  }[m
+[32m+[m
+[32m+[m[32m  return null;[m
+[32m+[m[32m};[m
+[32m+[m
+ const HouseholdForm = () => {[m
+   const [formData, setFormData] = useState({[m
+     household_no: '',[m
+[36m@@ -186,6 +263,8 @@[m [mconst HouseholdForm = () => {[m
+ [m
+   const [dob, setDob] = useState({ day: '', month: '', year: '' });[m
+   const [wardVillageError, setWardVillageError] = useState('');[m
+[32m+[m[32m  const [householdNoError, setHouseholdNoError] = useState('');[m
+[32m+[m[32m  const [taangLandIdError, setTaangLandIdError] = useState('');[m
+ [m
+   // Restore draft on mount[m
+   useEffect(() => {[m
+[36m@@ -212,7 +291,8 @@[m [mconst HouseholdForm = () => {[m
+ [m
+   useEffect(() => {[m
+     const dobString = [dob.day, dob.month, dob.year].filter(Boolean).join('.');[m
+[31m-    setFormData(prev => ({ ...prev, date_of_birth: dobString }));[m
+[32m+[m[32m    const normalized = normalizeDateOfBirth(dobString);[m
+[32m+[m[32m    setFormData(prev => ({ ...prev, date_of_birth: normalized }));[m
+   }, [dob]);[m
+ [m
+   const toMyanmarNum = useCallback((num) => {[m
+[36m@@ -370,9 +450,82 @@[m [mconst HouseholdForm = () => {[m
+     return value.replace(/\s*-\s*/g, '-').trim();[m
+   };[m
+ [m
+[32m+[m[32m  // Auto-format Household No: "ကောင်းတပ်-၁" → "ကောင်းတပ် - ၁"[m
+[32m+[m[32m  const formatHouseholdNo = (value) => {[m
+[32m+[m[32m    if (!value) return value;[m
+[32m+[m[32m    let v = String(value).replace(/\s*-\s*/g, '-');[m
+[32m+[m[32m    v = v.replace(/-/g, ' - ');[m
+[32m+[m[32m    v = v.replace(/  +/g, ' ').trim();[m
+[32m+[m[32m    return v;[m
+[32m+[m[32m  };[m
+[32m+[m
+[32m+[m[32m  // Strict validation for Household No. format[m
+[32m+[m[32m  const validateHouseholdNoFormat = (value) => {[m
+[32m+[m[32m    if (!value || value.trim() === '') {[m
+[32m+[m[32m      return 'အိမ်ထောင်စုအမှတ် ဖြည့်စွက်ရန် လိုအပ်ပါသည် (Household No. is required)';[m
+[32m+[m[32m    }[m
+[32m+[m[32m    const str = value.trim();[m
+[32m+[m[32m    if (str === 'UNKNOWN' || str === 'UNKNOWN-1') {[m
+[32m+[m[32m      return 'အိမ်ထောင်စုအမှတ်သည် "UNKNOWN" မဖြစ်ရပါ (Household No. cannot be "UNKNOWN")';[m
+[32m+[m[32m    }[m
+[32m+[m[32m    if (/[/.,၊၊]/.test(str)) {[m
+[32m+[m[32m      return 'အိမ်ထောင်စုအမှတ်တွင် /, ., , (သို့မဟုတ်) ၊ မသုံးရပါ။ ဟိုက်ဖင် (-) သာ သုံးရပါမည် (Separators like /, ., or , are not allowed. Use hyphen (-) only)';[m
+[32m+[m[32m    }[m
+[32m+[m[32m    const hhNoRegex = /^[a-zA-Z\u1000-\u109F\s]+(?:\s*[-–—]\s*)[0-9၀-၉]+$/;[m
+[32m+[m[32m    if (!hhNoRegex.test(str)) {[m
+[32m+[m[32m      return 'အိမ်ထောင်စုအမှတ် ပုံစံမမှန်ပါ။ ဥပမာ - ကောင်းတပ်-၁ သို့မဟုတ် ကောင်းတပ် - ၁ ဖြစ်ရမည် (Format must be like ကောင်းတပ်-၁ or ကောင်းတပ် - ၁)';[m
+[32m+[m[32m    }[m
+[32m+[m[32m    return '';[m
+[32m+[m[32m  };[m
+[32m+[m
+[32m+[m[32m  // Strict validation for Ta'ang Land ID No. format (between 4 and 19 digits)[m
+[32m+[m[32m  const validateTaangLandIdFormat = (value) => {[m
+[32m+[m[32m    if (!value || value.trim() === '') return ''; // Optional field, allowed empty[m
+[32m+[m[41m    [m
+[32m+[m[32m    const str = value.trim();[m
+[32m+[m[32m    // Strip invisible characters/whitespace and extract numeric part[m
+[32m+[m[32m    let normalized = str.replace(/[\u200B-\u200D\uFEFF\u00A0\s]/g, '').replace(/[–—]/g, '-');[m
+[32m+[m[32m    let numericPart = '';[m
+[32m+[m[32m    if (/^[Nn][Oo]/.test(normalized)) {[m
+[32m+[m[32m      numericPart = normalized.replace(/^[Nn][Oo][-.,;:|\\/_=#~]*/, '');[m
+[32m+[m[32m    } else {[m
+[32m+[m[32m      numericPart = normalized;[m
+[32m+[m[32m    }[m
+[32m+[m[41m    [m
+[32m+[m[32m    // Verify numericPart only contains Myanmar or English digits[m
+[32m+[m[32m    if (!/^[0-9၀-၉]+$/.test(numericPart)) {[m
+[32m+[m[32m      return "Ta'ang Land ID No. တွင် ဂဏန်းများသာ ပါဝင်ရပါမည် (Ta'ang Land ID No. must contain digits only)";[m
+[32m+[m[32m    }[m
+[32m+[m[41m    [m
+[32m+[m[32m    const len = numericPart.length;[m
+[32m+[m[32m    if (len <= 3) {[m
+[32m+[m[32m      return "Ta'ang Land ID No. ၏ ဂဏန်းအရေအတွက်သည် ၃ လုံးထက် ပိုရပါမည် (Ta'ang Land ID must have more than 3 digits)";[m
+[32m+[m[32m    }[m
+[32m+[m[32m    if (len >= 20) {[m
+[32m+[m[32m      return "Ta'ang Land ID No. ၏ ဂဏန်းအရေအတွက်သည် ၂၀ လုံးထက် နည်းရပါမည် (Ta'ang Land ID must have less than 20 digits)";[m
+[32m+[m[32m    }[m
+[32m+[m[32m    return '';[m
+[32m+[m[32m  };[m
+[32m+[m
+   const handleChange = useCallback((e) => {[m
+     const { name, value } = e.target;[m
+ [m
+[32m+[m[32m    // Validate household_no on change[m
+[32m+[m[32m    if (name === 'household_no') {[m
+[32m+[m[32m      const err = validateHouseholdNoFormat(value);[m
+[32m+[m[32m      setHouseholdNoError(err);[m
+[32m+[m[32m      setFormData(prev => ({ ...prev, [name]: value }));[m
+[32m+[m[32m      return;[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    // Validate taang_land_id_no on change[m
+[32m+[m[32m    if (name === 'taang_land_id_no') {[m
+[32m+[m[32m      const err = validateTaangLandIdFormat(value);[m
+[32m+[m[32m      setTaangLandIdError(err);[m
+[32m+[m[32m      setFormData(prev => ({ ...prev, [name]: value }));[m
+[32m+[m[32m      return;[m
+[32m+[m[32m    }[m
+[32m+[m
+     // Auto-correct and validate ward_village_group on change[m
+     if (name === 'ward_village_group') {[m
+       const corrected = autoCorrectWardVillageGroup(value);[m
+[36m@@ -398,11 +551,12 @@[m [mconst HouseholdForm = () => {[m
+     }));[m
+   }, []);[m
+ [m
+[31m-  const checkHouseholdExists = useCallback(async () => {[m
+[31m-    if (!formData.household_no) return;[m
+[32m+[m[32m  const checkHouseholdExists = useCallback(async (explicitValue) => {[m
+[32m+[m[32m    const val = explicitValue || formData.household_no;[m
+[32m+[m[32m    if (!val) return;[m
+     [m
+     try {[m
+[31m-      const normalizedHn = normalizeHouseholdNo(formData.household_no);[m
+[32m+[m[32m      const normalizedHn = normalizeHouseholdNo(val);[m
+       const { data, error: fetchError } = await supabase[m
+         .from('households')[m
+         .select('house_no, ward_village_group, township, district, resident_status, religious, nationality')[m
+[36m@@ -429,19 +583,56 @@[m [mconst HouseholdForm = () => {[m
+     }[m
+   }, [formData.household_no]);[m
+ [m
+[32m+[m[32m  const handleHouseholdNoBlur = useCallback(() => {[m
+[32m+[m[32m    if (!formData.household_no) {[m
+[32m+[m[32m      setHouseholdNoError('အိမ်ထောင်စုအမှတ် ဖြည့်စွက်ရန် လိုအပ်ပါသည် (Household No. is required)');[m
+[32m+[m[32m      return;[m
+[32m+[m[32m    }[m
+[32m+[m[32m    const err = validateHouseholdNoFormat(formData.household_no);[m
+[32m+[m[32m    setHouseholdNoError(err);[m
+[32m+[m[32m    if (!err) {[m
+[32m+[m[32m      const formatted = formatHouseholdNo(formData.household_no);[m
+[32m+[m[32m      setFormData(prev => ({ ...prev, household_no: formatted }));[m
+[32m+[m[32m      checkHouseholdExists(formatted);[m
+[32m+[m[32m    }[m
+[32m+[m[32m  }, [formData.household_no, checkHouseholdExists]);[m
+[32m+[m
+   const submitForm = async (mode) => {[m
+     if (!formData.household_no || !formData.name) {[m
+       setError('ကျေးဇူးပြု၍ မရှိမဖြစ်လိုအပ်သောအချက်အလက်များကို ဖြည့်စွက်ပါ။ (Please fill required fields)');[m
+       return;[m
+     }[m
+ [m
+[32m+[m[32m    const hhError = validateHouseholdNoFormat(formData.household_no);[m
+[32m+[m[32m    if (hhError) {[m
+[32m+[m[32m      setHouseholdNoError(hhError);[m
+[32m+[m[32m      setError('အိမ်ထောင်စုအမှတ် ပုံစံမမှန်ပါ။ (Household No. format is incorrect)');[m
+[32m+[m[32m      return;[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    const tlidError = validateTaangLandIdFormat(formData.taang_land_id_no);[m
+[32m+[m[32m    if (tlidError) {[m
+[32m+[m[32m      setTaangLandIdError(tlidError);[m
+[32m+[m[32m      setError("Ta'ang Land ID No. ပုံစံမမှန်ပါ။ (Ta'ang Land ID No. format is incorrect)");[m
+[32m+[m[32m      return;[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    const normalizedDob = normalizeDateOfBirth(formData.date_of_birth);[m
+[32m+[m[32m    const dobError = validateDateOfBirth(normalizedDob);[m
+[32m+[m[32m    if (dobError) {[m
+[32m+[m[32m      setError(dobError);[m
+[32m+[m[32m      return;[m
+[32m+[m[32m    }[m
+[32m+[m
+     setLoading(true);[m
+     setError(null);[m
+     setSuccess(false);[m
+ [m
+[31m-    // Add the detected types to the payload (array)[m
+[32m+[m[32m    // Add the detected types to the payload (array) and ensure standard formatted household_no[m
+     const payload = {[m
+       ...formData,[m
+[32m+[m[32m      date_of_birth: normalizedDob,[m
+[32m+[m[32m      household_no: formatHouseholdNo(formData.household_no),[m
+       ward_village_group_type: getWardVillageGroupTypes(formData.ward_village_group)[m
+     };[m
+ [m
+[36m@@ -582,6 +773,8 @@[m [mconst HouseholdForm = () => {[m
+     setIsCustomReligion(false);[m
+     setSuccess(false);[m
+     setError(null);[m
+[32m+[m[32m    setHouseholdNoError('');[m
+[32m+[m[32m    setTaangLandIdError('');[m
+     localStorage.removeItem(DRAFT_KEY);[m
+   }, [DRAFT_KEY]);[m
+ [m
+[36m@@ -590,7 +783,25 @@[m [mconst HouseholdForm = () => {[m
+ [m
+       <div style={{ ...groupStyle, gridColumn: 'span 1' }}>[m
+         <label style={labelStyle}>HOUSEHOLD NO.</label>[m
+[31m-        <input type="text" name="household_no" value={formData.household_no} onChange={handleChange} onBlur={checkHouseholdExists} placeholder="Enter household number" style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }} autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} required />[m
+[32m+[m[32m        <input[m[41m [m
+[32m+[m[32m          type="text"[m[41m [m
+[32m+[m[32m          name="household_no"[m[41m [m
+[32m+[m[32m          value={formData.household_no}[m[41m [m
+[32m+[m[32m          onChange={handleChange}[m[41m [m
+[32m+[m[32m          onBlur={handleHouseholdNoBlur}[m[41m [m
+[32m+[m[32m          placeholder="Enter household number"[m[41m [m
+[32m+[m[32m          style={{[m[41m [m
+[32m+[m[32m            ...inputStyle,[m[41m [m
+[32m+[m[32m            fontFamily: 'var(--font-mono)',[m
+[32m+[m[32m            borderColor: householdNoError ? '#EF4444' : undefined[m[41m [m
+[32m+[m[32m          }}[m[41m [m
+[32m+[m[32m          autoComplete="off"[m[41m [m
+[32m+[m[32m          autoCorrect="off"[m[41m [m
+[32m+[m[32m          autoCapitalize="off"[m[41m [m
+[32m+[m[32m          spellCheck={false}[m[41m [m
+[32m+[m[32m          required[m[41m [m
+[32m+[m[32m        />[m
+[32m+[m[32m        {householdNoError && <p style={{ margin: '4px 0 0', fontSize: '10px', color: '#EF4444', fontWeight: '500' }}>{householdNoError}</p>}[m
+         {autoFillMessage && <p style={{ margin: '4px 0 0', fontSize: '10px', color: '#737373', fontWeight: '600' }}>{autoFillMessage}</p>}[m
+       </div>[m
+ [m
+[36m@@ -678,7 +889,23 @@[m [mconst HouseholdForm = () => {[m
+ [m
+       <div style={{ ...groupStyle, gridColumn: 'span 1' }}>[m
+         <label style={labelStyle}>TA'ANG LAND ID NO.</label>[m
+[31m-        <input type="text" name="taang_land_id_no" value={formData.taang_land_id_no} onChange={handleChange} placeholder="Enter Ta'ang Land ID number" style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }} autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} />[m
+[32m+[m[32m        <input[m[41m [m
+[32m+[m[32m          type="text"[m[41m [m
+[32m+[m[32m          name="taang_land_id_no"[m[41m [m
+[32m+[m[32m          value={formData.taang_land_id_no}[m[41m [m
+[32m+[m[32m          onChange={handleChange}[m[41m [m
+[32m+[m[32m          placeholder="Enter Ta'ang Land ID number"[m[41m [m
+[32m+[m[32m          style={{[m[41m [m
+[32m+[m[32m            ...inputStyle,[m[41m [m
+[32m+[m[32m            fontFamily: 'var(--font-mono)',[m
+[32m+[m[32m            borderColor: taangLandIdError ? '#EF4444' : undefined[m[41m [m
+[32m+[m[32m          }}[m[41m [m
+[32m+[m[32m          autoComplete="off"[m[41m [m
+[32m+[m[32m          autoCorrect="off"[m[41m [m
+[32m+[m[32m          autoCapitalize="off"[m[41m [m
+[32m+[m[32m          spellCheck={false}[m[41m [m
+[32m+[m[32m        />[m
+[32m+[m[32m        {taangLandIdError && <p style={{ margin: '4px 0 0', fontSize: '10px', color: '#EF4444', fontWeight: '500' }}>{taangLandIdError}</p>}[m
+       </div>[m
+ [m
+       <div style={{ ...groupStyle, gridColumn: 'span 1' }}>[m

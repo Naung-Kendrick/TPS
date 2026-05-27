@@ -84,7 +84,7 @@ const MyanmarCalendar = ({ value, onChange }) => {
         style={{
           width: '100%', height: '28px', padding: '0 10px', borderRadius: '0px', border: '1px solid #E5E7EB',
           fontSize: '11px', marginTop: '3px', boxSizing: 'border-box',
-          fontFamily: 'Inter, sans-serif', backgroundColor: '#FFFFFF', cursor: 'pointer',
+          fontFamily: "Inter, 'Pyidaungsu', sans-serif", backgroundColor: '#FFFFFF', cursor: 'pointer',
           display: 'flex', justifyContent: 'space-between', alignItems: 'center'
         }}
       >
@@ -145,6 +145,83 @@ const MyanmarCalendar = ({ value, onChange }) => {
   );
 };
 
+// Convert Myanmar digits (၀-၉) to Arabic digits (0-9) for parsing.
+const myanmarToArabicDigits = (text) => {
+  if (!text) return text;
+  return String(text).replace(/[၀-၉]/g, ch => String('၀၁၂၃၄၅၆၇၈၉'.indexOf(ch)));
+};
+
+// Convert Arabic digits (0-9) to Myanmar digits (၀-၉).
+const arabicToMyanmarDigits = (text) => {
+  if (!text) return text;
+  return String(text).replace(/[0-9]/g, ch => '၀၁၂၃၄၅၆၇၈၉'[parseInt(ch, 10)]);
+};
+
+// Normalizes and zero-pads dates (e.g. ၃.၆.၁၉၉၇ -> ၀၃.၀၆.၁၉၉၇) in Myanmar numerals
+const normalizeDateOfBirth = (text) => {
+  if (text === null || text === undefined) return '';
+  let s = String(text).trim();
+  if (s === '') return '';
+
+  // Strip zero-width / NBSP and normalise whitespace
+  s = s.replace(/[\u200B-\u200D\uFEFF]/g, '');
+  s = s.replace(/[\u00A0\u2000-\u200A\u202F\u205F\u3000]/g, ' ');
+  s = s.replace(/\s+/g, '');
+
+  // Convert any separator (-, /, space) to "." for canonical form
+  s = s.replace(/[-\/]/g, '.');
+
+  // If exactly 3 numeric parts, zero-pad day and month to 2 digits each.
+  const parts = s.split('.');
+  if (parts.length === 3 && parts.every(p => /^\d+$/.test(myanmarToArabicDigits(p)))) {
+    const [d, m, y] = parts;
+    const padArabic = (v) => {
+      const arabic = myanmarToArabicDigits(v);
+      return arabic.length === 1 ? '0' + arabic : arabic;
+    };
+    // Format to standard English date first, then map everything to Myanmar digits
+    const englishDob = `${padArabic(d)}.${padArabic(m)}.${myanmarToArabicDigits(y)}`;
+    return arabicToMyanmarDigits(englishDob);
+  }
+
+  return arabicToMyanmarDigits(s);
+};
+
+// Validate standard date format and real-world existence
+const validateDateOfBirth = (text) => {
+  if (text === null || text === undefined) return 'မွေးသက္ကရာဇ် ဖြည့်စွက်ရန် လိုအပ်ပါသည် (Date of Birth is required, format: dd.mm.yyyy)';
+  const raw = String(text).trim();
+  if (raw === '' || raw === '-') return 'မွေးသက္ကရာဇ် ဖြည့်စွက်ရန် လိုအပ်ပါသည် (Date of Birth is required, format: dd.mm.yyyy)';
+
+  // Convert Myanmar digits to Arabic digits so that the English regex match works!
+  const s = myanmarToArabicDigits(raw);
+
+  // Must match dd.mm.yyyy exactly (after normalisation)
+  const match = s.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
+  if (!match) {
+    return `မွေးသက္ကရာဇ် "${text}" ပုံစံမမှန်ပါ။ စံပုံစံ - dd.mm.yyyy ဖြစ်ရမည် ဥပမာ - ၁၅.၀၆.၁၉၈၅ (Date of Birth "${text}" is incomplete or wrong format. Required: dd.mm.yyyy)`;
+  }
+
+  const day   = parseInt(match[1], 10);
+  const month = parseInt(match[2], 10);
+  const year  = parseInt(match[3], 10);
+  const currentYear = new Date().getFullYear();
+
+  if (month < 1 || month > 12) return `မွေးသက္ကရာဇ် "${text}" တွင် လအမှားဖြစ်နေသည် (Month must be 01-12)`;
+  if (day   < 1 || day   > 31) return `မွေးသက္ကရာဇ် "${text}" တွင် ရက်အမှားဖြစ်နေသည် (Day must be 01-31)`;
+  if (year  < 1900 || year > currentYear) {
+    return `မွေးသက္ကရာဇ် "${text}" တွင် ခုနှစ်အမှားဖြစ်နေသည် (Year must be 1900-${currentYear})`;
+  }
+
+  // Check calendar dates
+  const dt = new Date(year, month - 1, day);
+  if (dt.getFullYear() !== year || dt.getMonth() !== month - 1 || dt.getDate() !== day) {
+    return `မွေးသက္ကရာဇ် "${text}" သည် ပြက္ခဒိန်အရ မှန်ကန်သောရက်စွဲမဟုတ်ပါ (Not a real calendar date)`;
+  }
+
+  return null;
+};
+
 const HouseholdForm = () => {
   const [formData, setFormData] = useState({
     household_no: '',
@@ -186,6 +263,8 @@ const HouseholdForm = () => {
 
   const [dob, setDob] = useState({ day: '', month: '', year: '' });
   const [wardVillageError, setWardVillageError] = useState('');
+  const [householdNoError, setHouseholdNoError] = useState('');
+  const [taangLandIdError, setTaangLandIdError] = useState('');
 
   // Restore draft on mount
   useEffect(() => {
@@ -212,7 +291,8 @@ const HouseholdForm = () => {
 
   useEffect(() => {
     const dobString = [dob.day, dob.month, dob.year].filter(Boolean).join('.');
-    setFormData(prev => ({ ...prev, date_of_birth: dobString }));
+    const normalized = normalizeDateOfBirth(dobString);
+    setFormData(prev => ({ ...prev, date_of_birth: normalized }));
   }, [dob]);
 
   const toMyanmarNum = useCallback((num) => {
@@ -370,8 +450,81 @@ const HouseholdForm = () => {
     return value.replace(/\s*-\s*/g, '-').trim();
   };
 
+  // Auto-format Household No: "ကောင်းတပ်-၁" → "ကောင်းတပ် - ၁"
+  const formatHouseholdNo = (value) => {
+    if (!value) return value;
+    let v = String(value).replace(/\s*-\s*/g, '-');
+    v = v.replace(/-/g, ' - ');
+    v = v.replace(/  +/g, ' ').trim();
+    return v;
+  };
+
+  // Strict validation for Household No. format
+  const validateHouseholdNoFormat = (value) => {
+    if (!value || value.trim() === '') {
+      return 'အိမ်ထောင်စုအမှတ် ဖြည့်စွက်ရန် လိုအပ်ပါသည် (Household No. is required)';
+    }
+    const str = value.trim();
+    if (str === 'UNKNOWN' || str === 'UNKNOWN-1') {
+      return 'အိမ်ထောင်စုအမှတ်သည် "UNKNOWN" မဖြစ်ရပါ (Household No. cannot be "UNKNOWN")';
+    }
+    if (/[/.,၊၊]/.test(str)) {
+      return 'အိမ်ထောင်စုအမှတ်တွင် /, ., , (သို့မဟုတ်) ၊ မသုံးရပါ။ ဟိုက်ဖင် (-) သာ သုံးရပါမည် (Separators like /, ., or , are not allowed. Use hyphen (-) only)';
+    }
+    const hhNoRegex = /^[a-zA-Z\u1000-\u109F\s]+(?:\s*[-–—]\s*)[0-9၀-၉]+$/;
+    if (!hhNoRegex.test(str)) {
+      return 'အိမ်ထောင်စုအမှတ် ပုံစံမမှန်ပါ။ ဥပမာ - ကောင်းတပ်-၁ သို့မဟုတ် ကောင်းတပ် - ၁ ဖြစ်ရမည် (Format must be like ကောင်းတပ်-၁ or ကောင်းတပ် - ၁)';
+    }
+    return '';
+  };
+
+  // Strict validation for Ta'ang Land ID No. format (between 4 and 19 digits)
+  const validateTaangLandIdFormat = (value) => {
+    if (!value || value.trim() === '') return ''; // Optional field, allowed empty
+    
+    const str = value.trim();
+    // Strip invisible characters/whitespace and extract numeric part
+    let normalized = str.replace(/[\u200B-\u200D\uFEFF\u00A0\s]/g, '').replace(/[–—]/g, '-');
+    let numericPart = '';
+    if (/^[Nn][Oo]/.test(normalized)) {
+      numericPart = normalized.replace(/^[Nn][Oo][-.,;:|\\/_=#~]*/, '');
+    } else {
+      numericPart = normalized;
+    }
+    
+    // Verify numericPart only contains Myanmar or English digits
+    if (!/^[0-9၀-၉]+$/.test(numericPart)) {
+      return "Ta'ang Land ID No. တွင် ဂဏန်းများသာ ပါဝင်ရပါမည် (Ta'ang Land ID No. must contain digits only)";
+    }
+    
+    const len = numericPart.length;
+    if (len <= 3) {
+      return "Ta'ang Land ID No. ၏ ဂဏန်းအရေအတွက်သည် ၃ လုံးထက် ပိုရပါမည် (Ta'ang Land ID must have more than 3 digits)";
+    }
+    if (len >= 20) {
+      return "Ta'ang Land ID No. ၏ ဂဏန်းအရေအတွက်သည် ၂၀ လုံးထက် နည်းရပါမည် (Ta'ang Land ID must have less than 20 digits)";
+    }
+    return '';
+  };
+
   const handleChange = useCallback((e) => {
     const { name, value } = e.target;
+
+    // Validate household_no on change
+    if (name === 'household_no') {
+      const err = validateHouseholdNoFormat(value);
+      setHouseholdNoError(err);
+      setFormData(prev => ({ ...prev, [name]: value }));
+      return;
+    }
+
+    // Validate taang_land_id_no on change
+    if (name === 'taang_land_id_no') {
+      const err = validateTaangLandIdFormat(value);
+      setTaangLandIdError(err);
+      setFormData(prev => ({ ...prev, [name]: value }));
+      return;
+    }
 
     // Auto-correct and validate ward_village_group on change
     if (name === 'ward_village_group') {
@@ -398,11 +551,12 @@ const HouseholdForm = () => {
     }));
   }, []);
 
-  const checkHouseholdExists = useCallback(async () => {
-    if (!formData.household_no) return;
+  const checkHouseholdExists = useCallback(async (explicitValue) => {
+    const val = explicitValue || formData.household_no;
+    if (!val) return;
     
     try {
-      const normalizedHn = normalizeHouseholdNo(formData.household_no);
+      const normalizedHn = normalizeHouseholdNo(val);
       const { data, error: fetchError } = await supabase
         .from('households')
         .select('house_no, ward_village_group, township, district, resident_status, religious, nationality')
@@ -429,9 +583,44 @@ const HouseholdForm = () => {
     }
   }, [formData.household_no]);
 
+  const handleHouseholdNoBlur = useCallback(() => {
+    if (!formData.household_no) {
+      setHouseholdNoError('အိမ်ထောင်စုအမှတ် ဖြည့်စွက်ရန် လိုအပ်ပါသည် (Household No. is required)');
+      return;
+    }
+    const err = validateHouseholdNoFormat(formData.household_no);
+    setHouseholdNoError(err);
+    if (!err) {
+      const formatted = formatHouseholdNo(formData.household_no);
+      setFormData(prev => ({ ...prev, household_no: formatted }));
+      checkHouseholdExists(formatted);
+    }
+  }, [formData.household_no, checkHouseholdExists]);
+
   const submitForm = async (mode) => {
     if (!formData.household_no || !formData.name) {
       setError('ကျေးဇူးပြု၍ မရှိမဖြစ်လိုအပ်သောအချက်အလက်များကို ဖြည့်စွက်ပါ။ (Please fill required fields)');
+      return;
+    }
+
+    const hhError = validateHouseholdNoFormat(formData.household_no);
+    if (hhError) {
+      setHouseholdNoError(hhError);
+      setError('အိမ်ထောင်စုအမှတ် ပုံစံမမှန်ပါ။ (Household No. format is incorrect)');
+      return;
+    }
+
+    const tlidError = validateTaangLandIdFormat(formData.taang_land_id_no);
+    if (tlidError) {
+      setTaangLandIdError(tlidError);
+      setError("Ta'ang Land ID No. ပုံစံမမှန်ပါ။ (Ta'ang Land ID No. format is incorrect)");
+      return;
+    }
+
+    const normalizedDob = normalizeDateOfBirth(formData.date_of_birth);
+    const dobError = validateDateOfBirth(normalizedDob);
+    if (dobError) {
+      setError(dobError);
       return;
     }
 
@@ -439,9 +628,11 @@ const HouseholdForm = () => {
     setError(null);
     setSuccess(false);
 
-    // Add the detected types to the payload (array)
+    // Add the detected types to the payload (array) and ensure standard formatted household_no
     const payload = {
       ...formData,
+      date_of_birth: normalizedDob,
+      household_no: formatHouseholdNo(formData.household_no),
       ward_village_group_type: getWardVillageGroupTypes(formData.ward_village_group)
     };
 
@@ -518,7 +709,7 @@ const HouseholdForm = () => {
     fontSize: '11px',
     marginTop: '3px',
     boxSizing: 'border-box',
-    fontFamily: 'Inter, sans-serif',
+    fontFamily: "Inter, 'Pyidaungsu', sans-serif",
     color: '#1A1A1A',
     backgroundColor: '#FFFFFF',
     transition: 'border-color 0.1s',
@@ -582,6 +773,8 @@ const HouseholdForm = () => {
     setIsCustomReligion(false);
     setSuccess(false);
     setError(null);
+    setHouseholdNoError('');
+    setTaangLandIdError('');
     localStorage.removeItem(DRAFT_KEY);
   }, [DRAFT_KEY]);
 
@@ -590,7 +783,25 @@ const HouseholdForm = () => {
 
       <div style={{ ...groupStyle, gridColumn: 'span 1' }}>
         <label style={labelStyle}>HOUSEHOLD NO.</label>
-        <input type="text" name="household_no" value={formData.household_no} onChange={handleChange} onBlur={checkHouseholdExists} placeholder="Enter household number" style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }} autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} required />
+        <input 
+          type="text" 
+          name="household_no" 
+          value={formData.household_no} 
+          onChange={handleChange} 
+          onBlur={handleHouseholdNoBlur} 
+          placeholder="Enter household number" 
+          style={{ 
+            ...inputStyle, 
+            fontFamily: 'var(--font-mono)',
+            borderColor: householdNoError ? '#EF4444' : undefined 
+          }} 
+          autoComplete="off" 
+          autoCorrect="off" 
+          autoCapitalize="off" 
+          spellCheck={false} 
+          required 
+        />
+        {householdNoError && <p style={{ margin: '4px 0 0', fontSize: '10px', color: '#EF4444', fontWeight: '500' }}>{householdNoError}</p>}
         {autoFillMessage && <p style={{ margin: '4px 0 0', fontSize: '10px', color: '#737373', fontWeight: '600' }}>{autoFillMessage}</p>}
       </div>
 
@@ -678,7 +889,23 @@ const HouseholdForm = () => {
 
       <div style={{ ...groupStyle, gridColumn: 'span 1' }}>
         <label style={labelStyle}>TA'ANG LAND ID NO.</label>
-        <input type="text" name="taang_land_id_no" value={formData.taang_land_id_no} onChange={handleChange} placeholder="Enter Ta'ang Land ID number" style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }} autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} />
+        <input 
+          type="text" 
+          name="taang_land_id_no" 
+          value={formData.taang_land_id_no} 
+          onChange={handleChange} 
+          placeholder="Enter Ta'ang Land ID number" 
+          style={{ 
+            ...inputStyle, 
+            fontFamily: 'var(--font-mono)',
+            borderColor: taangLandIdError ? '#EF4444' : undefined 
+          }} 
+          autoComplete="off" 
+          autoCorrect="off" 
+          autoCapitalize="off" 
+          spellCheck={false} 
+        />
+        {taangLandIdError && <p style={{ margin: '4px 0 0', fontSize: '10px', color: '#EF4444', fontWeight: '500' }}>{taangLandIdError}</p>}
       </div>
 
       <div style={{ ...groupStyle, gridColumn: 'span 1' }}>

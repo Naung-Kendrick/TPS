@@ -2,10 +2,9 @@
 
 @font-face {
   font-family: 'Pyidaungsu';
-  src: url('./assets/fonts/Pyidaungsu.ttf') format('truetype');
+  src: url('/assets/fonts/Pyidaungsu.ttf') format('truetype');
   font-weight: normal;
   font-style: normal;
-  unicode-range: U+1000-109F, U+A9E0-A9FF, U+AA60-AA7F;
 }
 
 

@@ -737,7 +737,7 @@ const DemographicDashboard = () => {
 
   const selectStyle = {
     width: '100%', padding: '6px 28px 6px 10px', borderRadius: '0px',
-    border: '1px solid #E5E7EB', fontSize: '11px', fontFamily: 'Inter, sans-serif',
+    border: '1px solid #E5E7EB', fontSize: '11px', fontFamily: "Inter, 'Pyidaungsu', sans-serif",
     backgroundColor: '#FFFFFF', boxSizing: 'border-box', marginTop: '4px',
     color: '#1A1A1A', height: '32px', lineHeight: '1.4',
     appearance: 'none', WebkitAppearance: 'none', MozAppearance: 'none',

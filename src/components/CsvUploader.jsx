@@ -163,11 +163,11 @@ const normalizeDateOfBirth = (text) => {
   s = s.replace(/[\u00A0\u2000-\u200A\u202F\u205F\u3000]/g, ' ');
   s = s.replace(/\s+/g, '');
 
-  // Convert any separator (-, /, space) to "." for canonical form
-  s = s.replace(/[-\/]/g, '.');
+  // Convert any separator (-, /, space, fullwidth period, ideographic period, Myanmar punctuation, commas) to "."
+  s = s.replace(/[-\/．。။၊,]/g, '.');
 
   // If exactly 3 numeric parts, zero-pad day and month to 2 digits each.
-  // Year is left as-is (rejected later if not 4 digits).
+  // Also expand 2-digit years to 4-digit years (e.g., 15 -> 2015, 85 -> 1985)
   const parts = s.split('.');
   if (parts.length === 3 && parts.every(p => /^\d+$/.test(myanmarToArabicDigits(p)))) {
     const [d, m, y] = parts;
@@ -175,8 +175,16 @@ const normalizeDateOfBirth = (text) => {
       const arabic = myanmarToArabicDigits(v);
       return arabic.length === 1 ? '0' + arabic : arabic;
     };
+    const padArabicYear = (v) => {
+      let arabic = myanmarToArabicDigits(v);
+      if (arabic.length === 2) {
+        const yr = parseInt(arabic, 10);
+        arabic = String(yr >= 30 ? 1900 + yr : 2000 + yr);
+      }
+      return arabic;
+    };
     // Format to standard English date first, then map everything to Myanmar digits
-    const englishDob = `${padArabic(d)}.${padArabic(m)}.${myanmarToArabicDigits(y)}`;
+    const englishDob = `${padArabic(d)}.${padArabic(m)}.${padArabicYear(y)}`;
     return arabicToMyanmarDigits(englishDob);
   }
 
@@ -528,17 +536,6 @@ const validateMyanmarText = (text, fieldKey = null) => {
         if (sugg) issues.push(`Did you mean "${sugg}"?`);
       }
     }
-    else if (fieldKey === 'household_relationship') {
-      // Match the soft pattern used by Nationality / Religion: only flag if
-      // the value LOOKS like a typo (close spelling match in dictionary).
-      // Unknown-but-legitimate relationships (e.g. uncommon kinship terms)
-      // pass through without blocking the upload.
-      const matched = DICTS.relationships.some(r => r === str);
-      if (!matched) {
-        const sugg = getSpellingSuggestion(str, DICTS.relationships);
-        if (sugg) issues.push(`Did you mean "${sugg}"?`);
-      }
-    }
     else if (fieldKey === 'nationality') {
       const matched = DICTS.nationalities.some(r => r === str);
       if (!matched) {
@@ -828,11 +825,14 @@ const processAndUpload = async (formattedData, setValidationErrors, setShowModal
     
     // Validate using original value
     const missingFields = [];
-    if (!parsedRow.ward_village_group) missingFields.push('Ward/Village/Group');
-    if (!parsedRow.township) missingFields.push('Township');
-    if (!parsedRow.district) missingFields.push('District');
-    if (!parsedRow.gender) missingFields.push('Gender');
-    if (!parsedRow.household_relationship) missingFields.push('Household Relationship');
+    if (!parsedRow.name || parsedRow.name.trim() === '') missingFields.push('Name');
+    if (!parsedRow.household_no || parsedRow.household_no.trim() === '' || parsedRow.household_no === 'UNKNOWN-1') missingFields.push('Household No.');
+    if (!parsedRow.date_of_birth || parsedRow.date_of_birth.trim() === '') missingFields.push('Date of Birth');
+    if (!parsedRow.ward_village_group || parsedRow.ward_village_group.trim() === '') missingFields.push('Ward/Village/Group');
+    if (!parsedRow.township || parsedRow.township.trim() === '') missingFields.push('Township');
+    if (!parsedRow.district || parsedRow.district.trim() === '') missingFields.push('District');
+    if (!parsedRow.gender || parsedRow.gender.trim() === '') missingFields.push('Gender');
+    if (!parsedRow.household_relationship || parsedRow.household_relationship.trim() === '') missingFields.push('Household Relationship');
 
     // Validate Ward/Village/Group format (simple check only)
     const wardVillageError = validateWardVillageGroup(parsedRow.ward_village_group);
@@ -1218,11 +1218,14 @@ const CsvUploader = ({ onUploadSuccess }) => {
 
             // 2. Strict Validation Check (After Forward-Fill)
             const missingFields = [];
-            if (!parsedRow.ward_village_group) missingFields.push('Ward/Village/Group');
-            if (!parsedRow.township) missingFields.push('Township');
-            if (!parsedRow.district) missingFields.push('District');
-            if (!parsedRow.gender) missingFields.push('Gender');
-            if (!parsedRow.household_relationship) missingFields.push('Household Relationship');
+            if (!parsedRow.name || parsedRow.name.trim() === '') missingFields.push('Name');
+            if (!parsedRow.household_no || parsedRow.household_no.trim() === '' || parsedRow.household_no === 'UNKNOWN-1') missingFields.push('Household No.');
+            if (!parsedRow.date_of_birth || parsedRow.date_of_birth.trim() === '') missingFields.push('Date of Birth');
+            if (!parsedRow.ward_village_group || parsedRow.ward_village_group.trim() === '') missingFields.push('Ward/Village/Group');
+            if (!parsedRow.township || parsedRow.township.trim() === '') missingFields.push('Township');
+            if (!parsedRow.district || parsedRow.district.trim() === '') missingFields.push('District');
+            if (!parsedRow.gender || parsedRow.gender.trim() === '') missingFields.push('Gender');
+            if (!parsedRow.household_relationship || parsedRow.household_relationship.trim() === '') missingFields.push('Household Relationship');
 
             const spellingIssues = [];
 

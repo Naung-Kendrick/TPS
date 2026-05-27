@@ -32,10 +32,11 @@ const normalizeDateOfBirth = (text) => {
   s = s.replace(/[\u00A0\u2000-\u200A\u202F\u205F\u3000]/g, ' ');
   s = s.replace(/\s+/g, '');
 
-  // Convert any separator (-, /, space) to "." for canonical form
-  s = s.replace(/[-\/]/g, '.');
+  // Convert any separator (-, /, space, fullwidth period, ideographic period, Myanmar punctuation, commas) to "."
+  s = s.replace(/[-\/．。။၊,]/g, '.');
 
   // If exactly 3 numeric parts, zero-pad day and month to 2 digits each.
+  // Also expand 2-digit years to 4-digit years (e.g., 15 -> 2015, 85 -> 1985)
   const parts = s.split('.');
   if (parts.length === 3 && parts.every(p => /^\d+$/.test(myanmarToArabicDigits(p)))) {
     const [d, m, y] = parts;
@@ -43,8 +44,16 @@ const normalizeDateOfBirth = (text) => {
       const arabic = myanmarToArabicDigits(v);
       return arabic.length === 1 ? '0' + arabic : arabic;
     };
+    const padArabicYear = (v) => {
+      let arabic = myanmarToArabicDigits(v);
+      if (arabic.length === 2) {
+        const yr = parseInt(arabic, 10);
+        arabic = String(yr >= 30 ? 1900 + yr : 2000 + yr);
+      }
+      return arabic;
+    };
     // Format to standard English date first, then map everything to Myanmar digits
-    const englishDob = `${padArabic(d)}.${padArabic(m)}.${myanmarToArabicDigits(y)}`;
+    const englishDob = `${padArabic(d)}.${padArabic(m)}.${padArabicYear(y)}`;
     return arabicToMyanmarDigits(englishDob);
   }
 

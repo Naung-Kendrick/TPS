@@ -1,11 +1,5 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap');
 
-@font-face {
-  font-family: 'MyanmarCustom';
-  src: url('./assets/fonts/my-font.ttf') format('truetype');
-  font-weight: normal;
-  font-style: normal;
-}
 
 @tailwind base;
 @tailwind components;
@@ -47,9 +41,9 @@
   --color-border:     var(--n-border);
 
   /* ── Typography ───────────────────────────────────────── */
-  --font-headline: 'Inter', 'MyanmarCustom', system-ui, sans-serif;
-  --font-body:     'Inter', 'MyanmarCustom', system-ui, sans-serif;
-  --font-label:    'Inter', 'MyanmarCustom', system-ui, sans-serif;
+  --font-headline: 'Inter', system-ui, sans-serif;
+  --font-body:     'Inter', system-ui, sans-serif;
+  --font-label:    'Inter', system-ui, sans-serif;
   --font-mono:     'JetBrains Mono', monospace; /* For data values */
 
   /* ── Geometry ─────────────────────────────────────────── */

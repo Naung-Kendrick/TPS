@@ -62,7 +62,7 @@
   --shadow-md: none;
   --shadow-lg: none;
 
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Inter', 'Pyidaungsu', system-ui, sans-serif;
   font-size: 13px; /* Slightly smaller for technical look */
   line-height: 1.5;
   font-weight: 400;
@@ -75,7 +75,7 @@
 }
 
 h1, h2, h3, h4, h5, h6 {
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Inter', 'Pyidaungsu', system-ui, sans-serif;
   color: var(--n-text);
   font-weight: 500; /* Less heavy for architect look */
   line-height: 1.2;
@@ -174,7 +174,7 @@ button {
   padding: 0.5em 1em;
   font-size: 0.85rem;
   font-weight: 500;
-  font-family: 'Inter', sans-serif;
+  font-family: 'Inter', 'Pyidaungsu', sans-serif;
   cursor: pointer;
   /* Specify exact properties — never use 'transition: all' */
   transition: background-color 120ms var(--ease-out),
@@ -209,7 +209,7 @@ input, select, textarea {
   border: 1px solid var(--n-border);
   padding: 0.5em 0.75em;
   font-size: 0.85rem;
-  font-family: 'Inter', sans-serif;
+  font-family: 'Inter', 'Pyidaungsu', sans-serif;
   width: 100%;
   box-sizing: border-box;
   color: var(--n-text);

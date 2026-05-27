@@ -436,7 +436,7 @@ export const printStatistics = ({
     * { box-sizing: border-box; }
     html, body { margin: 0; padding: 0; }
     body {
-      font-family: 'Padauk', 'Myanmar Text', 'Times New Roman', Times, serif;
+      font-family: 'Pyidaungsu', 'Padauk', 'Myanmar Text', 'Times New Roman', Times, serif;
       font-size: 8.5px; color: #000; background: #fff;
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
@@ -751,7 +751,7 @@ export const printDemographicDashboard = ({
     * { box-sizing: border-box; }
     html, body { margin: 0; padding: 0; }
     body {
-      font-family: 'Padauk', 'Myanmar Text', 'Times New Roman', Times, serif;
+      font-family: 'Pyidaungsu', 'Padauk', 'Myanmar Text', 'Times New Roman', Times, serif;
       font-size: 8.5px; color: #000; background: #fff;
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;

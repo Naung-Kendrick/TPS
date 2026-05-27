@@ -242,7 +242,7 @@ export const printHouseholdPdf = (householdNo, members) => {
     * { box-sizing: border-box; }
     html, body { margin: 0; padding: 0; width: 100%; }
     body {
-      font-family: 'Padauk', 'Myanmar Text', 'Times New Roman', Times, serif;
+      font-family: 'Pyidaungsu', 'Padauk', 'Myanmar Text', 'Times New Roman', Times, serif;
       font-size: 10px; color: #000; background: #fff;
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;

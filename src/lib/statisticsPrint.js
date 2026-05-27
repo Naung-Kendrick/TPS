@@ -207,7 +207,11 @@ export const printStatistics = ({
   // Fit everything on one page - no chunking
 
   // ── Table 1: Population, Age, Religion ──────────────────────────────────────
-  const relThs = allReligions.map(r => `<th class="vertical">${safeHtml(r)}</th>`).join('');
+  // Limit religion columns to prevent overflow, use narrow width for vertical headers
+  const MAX_REL_COLS = 15;
+  const displayReligions = allReligions.slice(0, MAX_REL_COLS);
+  const hasMoreReligions = allReligions.length > MAX_REL_COLS;
+  const relThs = displayReligions.map(r => `<th class="vertical" style="width:28px">${safeHtml(r)}</th>`).join('');
 
   const table1Header = `
     <thead>
@@ -247,7 +251,7 @@ export const printStatistics = ({
       <td class="num">${toMM(w.a60m)}</td>
       <td class="num">${toMM(w.a60f)}</td>
       <td class="num">${toMM(w.a60m + w.a60f)}</td>
-      ${allReligions.map(r => `<td class="num">${w.relCounts[r] ? toMM(w.relCounts[r]) : '-'}</td>`).join('')}
+      ${displayReligions.map(r => `<td class="num">${w.relCounts[r] ? toMM(w.relCounts[r]) : '-'}</td>`).join('')}
     </tr>`;
 
   const table1TotalRow = `
@@ -267,7 +271,7 @@ export const printStatistics = ({
       <td class="num bold">${toMM(totalStats.a60m)}</td>
       <td class="num bold">${toMM(totalStats.a60f)}</td>
       <td class="num bold">${toMM(totalStats.a60m + totalStats.a60f)}</td>
-      ${allReligions.map(r => `<td class="num bold">${totalStats.relCounts[r] ? toMM(totalStats.relCounts[r]) : '-'}</td>`).join('')}
+      ${displayReligions.map(r => `<td class="num bold">${totalStats.relCounts[r] ? toMM(totalStats.relCounts[r]) : '-'}</td>`).join('')}
     </tr>`;
 
   const makeTable1Block = (title, colLabel, statsArr) => {
@@ -282,7 +286,7 @@ export const printStatistics = ({
           <th colspan="3" class="group-header">၁၆ နှစ်အောက်</th>
           <th colspan="3" class="group-header">၁၆ - ၆၀ နှစ်</th>
           <th colspan="3" class="group-header">၆၀ နှစ်အထက်</th>
-          ${allReligions.length > 0 ? `<th colspan="${allReligions.length}" class="group-header">ကိုးကွယ်သည့်ဘာသာ</th>` : ''}
+          ${displayReligions.length > 0 ? `<th colspan="${displayReligions.length}" class="group-header">ကိုးကွယ်သည့်ဘာသာ</th>` : ''}
         </tr>
         <tr>
           <th>ကျား</th><th>မ</th><th>ပေါင်း</th>
@@ -310,9 +314,12 @@ export const printStatistics = ({
         <td class="num bold">${toMM(totalStats.a60m)}</td>
         <td class="num bold">${toMM(totalStats.a60f)}</td>
         <td class="num bold">${toMM(totalStats.a60m + totalStats.a60f)}</td>
-        ${allReligions.map(r => `<td class="num bold">${totalStats.relCounts[r] ? toMM(totalStats.relCounts[r]) : '-'}</td>`).join('')}
+        ${displayReligions.map(r => `<td class="num bold">${totalStats.relCounts[r] ? toMM(totalStats.relCounts[r]) : '-'}</td>`).join('')}
       </tr>`;
-    return `<div class="section-title">${safeHtml(title)}</div><table>${hdr}<tbody>${rows}${totR}</tbody></table>`;
+    const truncationNote = hasMoreReligions 
+      ? `<div style="font-size:8px;color:#666;margin-top:4px;font-style:italic;">Showing top ${MAX_REL_COLS} of ${allReligions.length} religions. View full statistics online.</div>` 
+      : '';
+    return `<div class="section-title">${safeHtml(title)}</div><table>${hdr}<tbody>${rows}${totR}</tbody></table>${truncationNote}`;
   };
 
   const prefixedVillageStats = selectedGroup
@@ -330,8 +337,12 @@ export const printStatistics = ({
 
   // ── Table 2: Nationality ─────────────────────────────────────────────────────
   // Use normalized aggregated nationalities (same as UI display)
+  // Limit nationality columns to prevent overflow, use narrow width for vertical headers
   const uniqueNormalizedNats = getUniqueNormalizedNats(allNationalities, totalStats.natCounts);
-  const natThs = uniqueNormalizedNats.map(n => `<th class="vertical">${safeHtml(n)}</th>`).join('');
+  const MAX_NAT_COLS = 12;
+  const displayNats = uniqueNormalizedNats.slice(0, MAX_NAT_COLS);
+  const hasMoreNats = uniqueNormalizedNats.length > MAX_NAT_COLS;
+  const natThs = displayNats.map(n => `<th class="vertical" style="width:32px">${safeHtml(n)}</th>`).join('');
 
   const makeTable2Block = (title, colLabel, statsArr) => {
     if (!statsArr || statsArr.length === 0) return '';
@@ -341,7 +352,7 @@ export const printStatistics = ({
           <th rowspan="2" style="width:3%">စဉ်</th>
           <th rowspan="2" style="min-width:70px">${safeHtml(colLabel)}</th>
           <th colspan="3" class="group-header">လူဦးရေပေါင်း</th>
-          ${uniqueNormalizedNats.length > 0 ? `<th colspan="${uniqueNormalizedNats.length}" class="group-header">လူမျိုးအလိုက်</th>` : ''}
+          ${displayNats.length > 0 ? `<th colspan="${displayNats.length}" class="group-header">လူမျိုးအလိုက်</th>` : ''}
         </tr>
         <tr>
           <th>ကျား</th><th>မ</th><th>ပေါင်း</th>
@@ -355,7 +366,7 @@ export const printStatistics = ({
         <td class="num">${toMM(w.male)}</td>
         <td class="num">${toMM(w.female)}</td>
         <td class="num bold green">${toMM(w.total)}</td>
-        ${uniqueNormalizedNats.map(n => `<td class="num">${toMM(getAggregatedNatCount(w.natCounts, n, allNationalities)) || '-'}</td>`).join('')}
+        ${displayNats.map(n => `<td class="num">${toMM(getAggregatedNatCount(w.natCounts, n, allNationalities)) || '-'}</td>`).join('')}
       </tr>`).join('');
     const totR = `
       <tr class="total-row">
@@ -364,9 +375,12 @@ export const printStatistics = ({
         <td class="num bold">${toMM(totalStats.male)}</td>
         <td class="num bold">${toMM(totalStats.female)}</td>
         <td class="num bold green">${toMM(totalStats.total)}</td>
-        ${uniqueNormalizedNats.map(n => `<td class="num bold">${toMM(getAggregatedNatCount(totalStats.natCounts, n, allNationalities)) || '-'}</td>`).join('')}
+        ${displayNats.map(n => `<td class="num bold">${toMM(getAggregatedNatCount(totalStats.natCounts, n, allNationalities)) || '-'}</td>`).join('')}
       </tr>`;
-    return `<div class="section-title">${safeHtml(title)}</div><table>${hdr}<tbody>${rows}${totR}</tbody></table>`;
+    const natTruncationNote = hasMoreNats 
+      ? `<div style="font-size:8px;color:#666;margin-top:4px;font-style:italic;">Showing top ${MAX_NAT_COLS} of ${uniqueNormalizedNats.length} nationalities. View full statistics online.</div>` 
+      : '';
+    return `<div class="section-title">${safeHtml(title)}</div><table>${hdr}<tbody>${rows}${totR}</tbody></table>${natTruncationNote}`;
   };
 
   const makeTable2Row = (w, i) => `
@@ -376,7 +390,7 @@ export const printStatistics = ({
       <td class="num">${toMM(w.male)}</td>
       <td class="num">${toMM(w.female)}</td>
       <td class="num bold green">${toMM(w.total)}</td>
-      ${uniqueNormalizedNats.map(n => `<td class="num">${toMM(getAggregatedNatCount(w.natCounts, n, allNationalities)) || '-'}</td>`).join('')}
+      ${displayNats.map(n => `<td class="num">${toMM(getAggregatedNatCount(w.natCounts, n, allNationalities)) || '-'}</td>`).join('')}
     </tr>`;
 
   const table2TotalRow = `
@@ -386,7 +400,7 @@ export const printStatistics = ({
       <td class="num bold">${toMM(totalStats.male)}</td>
       <td class="num bold">${toMM(totalStats.female)}</td>
       <td class="num bold green">${toMM(totalStats.total)}</td>
-      ${uniqueNormalizedNats.map(n => `<td class="num bold">${toMM(getAggregatedNatCount(totalStats.natCounts, n, allNationalities)) || '-'}</td>`).join('')}
+      ${displayNats.map(n => `<td class="num bold">${toMM(getAggregatedNatCount(totalStats.natCounts, n, allNationalities)) || '-'}</td>`).join('')}
     </tr>`;
 
   const table2Header = `
@@ -395,7 +409,7 @@ export const printStatistics = ({
         <th rowspan="2" style="width:3%">စဉ်</th>
         <th rowspan="2" style="min-width:70px">${safeHtml(groupLabel)}</th>
         <th colspan="3" class="group-header">လူဦးရေပေါင်း</th>
-        ${uniqueNormalizedNats.length > 0 ? `<th colspan="${uniqueNormalizedNats.length}" class="group-header">လူမျိုးအလိုက်</th>` : ''}
+        ${displayNats.length > 0 ? `<th colspan="${displayNats.length}" class="group-header">လူမျိုးအလိုက်</th>` : ''}
       </tr>
       <tr>
         <th>ကျား</th><th>မ</th><th>ပေါင်း</th>
@@ -468,21 +482,94 @@ export const printStatistics = ({
     }
 
     /* ── Section title ── */
-    .section-title { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin: 6px 0 3px; border-bottom: 1px solid #000; padding-bottom: 2px; }
+    .section-title { 
+      font-size: 10px; 
+      font-weight: 700; 
+      text-transform: uppercase; 
+      letter-spacing: 0.8px; 
+      margin: 10px 0 6px; 
+      border-bottom: 2px solid #1A1A1A; 
+      padding-bottom: 4px;
+      color: #1A1A1A;
+    }
 
     /* ── Table ── */
-    table { width: 100%; border-collapse: collapse; margin-bottom: 3px; }
-    th, td { border: 1px solid #000; padding: 2px 3px; font-size: 8px; vertical-align: middle; line-height: 1.15; }
-    thead th { background: #e8e8e8 !important; font-weight: 700; text-align: center;
-      -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-    th.group-header { background: #d4d4d4 !important; }
-    th.vertical { writing-mode: vertical-rl; transform: rotate(180deg); white-space: nowrap; padding: 4px 2px; font-size: 7px; }
-    td.num { text-align: center; font-family: 'Courier New', monospace; }
-    td.name { text-align: left; font-weight: 500; white-space: normal; word-break: break-word; min-width: 80px; max-width: 140px; }
+    table { 
+      width: 100%; 
+      border-collapse: collapse; 
+      margin-bottom: 12px; 
+      table-layout: fixed;
+      border: 2px solid #000000;
+    }
+    th, td { 
+      border: 1px solid #000000;
+      padding: 10px 14px; 
+      font-size: 9px; 
+      vertical-align: middle; 
+      line-height: 1.6;
+      white-space: nowrap;
+    }
+    thead th { 
+      background: #E8E8E8 !important; 
+      font-weight: 700; 
+      text-align: center;
+      color: #000000;
+      letter-spacing: 0.3px;
+      border-bottom: 2px solid #000000;
+      border-top: 1px solid #000000;
+      -webkit-print-color-adjust: exact !important; 
+      print-color-adjust: exact !important; 
+    }
+    thead th:first-child { border-left: 1px solid #000000; }
+    thead th:last-child { border-right: 1px solid #000000; }
+    th.group-header { 
+      background: #D4D4D4 !important; 
+      color: #000000;
+      font-weight: 700;
+      border-bottom: 2px solid #000000;
+    }
+    th.vertical { 
+      writing-mode: vertical-rl; 
+      transform: rotate(180deg); 
+      white-space: nowrap; 
+      padding: 12px 6px; 
+      font-size: 8px;
+      line-height: 1.4;
+    }
+    td { 
+      border: 1px solid #000000;
+      background: #FFFFFF;
+    }
+    td.num { 
+      text-align: center; 
+      font-family: 'Courier New', monospace; 
+      font-weight: 500;
+      color: #000000;
+    }
+    td.name { 
+      text-align: left; 
+      font-weight: 500; 
+      white-space: nowrap;
+    }
     td.bold { font-weight: 700; }
-    td.green { color: #000; }
-    tr.total-row td { background: #f0f0f0 !important; font-weight: 700;
-      -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    td.green { 
+      color: #000000; 
+      font-weight: 700;
+    }
+    tbody tr:nth-child(even) td {
+      background: #F5F5F5;
+    }
+    tbody tr:hover td {
+      background: #E8E8E8;
+    }
+    tr.total-row td { 
+      background: #E8E8E8 !important; 
+      font-weight: 700;
+      border-top: 2px solid #000000;
+      border-bottom: 2px solid #000000;
+      -webkit-print-color-adjust: exact !important; 
+      print-color-adjust: exact !important; 
+    }
 
     /* ── Doc footer ── */
     .doc-footer { margin-top: 6px; padding-top: 2px; border-top: 1px solid #000; display: flex; justify-content: space-between; font-size: 7px; color: #444; }
@@ -722,32 +809,95 @@ export const printDemographicDashboard = ({
     .sc-brown  { border-top: 3px solid #A1887F !important; }
 
     /* ── Section title ── */
-    .section-title { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin: 6px 0 2px; border-bottom: 1px solid #000; padding-bottom: 2px; }
+    .section-title { 
+      font-size: 10px; 
+      font-weight: 700; 
+      text-transform: uppercase; 
+      letter-spacing: 0.8px; 
+      margin: 10px 0 6px; 
+      border-bottom: 2px solid #1A1A1A; 
+      padding-bottom: 4px;
+      color: #1A1A1A;
+    }
 
     /* ── Two-column layout ── */
-    .two-col { display: flex; gap: 6px; margin-bottom: 5px; }
+    .two-col { display: flex; gap: 8px; margin-bottom: 8px; }
     .two-col .col { flex: 1; }
 
     /* ── Stat table (religion / nationality / occupation) ── */
     .stat-table { width: 100%; border-collapse: collapse; }
     .stat-table td { border: 1px solid #ddd; padding: 2px 4px; font-size: 8px; vertical-align: middle; line-height: 1.2; }
-    .stat-table td.name { font-weight: 500; min-width: 60px; max-width: 120px; word-break: break-word; }
-    .stat-table td.num  { text-align: center; font-family: 'Courier New', monospace; white-space: nowrap; width: 36px; }
+    .stat-table td.name { 
+      font-weight: 500; 
+      min-width: 80px; 
+      max-width: 140px; 
+      word-break: break-word; 
+      overflow-wrap: anywhere;
+      line-height: 1.6;
+      padding: 10px 10px;
+    }
+    .stat-table td.num  { 
+      text-align: center; 
+      font-family: 'Courier New', monospace; 
+      white-space: nowrap; 
+      width: 42px;
+      font-weight: 500;
+      color: #333;
+    }
     .stat-table td.bold { font-weight: 700; }
-    .stat-table td.green { color: #000; }
-    .stat-table td.bar-cell-simple { width: 120px; padding: 2px 4px; }
-    .simple-bar { height: 8px; min-width: 1px;
-      -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    .stat-table td.green { 
+      color: #2E7D32; 
+      font-weight: 700;
+    }
+    .stat-table td.bar-cell-simple { 
+      width: 120px; 
+      padding: 8px;
+    }
+    .simple-bar { 
+      height: 10px; 
+      min-width: 1px;
+      border-radius: 2px;
+      -webkit-print-color-adjust: exact !important; 
+      print-color-adjust: exact !important; 
+    }
 
     /* ── Age Pyramid table ── */
     .pyramid-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
     .pyramid-table td { border: 1px solid #ddd; padding: 2px 4px; font-size: 8px; vertical-align: middle; line-height: 1.2; }
-    .pyramid-table td.num          { text-align: center; font-family: 'Courier New', monospace; width: 32px; white-space: nowrap; }
-    .pyramid-table td.bold         { font-weight: 700; }
-    .pyramid-table td.green        { color: #000; }
-    .pyramid-table td.bar-male     { width: 28%; padding: 2px 4px; overflow: hidden; }
-    .pyramid-table td.bar-female   { width: 28%; padding: 2px 4px; overflow: hidden; }
-    .pyramid-table td.age-label-cell { font-size: 7.5px; font-weight: 700; text-align: center; width: 58px; white-space: nowrap; color: #333; }
+    .pyramid-table td.num { 
+      text-align: center; 
+      font-family: 'Courier New', monospace; 
+      width: 36px; 
+      white-space: nowrap;
+      font-weight: 500;
+      color: #333;
+    }
+    .pyramid-table td.bold { font-weight: 700; }
+    .pyramid-table td.green { 
+      color: #2E7D32; 
+      font-weight: 700;
+    }
+    .pyramid-table td.bar-male { 
+      width: 28%; 
+      padding: 8px; 
+    }
+    .pyramid-table td.bar-female { 
+      width: 28%; 
+      padding: 8px; 
+    }
+    .pyramid-table td.bar-male > div,
+    .pyramid-table td.bar-female > div {
+      border-radius: 2px;
+    }
+    .pyramid-table td.age-label-cell { 
+      font-size: 8px; 
+      font-weight: 700; 
+      text-align: center; 
+      width: 60px; 
+      white-space: nowrap; 
+      color: #1A1A1A;
+      background: #FAFAFA;
+    }
 
     /* ── Legend ── */
     .legend { display: flex; gap: 10px; font-size: 7px; color: #555; margin-bottom: 2px; align-items: center; }

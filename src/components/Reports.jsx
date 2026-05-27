@@ -9,6 +9,83 @@ import { exportHouseholdExcel, printHouseholdPdf } from '../lib/householdPrint';
 import { deepEnsureUnicode } from './CsvUploader';
 import { buildExportFilename } from '../lib/exportFilename';
 
+// Convert Myanmar digits (၀-၉) to Arabic digits (0-9) for parsing.
+const myanmarToArabicDigits = (text) => {
+  if (!text) return text;
+  return String(text).replace(/[၀-၉]/g, ch => String('၀၁၂၃၄၅၆၇၈၉'.indexOf(ch)));
+};
+
+// Convert Arabic digits (0-9) to Myanmar digits (၀-၉).
+const arabicToMyanmarDigits = (text) => {
+  if (!text) return text;
+  return String(text).replace(/[0-9]/g, ch => '၀၁၂၃၄၅၆၇၈၉'[parseInt(ch, 10)]);
+};
+
+// Normalizes and zero-pads dates (e.g. ၃.၆.၁၉၉၇ -> ၀၃.၀၆.၁၉၉၇) in Myanmar numerals
+const normalizeDateOfBirth = (text) => {
+  if (text === null || text === undefined) return '';
+  let s = String(text).trim();
+  if (s === '') return '';
+
+  // Strip zero-width / NBSP and normalise whitespace
+  s = s.replace(/[\u200B-\u200D\uFEFF]/g, '');
+  s = s.replace(/[\u00A0\u2000-\u200A\u202F\u205F\u3000]/g, ' ');
+  s = s.replace(/\s+/g, '');
+
+  // Convert any separator (-, /, space) to "." for canonical form
+  s = s.replace(/[-\/]/g, '.');
+
+  // If exactly 3 numeric parts, zero-pad day and month to 2 digits each.
+  const parts = s.split('.');
+  if (parts.length === 3 && parts.every(p => /^\d+$/.test(myanmarToArabicDigits(p)))) {
+    const [d, m, y] = parts;
+    const padArabic = (v) => {
+      const arabic = myanmarToArabicDigits(v);
+      return arabic.length === 1 ? '0' + arabic : arabic;
+    };
+    // Format to standard English date first, then map everything to Myanmar digits
+    const englishDob = `${padArabic(d)}.${padArabic(m)}.${myanmarToArabicDigits(y)}`;
+    return arabicToMyanmarDigits(englishDob);
+  }
+
+  return arabicToMyanmarDigits(s);
+};
+
+// Validate standard date format and real-world existence
+const validateDateOfBirth = (text) => {
+  if (text === null || text === undefined) return 'မွေးသက္ကရာဇ် ဖြည့်စွက်ရန် လိုအပ်ပါသည် (Date of Birth is required, format: dd.mm.yyyy)';
+  const raw = String(text).trim();
+  if (raw === '' || raw === '-') return 'မွေးသက္ကရာဇ် ဖြည့်စွက်ရန် လိုအပ်ပါသည် (Date of Birth is required, format: dd.mm.yyyy)';
+
+  // Convert Myanmar digits to Arabic digits so that the English regex match works!
+  const s = myanmarToArabicDigits(raw);
+
+  // Must match dd.mm.yyyy exactly (after normalisation)
+  const match = s.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
+  if (!match) {
+    return `မွေးသက္ကရာဇ် "${text}" ပုံစံမမှန်ပါ။ စံပုံစံ - dd.mm.yyyy ဖြစ်ရမည် ဥပမာ - ၁၅.၀၆.၁၉၈၅ (Date of Birth "${text}" is incomplete or wrong format. Required: dd.mm.yyyy)`;
+  }
+
+  const day   = parseInt(match[1], 10);
+  const month = parseInt(match[2], 10);
+  const year  = parseInt(match[3], 10);
+  const currentYear = new Date().getFullYear();
+
+  if (month < 1 || month > 12) return `မွေးသက္ကရာဇ် "${text}" တွင် လအမှားဖြစ်နေသည် (Month must be 01-12)`;
+  if (day   < 1 || day   > 31) return `မွေးသက္ကရာဇ် "${text}" တွင် ရက်အမှားဖြစ်နေသည် (Day must be 01-31)`;
+  if (year  < 1900 || year > currentYear) {
+    return `မွေးသက္ကရာဇ် "${text}" တွင် ခုနှစ်အမှားဖြစ်နေသည် (Year must be 1900-${currentYear})`;
+  }
+
+  // Check calendar dates
+  const dt = new Date(year, month - 1, day);
+  if (dt.getFullYear() !== year || dt.getMonth() !== month - 1 || dt.getDate() !== day) {
+    return `မွေးသက္ကရာဇ် "${text}" သည် ပြက္ခဒိန်အရ မှန်ကန်သောရက်စွဲမဟုတ်ပါ (Not a real calendar date)`;
+  }
+
+  return null;
+};
+
 const Reports = () => {
   const [level, setLevel] = useState(1);
   const [loading, setLoading] = useState(true);
@@ -416,10 +493,23 @@ const Reports = () => {
     setSaving(true);
     try {
       const { id, created_at, ...fields } = editForm;
+
+      // Normalize and validate Date of Birth
+      if (fields.date_of_birth) {
+        fields.date_of_birth = normalizeDateOfBirth(fields.date_of_birth);
+        const dobError = validateDateOfBirth(fields.date_of_birth);
+        if (dobError) {
+          alert(dobError);
+          setSaving(false);
+          return;
+        }
+      }
+
       const { error } = await supabase
         .from('households')
         .update(fields)
         .eq('id', editingId);
+
       if (error) throw error;
       setFamilyMembers(prev =>
         prev.map(m => m.id === editingId ? { ...m, ...fields } : m)

@@ -64,13 +64,12 @@ serve(async (req) => {
         subject: 'TPS Login Verification Code',
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
-            <div style="background: #1A1A1A; padding: 20px; text-align: center; margin-bottom: 24px;">
-              <img src="https://tps-zeta.vercel.app/assets/logo.jpg" alt="IDTL Logo" width="64" height="64" style="border-radius: 50%; border: 2px solid #374151; margin-bottom: 12px; display: block; margin-left: auto; margin-right: auto;" />
-              <h1 style="color: white; margin: 0; font-size: 18px; letter-spacing: 0.1em;">TPS AUTHENTICATION</h1>
-              <p style="color: #A3A3A3; margin: 6px 0 0; font-size: 12px;">Immigration Department of Ta'ang Land</p>
+            <div style="background: #1A1A1A; padding: 28px 20px; text-align: center; margin-bottom: 24px;">
+              <h1 style="color: white; margin: 0; font-size: 18px; letter-spacing: 0.1em; font-weight: 700;">TPS AUTHENTICATION</h1>
+              <p style="color: #A3A3A3; margin: 8px 0 0; font-size: 12px;">Immigration Department of Ta'ang Land</p>
             </div>
             <p style="color: #4B5563; font-size: 14px; margin-bottom: 8px;">
-              Hello <strong>Officer</strong>,
+              Hello <strong> Immigration Officer</strong>,
             </p>
             <p style="color: #4B5563; font-size: 14px; margin-bottom: 24px;">
               Your one-time login verification code is:
@@ -86,10 +85,7 @@ serve(async (req) => {
             </p>
             <hr style="border: none; border-top: 1px solid #E5E7EB; margin: 24px 0;" />
             <p style="color: #9CA3AF; font-size: 10px; text-align: center;">
-              IDTL · Ta'ang Land Immigration Dept. · Confidential System
-            </p>
-            <p style="color: #9CA3AF; font-size: 10px; text-align: center; margin-top: 4px;">
-              TPS by Mai Naung Naung &amp; Mai Nay Lin
+              IDTL · Ta'ang Land Immigration Dept. · Confidential System . Powered By Mai Naung Naung & Mai Nay Lin 
             </p>
           </div>
         `,

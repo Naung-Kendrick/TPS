@@ -405,9 +405,7 @@ const Login = ({ onLogin }) => {
           textAlign: 'center', backgroundColor: '#FAFAFA',
         }}>
           <p style={{ fontSize: '0.75rem', color: '#6B7280', margin: 0, lineHeight: 1.5 }}>
-            SYSTEM VERSION: 2.0.5-RELEASE<br />
-            © {new Date().getFullYear()} IDTL CIVIL REGISTRY SERVICE<br />
-            <span style={{ fontSize: '0.65rem', color: '#9CA3AF' }}>TPS by Mai Naung Naung &amp; Mai Nay Lin</span>
+            Ta'ang Population System
           </p>
         </div>
       </div>

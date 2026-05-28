@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 import {
   UserPlus, Shield, User, Key, Hash, Loader2, CheckCircle2, AlertTriangle, X,
   RefreshCw, Lock, Clock, ShieldAlert, Eye, EyeOff, Users, Circle,
-  ToggleLeft, ToggleRight, UserCheck, UserX, Activity, ChevronDown
+  ToggleLeft, ToggleRight, UserCheck, UserX, Activity, ChevronDown, Mail
 } from 'lucide-react';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -35,7 +35,7 @@ function isOnline(ts) {
 
 const UserManagement = ({ user }) => {
   // ── Create-user form ──────────────────────────────────────────────────────
-  const [formData, setFormData] = useState({ username: '', password: '', role: 'field' });
+  const [formData, setFormData] = useState({ username: '', password: '', role: 'field', email: '' });
   const [loading,  setLoading]  = useState(false);
   const [status,   setStatus]   = useState(null);
 
@@ -155,8 +155,9 @@ const UserManagement = ({ user }) => {
         body: { ...formData, displayName: formData.username },
       });
       if (error) throw error;
-      setStatus({ type: 'success', text: 'User account created successfully. The officer can now log in using their credentials.' });
-      setFormData({ username: '', password: '', role: 'field' });
+      const emailNote = formData.email ? ' Email OTP will be required at login.' : ' No email set — OTP step will be skipped.';
+      setStatus({ type: 'success', text: `User account created successfully.${emailNote}` });
+      setFormData({ username: '', password: '', role: 'field', email: '' });
       await loadUsers();
     } catch (err) {
       setStatus({ type: 'error', text: err.message || 'An unexpected error occurred during user creation.' });
@@ -642,6 +643,24 @@ const UserManagement = ({ user }) => {
                         placeholder="••••••••"
                       />
                     </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase tracking-wider">
+                      OTP Email <span className="normal-case font-normal text-gray-400">(optional — for 2FA)</span>
+                    </label>
+                    <div className="flex">
+                      <div className="bg-gray-100 border border-r-0 border-gray-200 px-3 flex items-center">
+                        <Mail size={14} className="text-gray-400" />
+                      </div>
+                      <input
+                        type="email" name="email"
+                        value={formData.email} onChange={handleChange}
+                        className="w-full px-3 py-2 bg-white border border-gray-200 focus:outline-none focus:border-gray-900 transition-colors text-sm"
+                        placeholder="officer@gmail.com (leave blank to skip OTP)"
+                      />
+                    </div>
+                    <p className="text-[10px] text-gray-400 mt-1">If set, officer must verify a 6-digit email code after PIN login.</p>
                   </div>
 
                   <div>

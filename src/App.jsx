@@ -62,6 +62,31 @@ function App() {
     return () => clearInterval(timer);
   }, [user?.id]);
 
+  // Realtime: refresh user profile when an admin changes role/access_level
+  useEffect(() => {
+    if (!user?.id) return;
+    const channel = supabase
+      .channel(`profile-self-${user.id}`)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'profiles',
+        filter: `id=eq.${user.id}`,
+      }, (payload) => {
+        const updated = payload.new;
+        setUser(prev => ({
+          ...prev,
+          role:               updated.role               ?? prev.role,
+          access_level:       updated.access_level       ?? prev.access_level,
+          allowed_districts:  updated.allowed_districts  ?? prev.allowed_districts,
+          allowed_townships:  updated.allowed_townships  ?? prev.allowed_townships,
+          is_active:          updated.is_active          ?? prev.is_active,
+        }));
+      })
+      .subscribe();
+    return () => supabase.removeChannel(channel);
+  }, [user?.id]);
+
   const handleLogout = () => {
     setUser(null);
   };

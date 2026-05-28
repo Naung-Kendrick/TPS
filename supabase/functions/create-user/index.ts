@@ -22,7 +22,7 @@ serve(async (req) => {
     )
 
     // Receive data from React frontend
-    const { username, password, role, displayName } = await req.json()
+    const { username, password, role, displayName, email } = await req.json()
 
     if (!username || !password || !role) {
       throw new Error('Username, password, and role are required.')
@@ -43,14 +43,17 @@ serve(async (req) => {
     // 2. Update the profile
     // Note: A trigger usually creates a profile automatically. We update it with specific details.
     // We use upsert to be safe.
+    const profilePayload: any = {
+      id: authData.user.id,
+      username: username,
+      display_name: displayName,
+      role: role,
+    }
+    if (email) profilePayload.email = email
+
     const { error: profileError } = await supabaseAdmin
       .from('profiles')
-      .upsert({
-        id: authData.user.id,
-        username: username,
-        display_name: displayName,
-        role: role, // 'field', 'ops', 'regional', 'system' (or 'staff', 'admin', 'master')
-      }, { onConflict: 'id' })
+      .upsert(profilePayload, { onConflict: 'id' })
 
     if (profileError) throw profileError
 

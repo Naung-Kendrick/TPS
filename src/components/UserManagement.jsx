@@ -79,10 +79,20 @@ const UserManagement = ({ user }) => {
     setListLoading(true);
     setListError(null);
     try {
-      const { data, error } = await supabase
+      // Try full select first; fall back if username/email columns don't exist yet
+      let { data, error } = await supabase
         .from('profiles')
-        .select('id, username, role, is_active, last_seen_at, created_at')
+        .select('id, role, is_active, last_seen_at, created_at, username, email')
         .order('created_at', { ascending: false });
+      if (error && error.message?.includes('username')) {
+        // username column not yet in DB — run the migration SQL
+        const res = await supabase
+          .from('profiles')
+          .select('id, role, is_active, last_seen_at, created_at')
+          .order('created_at', { ascending: false });
+        data = res.data;
+        error = res.error;
+      }
       if (error) throw error;
       setUserList(data || []);
     } catch (err) {
@@ -444,7 +454,7 @@ const UserManagement = ({ user }) => {
                           <div className="flex items-center gap-2.5">
                             <div className="relative flex-shrink-0">
                               <div className="w-7 h-7 bg-gray-100 border border-gray-200 flex items-center justify-center text-[11px] font-bold text-gray-600 select-none uppercase">
-                                {(u.username || '?')[0]}
+                                {(u.username || u.id || '?')[0]}
                               </div>
                               {/* Online dot */}
                               <span
@@ -455,10 +465,10 @@ const UserManagement = ({ user }) => {
                             </div>
                             <div>
                               <div className="font-semibold text-gray-900 text-[11px]">
-                                {u.username}
+                                {u.username || <span className="text-gray-400 italic text-[10px]">{u.id.slice(0, 8)}</span>}
                                 {isSelf && <span className="ml-1.5 text-[9px] font-bold text-gray-400 bg-gray-100 px-1 py-0.5">(YOU)</span>}
                               </div>
-                              <div className="text-[9px] text-gray-400 font-mono">{u.username}@tps.idtl</div>
+                              <div className="text-[9px] text-gray-400 font-mono">{u.username ? `${u.username}@tps.idtl` : u.email || '—'}</div>
                             </div>
                           </div>
                         </td>

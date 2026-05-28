@@ -14,7 +14,6 @@ const HouseholdForm      = lazy(() => import('./components/HouseholdForm'))
 const IDCardScanner      = lazy(() => import('./components/IDCardScanner'))
 const Login              = lazy(() => import('./components/Login'))
 const UserManagement     = lazy(() => import('./components/UserManagement'))
-const TpsAuthenticator   = lazy(() => import('./components/TpsAuthenticator'))
 
 const PageFallback = () => (
   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
@@ -49,15 +48,6 @@ const Placeholder = ({ title }) => (
 
 function App() {
   const [user, setUser] = useState(null);
-  const [authPassed, setAuthPassed] = useState(() => {
-    // Persist gate pass for the browser session only
-    return sessionStorage.getItem('tps_auth_passed') === '1';
-  });
-
-  const handleAuthPassed = () => {
-    sessionStorage.setItem('tps_auth_passed', '1');
-    setAuthPassed(true);
-  };
 
   const handleLogin = (data) => {
     setUser(data);
@@ -74,20 +64,9 @@ function App() {
 
   const handleLogout = () => {
     setUser(null);
-    // Do NOT clear authPassed on logout — user already proved they know the weekly code.
-    // Only clear when the browser session ends (sessionStorage is tab-scoped).
   };
 
-  // Gate 1: TPS Authenticator (weekly code)
-  if (!authPassed) {
-    return (
-      <Suspense fallback={<PageFallback />}>
-        <TpsAuthenticator onPassed={handleAuthPassed} />
-      </Suspense>
-    );
-  }
-
-  // Gate 2: Username + PIN login
+  // Gate: Username + PIN + Email OTP login
   if (!user) {
     return (
       <Suspense fallback={<PageFallback />}>

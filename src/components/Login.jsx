@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Lock, User, Eye, EyeOff, ShieldAlert, ChevronRight, Mail, KeyRound, Loader2, ArrowLeft, CheckCircle2 } from 'lucide-react';
+import { Lock, User, Eye, EyeOff, ShieldAlert, ChevronRight, Mail, Loader2, ArrowLeft, CheckCircle2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import logo from '../assets/fonts/IDTL_logo.png';
 
@@ -65,33 +65,32 @@ const Login = ({ onLogin }) => {
       });
       if (authError) throw authError;
 
-      // 2. Fetch profile (need email field for OTP)
+      // 2. Fetch profile
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
-        .select('*')
+        .select('id, role, is_active, last_seen_at')
         .eq('id', authData.user.id)
         .single();
       if (profileError) { profileError.userId = authData.user.id; throw profileError; }
 
-      // 3. Check if the profile has a real email for OTP
-      const otpEmail = profile.email || null;
-      if (!otpEmail) {
-        // No email configured — skip OTP step (backwards compatibility)
-        await supabase.from('profiles').update({ last_seen_at: new Date().toISOString() }).eq('id', authData.user.id);
-        onLogin?.({ ...authData.user, profile, role: profile.role });
-        return;
-      }
-
-      // 4. Send OTP to the officer's email
-      const { error: otpError } = await supabase.auth.signInWithOtp({
-        email: otpEmail,
-        options: { shouldCreateUser: false },
+      // 3. Send OTP via edge function (uses Resend to deliver to profile.email)
+      const { data: otpResult, error: otpFnError } = await supabase.functions.invoke('send-otp', {
+        body: { user_id: authData.user.id },
       });
-      if (otpError) throw otpError;
+      // otpFnError.context has the actual response body on non-2xx
+      if (otpFnError) {
+        let msg = 'Failed to send OTP.';
+        try {
+          const body = await otpFnError.context?.json?.();
+          if (body?.error) msg = body.error;
+        } catch {}
+        throw new Error(msg);
+      }
+      if (otpResult?.error) throw new Error(otpResult.error);
 
-      // 5. Move to step 2
+      // 4. Move to step 2
       setPendingUser({ authData, profile });
-      setMaskedEmail(maskEmail(otpEmail));
+      setMaskedEmail(otpResult.masked_email || '');
       startCooldown();
       setStep(2);
 
@@ -145,13 +144,11 @@ const Login = ({ onLogin }) => {
     setError('');
 
     try {
-      const otpEmail = pendingUser.profile.email;
-      const { data, error: verifyErr } = await supabase.auth.verifyOtp({
-        email: otpEmail,
-        token,
-        type: 'email',
+      const { data: verifyResult, error: verifyFnError } = await supabase.functions.invoke('verify-otp', {
+        body: { user_id: pendingUser.authData.user.id, code: token },
       });
-      if (verifyErr) throw verifyErr;
+      if (verifyFnError) throw new Error(verifyFnError.message || 'Verification failed.');
+      if (verifyResult?.error) throw new Error(verifyResult.error);
 
       // Stamp last_seen_at
       await supabase.from('profiles').update({ last_seen_at: new Date().toISOString() }).eq('id', pendingUser.authData.user.id);
@@ -162,9 +159,7 @@ const Login = ({ onLogin }) => {
         role: pendingUser.profile.role,
       });
     } catch (err) {
-      setError(err.message?.includes('expired') || err.message?.includes('invalid')
-        ? 'Invalid or expired code. Please try again or resend.'
-        : `Error: ${err.message}`);
+      setError(err.message || 'Verification failed. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -174,11 +169,11 @@ const Login = ({ onLogin }) => {
     if (cooldown > 0 || !pendingUser) return;
     setError('');
     try {
-      const { error } = await supabase.auth.signInWithOtp({
-        email: pendingUser.profile.email,
-        options: { shouldCreateUser: false },
+      const { data, error } = await supabase.functions.invoke('send-otp', {
+        body: { user_id: pendingUser.authData.user.id },
       });
-      if (error) throw error;
+      if (error) throw new Error(error.message || 'Failed to resend.');
+      if (data?.error) throw new Error(data.error);
       startCooldown();
       setOtp(['', '', '', '', '', '']);
       otpRefs.current[0]?.focus();
@@ -411,7 +406,8 @@ const Login = ({ onLogin }) => {
         }}>
           <p style={{ fontSize: '0.75rem', color: '#6B7280', margin: 0, lineHeight: 1.5 }}>
             SYSTEM VERSION: 2.0.5-RELEASE<br />
-            © {new Date().getFullYear()} IDTL CIVIL REGISTRY SERVICE
+            © {new Date().getFullYear()} IDTL CIVIL REGISTRY SERVICE<br />
+            <span style={{ fontSize: '0.65rem', color: '#9CA3AF' }}>TPS by Mai Naung Naung &amp; Mai Nay Lin</span>
           </p>
         </div>
       </div>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
-import { Users, MapPin, Globe, Briefcase, Search, Printer } from 'lucide-react';
+import { Users, MapPin, Globe, Briefcase, Search, Printer, Send, CheckCircle2 } from 'lucide-react';
 import { printDemographicDashboard } from '../lib/statisticsPrint';
 import EmptyState from './EmptyState';
 import { SkeletonBar } from './Skeleton';
@@ -577,6 +577,7 @@ const DemographicDashboard = ({ user }) => {
     ? user.allowed_districts : null;
   const townshipFilter = (user?.access_level === 'township' && user?.allowed_townships?.length > 0)
     ? user.allowed_townships : null;
+  const isViewer = user?.access_level === 'viewer';
   const [statsData, setStatsData] = useState(null);
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState(null);
@@ -592,6 +593,34 @@ const DemographicDashboard = ({ user }) => {
   const [selectedWard, setSelectedWard]         = useState('');
   const [selectedGroup, setSelectedGroup]       = useState('');
   const [selectedVillage, setSelectedVillage]   = useState('');
+  const [reqSending, setReqSending] = useState(false);
+  const [reqSent,    setReqSent]    = useState(null);
+
+  const submitRequest = async (exportType) => {
+    setReqSending(true);
+    try {
+      const { error } = await supabase.from('print_export_requests').insert({
+        requester_id:   user.id,
+        requester_name: user.profile?.display_name || user.profile?.username || user.email || 'Unknown',
+        page:           'demographics',
+        export_type:    exportType,
+        filters: {
+          district: selectedDistrict || null,
+          township: selectedTownship || null,
+          ward:     selectedWard     || null,
+          group:    selectedGroup    || null,
+          village:  selectedVillage  || null,
+        },
+      });
+      if (error) throw error;
+      setReqSent(exportType);
+      setTimeout(() => setReqSent(null), 6000);
+    } catch (err) {
+      alert('Failed to send request: ' + err.message);
+    } finally {
+      setReqSending(false);
+    }
+  };
 
   // ─── Load districts ───────────────────────────────────────
   const loadDistricts = async () => {
@@ -944,32 +973,30 @@ const DemographicDashboard = ({ user }) => {
           </div>
 
           {/* ── Print / Export toolbar ─────────────────────── */}
-          <div className="tps-stats-toolbar" style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '8px' }}>
-            <button
-              type="button"
-              onClick={() => {
-                if (!statsData) return;
-                printDemographicDashboard({
-                  totalStats, allReligions, allNationalities, allOccupations,
-                  selectedDistrict, selectedTownship, selectedWard, selectedGroup, selectedVillage,
-                });
-              }}
-              onMouseOver={e => { e.currentTarget.style.backgroundColor = '#FFFFFF'; e.currentTarget.style.color = '#1A1A1A'; }}
-              onMouseOut={e => { e.currentTarget.style.backgroundColor = '#1A1A1A'; e.currentTarget.style.color = '#FFFFFF'; }}
-              disabled={!statsData || loading}
-              style={{
-                display: 'flex', alignItems: 'center', gap: '6px',
-                padding: '8px 16px', border: '1px solid #1A1A1A', backgroundColor: '#1A1A1A', color: '#FFFFFF',
-                fontSize: '11px', fontWeight: '500', cursor: !statsData || loading ? 'not-allowed' : 'pointer',
-                textTransform: 'uppercase', letterSpacing: '0.05em', flexShrink: 0,
-                opacity: !statsData || loading ? 0.45 : 1,
-                transition: 'background-color 120ms cubic-bezier(0.23,1,0.32,1), color 120ms cubic-bezier(0.23,1,0.32,1)',
-              }}
-            >
-              <Printer size={13} />
-              Print (Legal)
-            </button>
-          </div>
+          {isViewer ? (
+            <div className="tps-stats-toolbar" style={{ display:'flex', gap:'8px', justifyContent:'flex-end', marginTop:'8px', flexWrap:'wrap', alignItems:'center' }}>
+              <button type="button" onClick={() => submitRequest('print')} disabled={reqSending || reqSent === 'print'}
+                style={{ display:'flex', alignItems:'center', gap:'6px', padding:'8px 16px', border:'1px solid #1A1A1A', backgroundColor:'#1A1A1A', color:'#FFFFFF', fontSize:'11px', fontWeight:'500', cursor: reqSending ? 'not-allowed' : 'pointer', textTransform:'uppercase', letterSpacing:'0.05em', flexShrink:0, opacity: reqSent === 'print' ? 0.6 : 1 }}>
+                {reqSent === 'print' ? <><CheckCircle2 size={13} /> Requested</> : <><Send size={13} /> Request Print</>}
+              </button>
+              {reqSent && (
+                <span style={{ fontSize:'10px', color:'#065F46', fontWeight:'600', display:'flex', alignItems:'center', gap:'4px' }}>
+                  <CheckCircle2 size={12} /> Request sent. District administrator has been notified.
+                </span>
+              )}
+            </div>
+          ) : (
+            <div className="tps-stats-toolbar" style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '8px' }}>
+              <button type="button"
+                onClick={() => { if (!statsData) return; printDemographicDashboard({ totalStats, allReligions, allNationalities, allOccupations, selectedDistrict, selectedTownship, selectedWard, selectedGroup, selectedVillage }); }}
+                onMouseOver={e => { e.currentTarget.style.backgroundColor = '#FFFFFF'; e.currentTarget.style.color = '#1A1A1A'; }}
+                onMouseOut={e => { e.currentTarget.style.backgroundColor = '#1A1A1A'; e.currentTarget.style.color = '#FFFFFF'; }}
+                disabled={!statsData || loading}
+                style={{ display:'flex', alignItems:'center', gap:'6px', padding:'8px 16px', border:'1px solid #1A1A1A', backgroundColor:'#1A1A1A', color:'#FFFFFF', fontSize:'11px', fontWeight:'500', cursor: !statsData || loading ? 'not-allowed' : 'pointer', textTransform:'uppercase', letterSpacing:'0.05em', flexShrink:0, opacity: !statsData || loading ? 0.45 : 1, transition:'background-color 120ms cubic-bezier(0.23,1,0.32,1), color 120ms cubic-bezier(0.23,1,0.32,1)' }}>
+                <Printer size={13} /> Print (Legal)
+              </button>
+            </div>
+          )}
         </>
       )}
 

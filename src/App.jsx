@@ -85,7 +85,11 @@ function App() {
         <Route path="verification" element={<Suspense fallback={<PageFallback />}><Verification user={user} /></Suspense>} />
         <Route path="upload" element={<Suspense fallback={<PageFallback />}><UploadPage user={user} /></Suspense>} />
         <Route path="scanner" element={<Suspense fallback={<PageFallback />}><IDCardScanner /></Suspense>} />
-        <Route path="central-database" element={<Suspense fallback={<PageFallback />}><Reports user={user} /></Suspense>} />
+        <Route path="central-database" element={
+          user?.access_level === 'viewer'
+            ? <Navigate to="/verification" replace />
+            : <Suspense fallback={<PageFallback />}><Reports user={user} /></Suspense>
+        } />
         <Route path="statistics" element={<Suspense fallback={<PageFallback />}><PopulationStatistics user={user} /></Suspense>} />
         <Route path="demographics" element={<Suspense fallback={<PageFallback />}><DemographicDashboard user={user} /></Suspense>} />
         <Route path="registration" element={<Suspense fallback={<PageFallback />}><HouseholdForm user={user} /></Suspense>} />

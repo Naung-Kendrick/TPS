@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { SkeletonStatGrid, SkeletonBar } from './Skeleton';
 import { supabase } from '../lib/supabase';
-import { Users, User, Home, Search, BarChart2, Printer, FileSpreadsheet } from 'lucide-react';
+import { Users, User, Home, Search, BarChart2, Printer, FileSpreadsheet, Send, CheckCircle2 } from 'lucide-react';
 import EmptyState from './EmptyState';
 import { printStatistics, exportStatisticsExcel } from '../lib/statisticsPrint';
 
@@ -171,6 +171,7 @@ const PopulationStatistics = ({ user }) => {
     ? user.allowed_districts : null;
   const townshipFilter = (user?.access_level === 'township' && user?.allowed_townships?.length > 0)
     ? user.allowed_townships : null;
+  const isViewer = user?.access_level === 'viewer';
   // RPC response data (replaces allData)
   const [statsData, setStatsData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -202,8 +203,36 @@ const PopulationStatistics = ({ user }) => {
   const [villagePage2, setVillagePage2] = useState(1);
   const [groupPage1, setGroupPage1] = useState(1);
   const [groupPage2, setGroupPage2] = useState(1);
+  const [reqSending, setReqSending] = useState(false);
+  const [reqSent,    setReqSent]    = useState(null); // 'print' | 'excel' | null
 
   // ─── Fetch districts via RPC ──────────────────────────────
+  const submitRequest = async (exportType) => {
+    setReqSending(true);
+    try {
+      const { error } = await supabase.from('print_export_requests').insert({
+        requester_id:   user.id,
+        requester_name: user.profile?.display_name || user.profile?.username || user.email || 'Unknown',
+        page:           'statistics',
+        export_type:    exportType,
+        filters: {
+          district: selectedDistrict  || null,
+          township: selectedTownship  || null,
+          ward:     selectedWard      || null,
+          group:    selectedGroup     || null,
+          village:  selectedVillage   || null,
+        },
+      });
+      if (error) throw error;
+      setReqSent(exportType);
+      setTimeout(() => setReqSent(null), 6000);
+    } catch (err) {
+      alert('Failed to send request: ' + err.message);
+    } finally {
+      setReqSending(false);
+    }
+  };
+
   const loadDistricts = async () => {
     try {
       const { data, error } = await supabase.rpc('stats_districts');
@@ -1068,37 +1097,36 @@ const PopulationStatistics = ({ user }) => {
             )}
 
             {/* ── Print / Export toolbar ─────────────────────── */}
-            <div className="tps-stats-toolbar">
-              <button
-                type="button"
-                onClick={() => exportStatisticsExcel(printArgs)}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: '6px',
-                  padding: '8px 16px', border: '1px solid #1A1A1A', backgroundColor: '#FFFFFF',
-                  color: '#1A1A1A', fontSize: '11px', fontWeight: '500', cursor: 'pointer',
-                  textTransform: 'uppercase', letterSpacing: '0.05em',
-                }}
-              >
-                <FileSpreadsheet size={13} />
-                Export Excel
-              </button>
-              <button
-                type="button"
-                onClick={() => printStatistics(printArgs)}
-                onMouseOver={e => { e.currentTarget.style.backgroundColor = '#FFFFFF'; e.currentTarget.style.color = '#1A1A1A'; }}
-                onMouseOut={e => { e.currentTarget.style.backgroundColor = '#1A1A1A'; e.currentTarget.style.color = '#FFFFFF'; }}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: '6px',
-                  padding: '8px 16px', border: '1px solid #1A1A1A', backgroundColor: '#1A1A1A',
-                  color: '#FFFFFF', fontSize: '11px', fontWeight: '500', cursor: 'pointer',
-                  textTransform: 'uppercase', letterSpacing: '0.05em',
-                  transition: 'background-color 120ms cubic-bezier(0.23,1,0.32,1), color 120ms cubic-bezier(0.23,1,0.32,1)',
-                }}
-              >
-                <Printer size={13} />
-                Print (Legal)
-              </button>
-            </div>
+            {isViewer ? (
+              <div className="tps-stats-toolbar">
+                <button type="button" onClick={() => submitRequest('excel')} disabled={reqSending || reqSent === 'excel'}
+                  style={{ display:'flex', alignItems:'center', gap:'6px', padding:'8px 16px', border:'1px solid #1A1A1A', backgroundColor:'#FFFFFF', color:'#1A1A1A', fontSize:'11px', fontWeight:'500', cursor: reqSending ? 'not-allowed' : 'pointer', textTransform:'uppercase', letterSpacing:'0.05em', opacity: reqSent === 'excel' ? 0.6 : 1 }}>
+                  {reqSent === 'excel' ? <><CheckCircle2 size={13} /> Requested</> : <><Send size={13} /> Request Excel Export</>}
+                </button>
+                <button type="button" onClick={() => submitRequest('print')} disabled={reqSending || reqSent === 'print'}
+                  style={{ display:'flex', alignItems:'center', gap:'6px', padding:'8px 16px', border:'1px solid #1A1A1A', backgroundColor:'#1A1A1A', color:'#FFFFFF', fontSize:'11px', fontWeight:'500', cursor: reqSending ? 'not-allowed' : 'pointer', textTransform:'uppercase', letterSpacing:'0.05em', opacity: reqSent === 'print' ? 0.6 : 1 }}>
+                  {reqSent === 'print' ? <><CheckCircle2 size={13} /> Requested</> : <><Send size={13} /> Request Print</>}
+                </button>
+                {reqSent && (
+                  <span style={{ fontSize:'10px', color:'#065F46', fontWeight:'600', display:'flex', alignItems:'center', gap:'4px' }}>
+                    <CheckCircle2 size={12} /> Request sent. District administrator has been notified.
+                  </span>
+                )}
+              </div>
+            ) : (
+              <div className="tps-stats-toolbar">
+                <button type="button" onClick={() => exportStatisticsExcel(printArgs)}
+                  style={{ display:'flex', alignItems:'center', gap:'6px', padding:'8px 16px', border:'1px solid #1A1A1A', backgroundColor:'#FFFFFF', color:'#1A1A1A', fontSize:'11px', fontWeight:'500', cursor:'pointer', textTransform:'uppercase', letterSpacing:'0.05em' }}>
+                  <FileSpreadsheet size={13} /> Export Excel
+                </button>
+                <button type="button" onClick={() => printStatistics(printArgs)}
+                  onMouseOver={e => { e.currentTarget.style.backgroundColor='#FFFFFF'; e.currentTarget.style.color='#1A1A1A'; }}
+                  onMouseOut={e => { e.currentTarget.style.backgroundColor='#1A1A1A'; e.currentTarget.style.color='#FFFFFF'; }}
+                  style={{ display:'flex', alignItems:'center', gap:'6px', padding:'8px 16px', border:'1px solid #1A1A1A', backgroundColor:'#1A1A1A', color:'#FFFFFF', fontSize:'11px', fontWeight:'500', cursor:'pointer', textTransform:'uppercase', letterSpacing:'0.05em', transition:'background-color 120ms cubic-bezier(0.23,1,0.32,1), color 120ms cubic-bezier(0.23,1,0.32,1)' }}>
+                  <Printer size={13} /> Print (Legal)
+                </button>
+              </div>
+            )}
           </>
         );
       })()}

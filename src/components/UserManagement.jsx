@@ -51,6 +51,10 @@ const UserManagement = ({ user }) => {
   const [filterRole,   setFilterRole]   = useState('all');
   const [filterStatus, setFilterStatus] = useState('all'); // 'all' | 'active' | 'disabled'
 
+  // ── Print/Export requests (visible to central/district admins) ──────────
+  const [requests,    setRequests]    = useState([]);
+  const [reqLoading,  setReqLoading]  = useState(false);
+
   // ── District / Township edit state ───────────────────────────────────────
   const [editingDistrictsFor, setEditingDistrictsFor] = useState(null);
   const [editedLevel,      setEditedLevel]      = useState('central');
@@ -62,6 +66,34 @@ const UserManagement = ({ user }) => {
   const townshipsLoadedRef = useRef(false);
 
   const canToggleUsers = user?.role === 'system' || user?.role === 'master' || user?.role === 'admin';
+  const isAdminLevel   = user?.access_level === 'central' || user?.access_level === 'district';
+
+  // ── Load print/export requests ───────────────────────────────────
+  const loadRequests = useCallback(async () => {
+    if (!isAdminLevel) return;
+    setReqLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('print_export_requests')
+        .select('*')
+        .eq('status', 'pending')
+        .order('requested_at', { ascending: false });
+      if (error) throw error;
+      setRequests(data || []);
+    } catch (err) {
+      console.error('Failed to load requests:', err);
+    } finally {
+      setReqLoading(false);
+    }
+  }, [isAdminLevel]);
+
+  const resolveRequest = async (id) => {
+    const { error } = await supabase
+      .from('print_export_requests')
+      .update({ status: 'resolved', resolved_by: user.id, resolved_at: new Date().toISOString() })
+      .eq('id', id);
+    if (!error) setRequests(prev => prev.filter(r => r.id !== id));
+  };
 
   // ── Load user list ────────────────────────────────────────────────────────
   const loadUsers = useCallback(async () => {
@@ -93,6 +125,18 @@ const UserManagement = ({ user }) => {
   }, []);
 
   useEffect(() => { loadUsers(); }, [loadUsers]);
+
+  // ── Realtime subscription for print/export requests ───────────────────
+  useEffect(() => {
+    if (!isAdminLevel) return;
+    loadRequests();
+    const ch = supabase
+      .channel('print_export_requests_ch')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'print_export_requests' },
+        () => loadRequests())
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [isAdminLevel, loadRequests]);
 
   // ── Toggle active/disabled ────────────────────────────────────────────────
   const toggleUserActive = async (targetUser) => {
@@ -142,7 +186,7 @@ const UserManagement = ({ user }) => {
     setSavingDistricts(true);
     try {
       const newLevel     = editedLevel;
-      let newDistricts   = newLevel === 'district' ? editedDistricts : [];
+      let newDistricts   = (newLevel === 'district' || newLevel === 'viewer') ? editedDistricts : [];
       const newTownships = newLevel === 'township'  ? editedTownships : [];
       // For township level: auto-compute parent districts from selected townships
       if (newLevel === 'township' && newTownships.length > 0) {
@@ -189,7 +233,7 @@ const UserManagement = ({ user }) => {
     }
     if (name === 'access_level') {
       if (value === 'central')   setFormData(prev => ({ ...prev, access_level: value, allowed_districts: [], allowed_townships: [] }));
-      else if (value === 'district') setFormData(prev => ({ ...prev, access_level: value, allowed_townships: [] }));
+      else if (value === 'district' || value === 'viewer') setFormData(prev => ({ ...prev, access_level: value, allowed_townships: [] }));
       else if (value === 'township') { setFormData(prev => ({ ...prev, access_level: value, allowed_districts: [] })); loadAllTownships(); }
       return;
     }
@@ -267,12 +311,13 @@ const UserManagement = ({ user }) => {
       {/* ── Tab Switcher ────────────────────────────────────────────────────── */}
       <div className="border-b border-gray-200 flex gap-0">
         {[
-          { key: 'list',   label: 'User Accounts', icon: <Users size={13} /> },
-          { key: 'create', label: 'Create Account', icon: <UserPlus size={13} /> },
+          { key: 'list',     label: 'User Accounts',            icon: <Users size={13} /> },
+          { key: 'create',   label: 'Create Account',           icon: <UserPlus size={13} /> },
+          ...(isAdminLevel ? [{ key: 'requests', label: 'Print / Export Requests', icon: <RefreshCw size={13} /> }] : []),
         ].map(tab => (
           <button
             key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
+            onClick={() => { setActiveTab(tab.key); if (tab.key === 'requests') loadRequests(); }}
             className={`flex items-center gap-2 px-5 py-3 text-[11px] font-bold uppercase tracking-wider border-b-2 transition-colors ${
               activeTab === tab.key
                 ? 'border-gray-900 text-gray-900'
@@ -283,6 +328,11 @@ const UserManagement = ({ user }) => {
             {tab.key === 'list' && (
               <span className={`ml-1 px-1.5 py-0.5 text-[9px] font-bold rounded-full ${activeTab === 'list' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-500'}`}>
                 {totalUsers}
+              </span>
+            )}
+            {tab.key === 'requests' && requests.length > 0 && (
+              <span className="ml-1 px-1.5 py-0.5 text-[9px] font-bold rounded-full bg-red-500 text-white animate-pulse">
+                {requests.length}
               </span>
             )}
           </button>
@@ -384,9 +434,10 @@ const UserManagement = ({ user }) => {
                     const isSelf   = u.id === user?.id;
                     const toggling = togglingId === u.id;
                     const roleInfo = ROLE_LABELS[u.role] || { label: u.role, color: '#737373', bg: '#F5F5F5' };
-                    const isEditingThis  = editingDistrictsFor === u.id;
-                    const isDistrictLevel = u.access_level === 'district';
-                    const isTownshipLevel = u.access_level === 'township';
+                    const isEditingThis   = editingDistrictsFor === u.id;
+                    const isDistrictLevel  = u.access_level === 'district';
+                    const isTownshipLevel  = u.access_level === 'township';
+                    const isViewerLevel    = u.access_level === 'viewer';
 
                     return (
                       <React.Fragment key={u.id}>
@@ -440,6 +491,8 @@ const UserManagement = ({ user }) => {
                                         <span className="text-[9px] text-gray-400">+{(u.allowed_townships || []).length - 2} more</span>
                                       )}
                                     </>
+                              ) : isViewerLevel ? (
+                                <span className="text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5">မြင်းသာ (Viewer)</span>
                               ) : (
                                 <span className="text-[9px] font-bold bg-gray-100 text-gray-500 border border-gray-200 px-2 py-0.5">Central</span>
                               )}
@@ -521,7 +574,7 @@ const UserManagement = ({ user }) => {
                                 <div>
                                   <div className="text-[9px] font-bold text-gray-500 uppercase tracking-wider mb-2">Access Level</div>
                                   <div className="flex flex-wrap gap-2">
-                                    {[['central','Central — Full Access'],['district','District — Restricted'],['township','Township — Most Restricted']].map(([val, lbl]) => (
+                                    {[['central','Central — Full Access'],['district','District — Restricted'],['township','Township — Most Restricted'],['viewer','Viewer — View Only']].map(([val, lbl]) => (
                                       <label key={val} className={`flex items-center gap-2 px-3 py-2 border cursor-pointer text-[11px] font-semibold transition-colors ${
                                         editedLevel === val ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-400'
                                       }`}>
@@ -529,7 +582,7 @@ const UserManagement = ({ user }) => {
                                           onChange={() => {
                                             setEditedLevel(val);
                                             if (val === 'central') { setEditedDistricts([]); setEditedTownships([]); }
-                                            else if (val === 'district') setEditedTownships([]);
+                                            else if (val === 'district' || val === 'viewer') setEditedTownships([]);
                                             else if (val === 'township') { setEditedDistricts([]); loadAllTownships(); }
                                           }}
                                           className="hidden" />
@@ -539,8 +592,8 @@ const UserManagement = ({ user }) => {
                                   </div>
                                 </div>
 
-                                {/* Row 2: district checkboxes */}
-                                {editedLevel === 'district' && (
+                                {/* Row 2: district checkboxes (district + viewer levels) */}
+                                {(editedLevel === 'district' || editedLevel === 'viewer') && (
                                   <div>
                                     <div className="text-[9px] font-bold text-gray-500 uppercase tracking-wider mb-2">Allowed Districts</div>
                                     <div className="flex flex-wrap gap-2">
@@ -763,7 +816,7 @@ const UserManagement = ({ user }) => {
                   <div>
                     <label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase tracking-wider">Data Access Level</label>
                     <div className="flex flex-wrap gap-2">
-                      {[['central', 'Central — Full Access'], ['district', 'District — Restricted'], ['township', 'Township — Most Restricted']].map(([val, lbl]) => (
+                      {[['central', 'Central — Full Access'], ['district', 'District — Restricted'], ['township', 'Township — Most Restricted'], ['viewer', 'Viewer — View Only']].map(([val, lbl]) => (
                         <label key={val} className={`flex items-center gap-2 px-3 py-2.5 border cursor-pointer text-[11px] font-semibold transition-colors ${
                           formData.access_level === val ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-400'
                         }`}>
@@ -773,10 +826,10 @@ const UserManagement = ({ user }) => {
                         </label>
                       ))}
                     </div>
-                    <p className="text-[10px] text-gray-400 mt-1">Central = all data. District = assigned districts only. Township = specific townships only.</p>
+                    <p className="text-[10px] text-gray-400 mt-1">Central = all. District = districts only. Township = specific townships. Viewer = view only, no print/export.</p>
                   </div>
 
-                  {formData.access_level === 'district' && (
+                  {(formData.access_level === 'district' || formData.access_level === 'viewer') && (
                     <div>
                       <label className="block text-[10px] font-bold text-gray-600 mb-2 uppercase tracking-wider">Allowed Districts</label>
                       <div className="flex flex-wrap gap-2">
@@ -839,6 +892,73 @@ const UserManagement = ({ user }) => {
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ── PRINT / EXPORT REQUESTS TAB ─────────────────────────────────────── */}
+      {activeTab === 'requests' && isAdminLevel && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-[13px] font-bold text-gray-900 uppercase tracking-wider">Pending Print / Export Requests</h3>
+              <p className="text-[10px] text-gray-400 mt-0.5">Viewer-level officers who need to print or export data will appear here.</p>
+            </div>
+            <button onClick={loadRequests} disabled={reqLoading}
+              className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 text-[10px] font-bold uppercase tracking-wider text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50">
+              <RefreshCw size={11} className={reqLoading ? 'animate-spin' : ''} /> Refresh
+            </button>
+          </div>
+
+          {reqLoading ? (
+            <div className="flex items-center gap-2 text-[11px] text-gray-400 py-8 justify-center">
+              <Loader2 size={14} className="animate-spin" /> Loading requests...
+            </div>
+          ) : requests.length === 0 ? (
+            <div className="border border-gray-100 bg-gray-50 text-center py-12">
+              <CheckCircle2 size={28} className="text-gray-300 mx-auto mb-3" />
+              <p className="text-[11px] text-gray-400 uppercase tracking-wider font-bold">No Pending Requests</p>
+              <p className="text-[10px] text-gray-300 mt-1">All caught up.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {requests.map(r => {
+                const pageName = r.page === 'statistics' ? 'Population Statistics' : 'Demographic Dashboard';
+                const typeLabel = r.export_type === 'print' ? 'Print (Legal)' : 'Export Excel';
+                const f = r.filters || {};
+                const filterStr = [
+                  f.district  && `District: ${f.district}`,
+                  f.township  && `Township: ${f.township}`,
+                  f.ward      && `Ward: ${f.ward}`,
+                  f.group     && `Group: ${f.group}`,
+                  f.village   && `Village: ${f.village}`,
+                ].filter(Boolean).join(' › ') || 'All data (no filter selected)';
+
+                return (
+                  <div key={r.id} className="border border-amber-200 bg-amber-50 p-4 flex flex-col sm:flex-row sm:items-start gap-4">
+                    <div className="flex-1 space-y-1.5">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-[11px] font-bold text-gray-900">{r.requester_name || 'Unknown Officer'}</span>
+                        <span className="text-[9px] font-bold bg-amber-200 text-amber-800 px-2 py-0.5 uppercase tracking-wider">Viewer</span>
+                        <span className="text-[9px] text-gray-400">{formatLastSeen(r.requested_at)}</span>
+                      </div>
+                      <div className="text-[11px] text-gray-700">
+                        Requests to <strong>{typeLabel}</strong> on <strong>{pageName}</strong>
+                      </div>
+                      <div className="text-[10px] text-gray-500 font-mono bg-white border border-amber-100 px-2 py-1 inline-block">
+                        {filterStr}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => resolveRequest(r.id)}
+                      className="flex items-center gap-1.5 px-4 py-2 bg-gray-900 text-white text-[10px] font-bold uppercase tracking-wider hover:bg-gray-700 transition-colors self-start sm:self-auto whitespace-nowrap"
+                    >
+                      <CheckCircle2 size={12} /> Mark Resolved
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
     </div>

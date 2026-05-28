@@ -57,6 +57,7 @@ const UserManagement = ({ user }) => {
 
   // ── District / Township edit state ───────────────────────────────────────
   const [editingDistrictsFor, setEditingDistrictsFor] = useState(null);
+  const [editedRole,       setEditedRole]       = useState('field');
   const [editedLevel,      setEditedLevel]      = useState('central');
   const [editedDistricts,  setEditedDistricts]  = useState([]);
   const [editedTownships,  setEditedTownships]  = useState([]);
@@ -198,12 +199,12 @@ const UserManagement = ({ user }) => {
       }
       const { error } = await supabase
         .from('profiles')
-        .update({ access_level: newLevel, allowed_districts: newDistricts, allowed_townships: newTownships })
+        .update({ role: editedRole, access_level: newLevel, allowed_districts: newDistricts, allowed_townships: newTownships })
         .eq('id', userId);
       if (error) throw error;
       setUserList(prev => prev.map(u =>
         u.id === userId
-          ? { ...u, access_level: newLevel, allowed_districts: newDistricts, allowed_townships: newTownships }
+          ? { ...u, role: editedRole, access_level: newLevel, allowed_districts: newDistricts, allowed_townships: newTownships }
           : u
       ));
       setEditingDistrictsFor(null);
@@ -547,10 +548,11 @@ const UserManagement = ({ user }) => {
                                   <button
                                     onClick={() => {
                                       if (isEditingThis) { setEditingDistrictsFor(null); return; }
+                                      setEditedRole(u.role || 'field');
                                       setEditedLevel(u.access_level || 'central');
                                       setEditedDistricts(u.allowed_districts || []);
                                       setEditedTownships(u.allowed_townships || []);
-                                      if ((u.access_level === 'township')) loadAllTownships();
+                                      if ((u.access_level === 'township' || u.access_level === 'sub_township')) loadAllTownships();
                                       setEditingDistrictsFor(u.id);
                                     }}
                                     title="Edit district access"
@@ -560,7 +562,7 @@ const UserManagement = ({ user }) => {
                                         : 'border-blue-200 text-blue-600 hover:bg-blue-50 bg-white'
                                     }`}
                                   >
-                                    <MapPin size={11} /> Districts
+                                    <Pencil size={11} /> Edit
                                   </button>
                                   <button
                                     onClick={() => toggleUserActive(u)}
@@ -585,6 +587,22 @@ const UserManagement = ({ user }) => {
                           <tr className="border-b border-blue-200">
                             <td colSpan={6} className="px-6 py-5 bg-blue-50">
                               <div className="flex flex-col gap-4">
+                                {/* Row 0: role radios */}
+                                <div>
+                                  <div className="text-[9px] font-bold text-gray-500 uppercase tracking-wider mb-2">Role</div>
+                                  <div className="flex flex-wrap gap-2">
+                                    {Object.entries(ROLE_LABELS).map(([val, info]) => (
+                                      <label key={val} className={`flex items-center gap-2 px-3 py-2 border cursor-pointer text-[11px] font-semibold transition-colors ${
+                                        editedRole === val ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-400'
+                                      }`}>
+                                        <input type="radio" name={`role-${u.id}`} value={val} checked={editedRole === val}
+                                          onChange={() => setEditedRole(val)} className="hidden" />
+                                        {info.label}
+                                      </label>
+                                    ))}
+                                  </div>
+                                </div>
+
                                 {/* Row 1: access level radios */}
                                 <div>
                                   <div className="text-[9px] font-bold text-gray-500 uppercase tracking-wider mb-2">Access Level</div>

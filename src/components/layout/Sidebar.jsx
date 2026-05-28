@@ -126,7 +126,7 @@ const Sidebar = ({ user, onLogout }) => {
   const filteredMenuItems = menuItems.filter(item => {
     if (item.id === 'users') return user?.role === 'system' || user?.role === 'master' || user?.role === 'admin';
     if (item.id === 'upload') return user?.role === 'system' || user?.role === 'master' || user?.role === 'admin' || user?.role === 'ops';
-    if (item.id === 'central-database') return user?.access_level !== 'viewer';
+    if (item.id === 'central-database') return user?.access_level !== 'viewer' && user?.access_level !== 'sub_township';
     return true;
   });
 

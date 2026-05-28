@@ -575,9 +575,9 @@ const sectionTitleStyle = {
 const DemographicDashboard = ({ user }) => {
   const districtFilter = (user?.access_level !== 'central' && user?.allowed_districts?.length > 0)
     ? user.allowed_districts : null;
-  const townshipFilter = (user?.access_level === 'township' && user?.allowed_townships?.length > 0)
+  const townshipFilter = ((user?.access_level === 'township' || user?.access_level === 'sub_township') && user?.allowed_townships?.length > 0)
     ? user.allowed_townships : null;
-  const isViewer = user?.access_level === 'viewer';
+  const isViewer = user?.access_level === 'viewer' || user?.access_level === 'sub_township';
   const [statsData, setStatsData] = useState(null);
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState(null);
@@ -610,6 +610,7 @@ const DemographicDashboard = ({ user }) => {
           ward:     selectedWard     || null,
           group:    selectedGroup    || null,
           village:  selectedVillage  || null,
+          _level:   user?.access_level || 'viewer',
         },
       });
       if (error) throw error;

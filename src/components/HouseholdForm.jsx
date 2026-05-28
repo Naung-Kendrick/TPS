@@ -236,7 +236,7 @@ const DISTRICTS = ['နမ့်ခမ်း ခရိုင်', 'နမ့်�
 const HouseholdForm = ({ user }) => {
   const districtFilter = (user?.access_level !== 'central' && user?.allowed_districts?.length > 0)
     ? user.allowed_districts : null;
-  const townshipFilter = (user?.access_level === 'township' && user?.allowed_townships?.length > 0)
+  const townshipFilter = ((user?.access_level === 'township' || user?.access_level === 'sub_township') && user?.allowed_townships?.length > 0)
     ? user.allowed_townships : null;
   const [formData, setFormData] = useState({
     household_no: '',

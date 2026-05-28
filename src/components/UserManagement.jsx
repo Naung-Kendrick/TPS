@@ -66,7 +66,7 @@ const UserManagement = ({ user }) => {
   const townshipsLoadedRef = useRef(false);
 
   const canToggleUsers = user?.role === 'system' || user?.role === 'master' || user?.role === 'admin';
-  const isAdminLevel   = user?.access_level === 'central' || user?.access_level === 'district';
+  const isAdminLevel   = user?.access_level === 'central' || user?.access_level === 'district' || user?.access_level === 'township';
 
   // ── Load print/export requests ───────────────────────────────────
   const loadRequests = useCallback(async () => {
@@ -187,9 +187,9 @@ const UserManagement = ({ user }) => {
     try {
       const newLevel     = editedLevel;
       let newDistricts   = (newLevel === 'district' || newLevel === 'viewer') ? editedDistricts : [];
-      const newTownships = newLevel === 'township'  ? editedTownships : [];
-      // For township level: auto-compute parent districts from selected townships
-      if (newLevel === 'township' && newTownships.length > 0) {
+      const newTownships = (newLevel === 'township' || newLevel === 'sub_township') ? editedTownships : [];
+      // For township / sub_township level: auto-compute parent districts from selected townships
+      if ((newLevel === 'township' || newLevel === 'sub_township') && newTownships.length > 0) {
         const parentSet = new Set();
         Object.entries(allTownships).forEach(([dist, towns]) => {
           if (towns.some(t => newTownships.includes(t))) parentSet.add(dist);
@@ -234,7 +234,7 @@ const UserManagement = ({ user }) => {
     if (name === 'access_level') {
       if (value === 'central')   setFormData(prev => ({ ...prev, access_level: value, allowed_districts: [], allowed_townships: [] }));
       else if (value === 'district' || value === 'viewer') setFormData(prev => ({ ...prev, access_level: value, allowed_townships: [] }));
-      else if (value === 'township') { setFormData(prev => ({ ...prev, access_level: value, allowed_districts: [] })); loadAllTownships(); }
+      else if (value === 'township' || value === 'sub_township') { setFormData(prev => ({ ...prev, access_level: value, allowed_districts: [] })); loadAllTownships(); }
       return;
     }
     setFormData(prev => ({ ...prev, [name]: value }));
@@ -434,10 +434,11 @@ const UserManagement = ({ user }) => {
                     const isSelf   = u.id === user?.id;
                     const toggling = togglingId === u.id;
                     const roleInfo = ROLE_LABELS[u.role] || { label: u.role, color: '#737373', bg: '#F5F5F5' };
-                    const isEditingThis   = editingDistrictsFor === u.id;
-                    const isDistrictLevel  = u.access_level === 'district';
-                    const isTownshipLevel  = u.access_level === 'township';
-                    const isViewerLevel    = u.access_level === 'viewer';
+                    const isEditingThis      = editingDistrictsFor === u.id;
+                    const isDistrictLevel     = u.access_level === 'district';
+                    const isTownshipLevel     = u.access_level === 'township';
+                    const isViewerLevel       = u.access_level === 'viewer';
+                    const isSubTownshipLevel  = u.access_level === 'sub_township';
 
                     return (
                       <React.Fragment key={u.id}>
@@ -493,6 +494,20 @@ const UserManagement = ({ user }) => {
                                     </>
                               ) : isViewerLevel ? (
                                 <span className="text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5">မြင်းသာ (Viewer)</span>
+                              ) : isSubTownshipLevel ? (
+                                <>
+                                  {(u.allowed_townships || []).length === 0
+                                    ? <span className="text-[9px] font-bold bg-red-50 text-red-600 border border-red-200 px-2 py-0.5">No Townships</span>
+                                    : <>
+                                        {(u.allowed_townships || []).slice(0, 2).map(t => (
+                                          <span key={t} className="text-[9px] font-bold bg-orange-50 text-orange-700 border border-orange-200 px-1.5 py-0.5">{t}</span>
+                                        ))}
+                                        {(u.allowed_townships || []).length > 2 && (
+                                          <span className="text-[9px] text-gray-400">+{(u.allowed_townships || []).length - 2} more</span>
+                                        )}
+                                      </>
+                                  }
+                                </>
                               ) : (
                                 <span className="text-[9px] font-bold bg-gray-100 text-gray-500 border border-gray-200 px-2 py-0.5">Central</span>
                               )}
@@ -574,7 +589,7 @@ const UserManagement = ({ user }) => {
                                 <div>
                                   <div className="text-[9px] font-bold text-gray-500 uppercase tracking-wider mb-2">Access Level</div>
                                   <div className="flex flex-wrap gap-2">
-                                    {[['central','Central — Full Access'],['district','District — Restricted'],['township','Township — Most Restricted'],['viewer','Viewer — View Only']].map(([val, lbl]) => (
+                                    {[['central','Central — Full Access'],['district','District — Restricted'],['township','Township — Most Restricted'],['viewer','Viewer — View Only'],['sub_township','Sub-Township — View Only']].map(([val, lbl]) => (
                                       <label key={val} className={`flex items-center gap-2 px-3 py-2 border cursor-pointer text-[11px] font-semibold transition-colors ${
                                         editedLevel === val ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-400'
                                       }`}>
@@ -583,7 +598,7 @@ const UserManagement = ({ user }) => {
                                             setEditedLevel(val);
                                             if (val === 'central') { setEditedDistricts([]); setEditedTownships([]); }
                                             else if (val === 'district' || val === 'viewer') setEditedTownships([]);
-                                            else if (val === 'township') { setEditedDistricts([]); loadAllTownships(); }
+                                            else if (val === 'township' || val === 'sub_township') { setEditedDistricts([]); loadAllTownships(); }
                                           }}
                                           className="hidden" />
                                         {lbl}
@@ -615,7 +630,7 @@ const UserManagement = ({ user }) => {
                                 )}
 
                                 {/* Row 3: township checkboxes grouped by district */}
-                                {editedLevel === 'township' && (
+                                {(editedLevel === 'township' || editedLevel === 'sub_township') && (
                                   <div>
                                     <div className="text-[9px] font-bold text-gray-500 uppercase tracking-wider mb-2">Allowed Townships</div>
                                     {loadingTownships ? (
@@ -816,7 +831,7 @@ const UserManagement = ({ user }) => {
                   <div>
                     <label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase tracking-wider">Data Access Level</label>
                     <div className="flex flex-wrap gap-2">
-                      {[['central', 'Central — Full Access'], ['district', 'District — Restricted'], ['township', 'Township — Most Restricted'], ['viewer', 'Viewer — View Only']].map(([val, lbl]) => (
+                      {[['central', 'Central — Full Access'], ['district', 'District — Restricted'], ['township', 'Township — Most Restricted'], ['viewer', 'Viewer — View Only'], ['sub_township', 'Sub-Township — View Only']].map(([val, lbl]) => (
                         <label key={val} className={`flex items-center gap-2 px-3 py-2.5 border cursor-pointer text-[11px] font-semibold transition-colors ${
                           formData.access_level === val ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-400'
                         }`}>
@@ -826,10 +841,10 @@ const UserManagement = ({ user }) => {
                         </label>
                       ))}
                     </div>
-                    <p className="text-[10px] text-gray-400 mt-1">Central = all. District = districts only. Township = specific townships. Viewer = view only, no print/export.</p>
+                    <p className="text-[10px] text-gray-400 mt-1">Central = all. District = districts only. Township = specific townships. Viewer = district view-only. Sub-Township = township view-only, no print/export.</p>
                   </div>
 
-                  {(formData.access_level === 'district' || formData.access_level === 'viewer') && (
+                  {(formData.access_level === 'district' || formData.access_level === 'viewer') && (  /* district picker */
                     <div>
                       <label className="block text-[10px] font-bold text-gray-600 mb-2 uppercase tracking-wider">Allowed Districts</label>
                       <div className="flex flex-wrap gap-2">
@@ -849,7 +864,7 @@ const UserManagement = ({ user }) => {
                     </div>
                   )}
 
-                  {formData.access_level === 'township' && (
+                  {(formData.access_level === 'township' || formData.access_level === 'sub_township') && (
                     <div>
                       <label className="block text-[10px] font-bold text-gray-600 mb-2 uppercase tracking-wider">Allowed Townships</label>
                       {loadingTownships ? (
@@ -938,7 +953,9 @@ const UserManagement = ({ user }) => {
                     <div className="flex-1 space-y-1.5">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-[11px] font-bold text-gray-900">{r.requester_name || 'Unknown Officer'}</span>
-                        <span className="text-[9px] font-bold bg-amber-200 text-amber-800 px-2 py-0.5 uppercase tracking-wider">Viewer</span>
+                        <span className={`text-[9px] font-bold px-2 py-0.5 uppercase tracking-wider ${
+                                  (f._level === 'sub_township') ? 'bg-orange-100 text-orange-800' : 'bg-amber-200 text-amber-800'
+                                }`}>{f._level === 'sub_township' ? 'Sub-Township' : 'Viewer'}</span>
                         <span className="text-[9px] text-gray-400">{formatLastSeen(r.requested_at)}</span>
                       </div>
                       <div className="text-[11px] text-gray-700">

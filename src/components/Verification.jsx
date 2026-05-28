@@ -32,7 +32,7 @@ const getAge = (dobStr) => {
 const Verification = ({ user }) => {
   const districtFilter = (user?.access_level === 'district' && user?.allowed_districts?.length > 0)
     ? user.allowed_districts : null;
-  const townshipFilter = (user?.access_level === 'township' && user?.allowed_townships?.length > 0)
+  const townshipFilter = ((user?.access_level === 'township' || user?.access_level === 'sub_township') && user?.allowed_townships?.length > 0)
     ? user.allowed_townships : null;
   const [formData, setFormData] = useState({
     household_no: '',

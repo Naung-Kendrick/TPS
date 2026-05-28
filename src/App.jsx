@@ -86,7 +86,7 @@ function App() {
         <Route path="upload" element={<Suspense fallback={<PageFallback />}><UploadPage user={user} /></Suspense>} />
         <Route path="scanner" element={<Suspense fallback={<PageFallback />}><IDCardScanner /></Suspense>} />
         <Route path="central-database" element={
-          user?.access_level === 'viewer'
+          (user?.access_level === 'viewer' || user?.access_level === 'sub_township')
             ? <Navigate to="/verification" replace />
             : <Suspense fallback={<PageFallback />}><Reports user={user} /></Suspense>
         } />

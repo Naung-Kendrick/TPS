@@ -98,7 +98,7 @@ const validateDateOfBirth = (text) => {
 const Reports = ({ user }) => {
   const districtFilter = (user?.access_level !== 'central' && user?.allowed_districts?.length > 0)
     ? user.allowed_districts : null;
-  const townshipFilter = (user?.access_level === 'township' && user?.allowed_townships?.length > 0)
+  const townshipFilter = ((user?.access_level === 'township' || user?.access_level === 'sub_township') && user?.allowed_townships?.length > 0)
     ? user.allowed_townships : null;
   const [level, setLevel] = useState(1);
   const [loading, setLoading] = useState(true);

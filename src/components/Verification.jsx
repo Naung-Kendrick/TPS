@@ -29,7 +29,9 @@ const getAge = (dobStr) => {
   return age;
 };
 
-const Verification = () => {
+const Verification = ({ user }) => {
+  const districtFilter = (user?.access_level === 'district' && user?.allowed_districts?.length > 0)
+    ? user.allowed_districts : null;
   const [formData, setFormData] = useState({
     household_no: '',
     name: '',
@@ -121,6 +123,7 @@ const Verification = () => {
 
     try {
       let query = supabase.from('households').select('*');
+      if (districtFilter) query = query.in('district', districtFilter);
 
       if (formData.household_no.trim()) {
         const raw = formData.household_no.trim();
@@ -138,7 +141,7 @@ const Verification = () => {
       if (formData.village.trim()) query = query.ilike('ward_village_group', `%${formData.village.trim()}%`);
       if (formData.group.trim()) query = query.ilike('ward_village_group', `%${formData.group.trim()}%`);
       if (formData.township.trim()) query = query.ilike('township', `%${formData.township.trim()}%`);
-      if (formData.district.trim()) query = query.ilike('district', `%${formData.district.trim()}%`);
+      if (!districtFilter && formData.district.trim()) query = query.ilike('district', `%${formData.district.trim()}%`);
       
       // Previous ID No. search (4 parts - each optional, searched independently)
       const prevRegion = formData.previous_id_region.trim();

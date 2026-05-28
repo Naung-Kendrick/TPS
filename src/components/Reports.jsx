@@ -95,7 +95,9 @@ const validateDateOfBirth = (text) => {
   return null;
 };
 
-const Reports = () => {
+const Reports = ({ user }) => {
+  const districtFilter = (user?.access_level === 'district' && user?.allowed_districts?.length > 0)
+    ? user.allowed_districts : null;
   const [level, setLevel] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -187,9 +189,14 @@ const Reports = () => {
         // Districts
         const { data, error } = await supabase.rpc('report_districts');
         if (error) throw error;
-        const list = (data || []).map(d => ({ id: d.district, name: d.district }));
+        let list = (data || []).map(d => ({ id: d.district, name: d.district }));
+        if (districtFilter) list = list.filter(d => districtFilter.includes(d.id));
         setDataList(list);
         cacheSet(cacheKey, list);
+        // Auto-navigate if district user with only one district
+        if (districtFilter?.length === 1 && list.length === 1) {
+          handleNavigate(2, { district: list[0].name });
+        }
       } 
       else if (level === 2) {
         // Townships

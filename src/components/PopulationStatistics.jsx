@@ -166,7 +166,9 @@ const clearCache = () => {
 };
 
 // ─── Main Component ───────────────────────────────────────
-const PopulationStatistics = () => {
+const PopulationStatistics = ({ user }) => {
+  const districtFilter = (user?.access_level === 'district' && user?.allowed_districts?.length > 0)
+    ? user.allowed_districts : null;
   // RPC response data (replaces allData)
   const [statsData, setStatsData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -204,7 +206,11 @@ const PopulationStatistics = () => {
     try {
       const { data, error } = await supabase.rpc('stats_districts');
       if (error) throw error;
-      setDistricts(data?.map(d => d.name) || []);
+      let list = data?.map(d => d.name) || [];
+      if (districtFilter) list = list.filter(d => districtFilter.includes(d));
+      setDistricts(list);
+      // Auto-select if only one allowed district
+      if (districtFilter?.length === 1 && list.length === 1) setSelectedDistrict(list[0]);
     } catch (err) {
       console.error('Failed to load districts:', err);
       setError(err.message);

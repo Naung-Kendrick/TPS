@@ -2,8 +2,12 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import {
   UserPlus, Shield, User, Key, Hash, Loader2, CheckCircle2, AlertTriangle, X,
-  Users, Circle, ToggleLeft, ToggleRight, UserCheck, UserX, Activity, ChevronDown, Mail
+  Users, Circle, ToggleLeft, ToggleRight, UserCheck, UserX, Activity, ChevronDown, Mail,
+  RefreshCw, MapPin, Pencil, Save
 } from 'lucide-react';
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+const DISTRICTS = ['နမ့်ခမ်း ခရိုင်', 'နမ့်ဆန် ခရိုင်', 'မန်တုံ ခရိုင်'];
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -34,7 +38,7 @@ function isOnline(ts) {
 
 const UserManagement = ({ user }) => {
   // ── Create-user form ──────────────────────────────────────────────────────
-  const [formData, setFormData] = useState({ username: '', password: '', role: 'field', email: '' });
+  const [formData, setFormData] = useState({ username: '', password: '', role: 'field', email: '', access_level: 'central', allowed_districts: [] });
   const [loading,  setLoading]  = useState(false);
   const [status,   setStatus]   = useState(null);
 
@@ -47,6 +51,12 @@ const UserManagement = ({ user }) => {
   const [filterRole,   setFilterRole]   = useState('all');
   const [filterStatus, setFilterStatus] = useState('all'); // 'all' | 'active' | 'disabled'
 
+  // ── District edit state ───────────────────────────────────────────────────
+  const [editingDistrictsFor, setEditingDistrictsFor] = useState(null);
+  const [editedLevel,    setEditedLevel]    = useState('central');
+  const [editedDistricts, setEditedDistricts] = useState([]);
+  const [savingDistricts, setSavingDistricts] = useState(false);
+
   const canToggleUsers = user?.role === 'system' || user?.role === 'master' || user?.role === 'admin';
 
   // ── Load user list ────────────────────────────────────────────────────────
@@ -57,7 +67,7 @@ const UserManagement = ({ user }) => {
       // Try full select first; fall back if username/email columns don't exist yet
       let { data, error } = await supabase
         .from('profiles')
-        .select('id, role, is_active, last_seen_at, created_at, username, email')
+        .select('id, role, is_active, last_seen_at, created_at, username, email, access_level, allowed_districts')
         .order('created_at', { ascending: false });
       if (error && error.message?.includes('username')) {
         // username column not yet in DB — run the migration SQL
@@ -103,8 +113,46 @@ const UserManagement = ({ user }) => {
     }
   };
 
+  // ── Save district access for existing user ────────────────────────────────
+  const saveDistrictAccess = async (userId) => {
+    setSavingDistricts(true);
+    try {
+      const newLevel     = editedLevel;
+      const newDistricts = newLevel === 'district' ? editedDistricts : [];
+      const { error } = await supabase
+        .from('profiles')
+        .update({ access_level: newLevel, allowed_districts: newDistricts })
+        .eq('id', userId);
+      if (error) throw error;
+      setUserList(prev => prev.map(u =>
+        u.id === userId ? { ...u, access_level: newLevel, allowed_districts: newDistricts } : u
+      ));
+      setEditingDistrictsFor(null);
+    } catch (err) {
+      alert('Failed to save district access: ' + err.message);
+    } finally {
+      setSavingDistricts(false);
+    }
+  };
+
   // ── Form ──────────────────────────────────────────────────────────────────
-  const handleChange  = e => setFormData({ ...formData, [e.target.name]: e.target.value });
+  const handleChange = e => {
+    const { name, value, type, checked } = e.target;
+    if (name === 'allowed_districts') {
+      setFormData(prev => ({
+        ...prev,
+        allowed_districts: checked
+          ? [...prev.allowed_districts, value]
+          : prev.allowed_districts.filter(d => d !== value),
+      }));
+      return;
+    }
+    if (name === 'access_level' && value === 'central') {
+      setFormData(prev => ({ ...prev, access_level: value, allowed_districts: [] }));
+      return;
+    }
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -117,7 +165,7 @@ const UserManagement = ({ user }) => {
       if (error) throw error;
       const emailNote = formData.email ? ' Email OTP will be required at login.' : ' No email set — OTP step will be skipped.';
       setStatus({ type: 'success', text: `User account created successfully.${emailNote}` });
-      setFormData({ username: '', password: '', role: 'field', email: '' });
+      setFormData({ username: '', password: '', role: 'field', email: '', access_level: 'central', allowed_districts: [] });
       await loadUsers();
     } catch (err) {
       setStatus({ type: 'error', text: err.message || 'An unexpected error occurred during user creation.' });
@@ -263,10 +311,11 @@ const UserManagement = ({ user }) => {
                 <tr className="border-b border-gray-200 bg-gray-50">
                   <th className="text-left px-4 py-3 text-[9px] font-bold text-gray-400 uppercase tracking-wider">Officer</th>
                   <th className="text-left px-4 py-3 text-[9px] font-bold text-gray-400 uppercase tracking-wider hidden sm:table-cell">Role</th>
+                  <th className="text-left px-4 py-3 text-[9px] font-bold text-gray-400 uppercase tracking-wider hidden lg:table-cell">District Access</th>
                   <th className="text-left px-4 py-3 text-[9px] font-bold text-gray-400 uppercase tracking-wider">Status</th>
                   <th className="text-left px-4 py-3 text-[9px] font-bold text-gray-400 uppercase tracking-wider hidden md:table-cell">Last Seen</th>
                   {canToggleUsers && (
-                    <th className="text-right px-4 py-3 text-[9px] font-bold text-gray-400 uppercase tracking-wider">Access</th>
+                    <th className="text-right px-4 py-3 text-[9px] font-bold text-gray-400 uppercase tracking-wider">Actions</th>
                   )}
                 </tr>
               </thead>
@@ -287,106 +336,190 @@ const UserManagement = ({ user }) => {
                     </td>
                   </tr>
                 ) : (
-                  filteredList.map((u, idx) => {
-                    const online    = isOnline(u.last_seen_at);
-                    const active    = u.is_active !== false;
-                    const isSelf    = u.id === user?.id;
-                    const toggling  = togglingId === u.id;
-                    const roleInfo  = ROLE_LABELS[u.role] || { label: u.role, color: '#737373', bg: '#F5F5F5' };
+                  filteredList.map((u) => {
+                    const online   = isOnline(u.last_seen_at);
+                    const active   = u.is_active !== false;
+                    const isSelf   = u.id === user?.id;
+                    const toggling = togglingId === u.id;
+                    const roleInfo = ROLE_LABELS[u.role] || { label: u.role, color: '#737373', bg: '#F5F5F5' };
+                    const isEditingThis = editingDistrictsFor === u.id;
+                    const districtAccess = u.access_level === 'district';
 
                     return (
-                      <tr
-                        key={u.id}
-                        className={`border-b border-gray-100 transition-colors ${!active ? 'bg-gray-50 opacity-60' : 'hover:bg-gray-50'}`}
-                      >
-                        {/* Officer */}
-                        <td className="px-4 py-3.5">
-                          <div className="flex items-center gap-2.5">
-                            <div className="relative flex-shrink-0">
-                              <div className="w-7 h-7 bg-gray-100 border border-gray-200 flex items-center justify-center text-[11px] font-bold text-gray-600 select-none uppercase">
-                                {(u.username || u.id || '?')[0]}
+                      <React.Fragment key={u.id}>
+                        <tr className={`border-b border-gray-100 transition-colors ${!active ? 'bg-gray-50 opacity-60' : 'hover:bg-gray-50'}`}>
+
+                          {/* Officer */}
+                          <td className="px-4 py-3.5">
+                            <div className="flex items-center gap-2.5">
+                              <div className="relative flex-shrink-0">
+                                <div className="w-7 h-7 bg-gray-100 border border-gray-200 flex items-center justify-center text-[11px] font-bold text-gray-600 select-none uppercase">
+                                  {(u.username || u.id || '?')[0]}
+                                </div>
+                                <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-white"
+                                  style={{ background: online ? '#22C55E' : '#D1D5DB' }} title={online ? 'Online' : 'Offline'} />
                               </div>
-                              {/* Online dot */}
-                              <span
-                                className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-white"
-                                style={{ background: online ? '#22C55E' : '#D1D5DB' }}
-                                title={online ? 'Online' : 'Offline'}
-                              />
-                            </div>
-                            <div>
-                              <div className="font-semibold text-gray-900 text-[11px]">
-                                {u.username || <span className="text-gray-400 italic text-[10px]">{u.id.slice(0, 8)}</span>}
-                                {isSelf && <span className="ml-1.5 text-[9px] font-bold text-gray-400 bg-gray-100 px-1 py-0.5">(YOU)</span>}
+                              <div>
+                                <div className="font-semibold text-gray-900 text-[11px]">
+                                  {u.username || <span className="text-gray-400 italic text-[10px]">{u.id.slice(0, 8)}</span>}
+                                  {isSelf && <span className="ml-1.5 text-[9px] font-bold text-gray-400 bg-gray-100 px-1 py-0.5">(YOU)</span>}
+                                </div>
+                                <div className="text-[9px] text-gray-400 font-mono">{u.username ? `${u.username}@tps.idtl` : u.email || '—'}</div>
                               </div>
-                              <div className="text-[9px] text-gray-400 font-mono">{u.username ? `${u.username}@tps.idtl` : u.email || '—'}</div>
                             </div>
-                          </div>
-                        </td>
+                          </td>
 
-                        {/* Role */}
-                        <td className="px-4 py-3.5 hidden sm:table-cell">
-                          <span
-                            className="inline-flex items-center px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider border"
-                            style={{ color: roleInfo.color, background: roleInfo.bg, borderColor: roleInfo.color + '30' }}
-                          >
-                            {roleInfo.label}
-                          </span>
-                        </td>
-
-                        {/* Status */}
-                        <td className="px-4 py-3.5">
-                          {active ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[9px] font-bold bg-green-50 text-green-700 border border-green-200 uppercase tracking-wider">
-                              <Circle size={6} fill="#16A34A" stroke="none" /> Active
+                          {/* Role */}
+                          <td className="px-4 py-3.5 hidden sm:table-cell">
+                            <span className="inline-flex items-center px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider border"
+                              style={{ color: roleInfo.color, background: roleInfo.bg, borderColor: roleInfo.color + '30' }}>
+                              {roleInfo.label}
                             </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[9px] font-bold bg-red-50 text-red-700 border border-red-200 uppercase tracking-wider">
-                              <Circle size={6} fill="#DC2626" stroke="none" /> Disabled
-                            </span>
-                          )}
-                        </td>
+                          </td>
 
-                        {/* Last Seen */}
-                        <td className="px-4 py-3.5 hidden md:table-cell">
-                          <div className="flex items-center gap-1.5">
-                            <span
-                              className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                              style={{ background: online ? '#22C55E' : '#D1D5DB' }}
-                            />
-                            <span className={`text-[10px] font-medium ${online ? 'text-green-700' : 'text-gray-400'}`}>
-                              {online ? 'Online' : formatLastSeen(u.last_seen_at)}
-                            </span>
-                          </div>
-                        </td>
-
-                        {/* Toggle */}
-                        {canToggleUsers && (
-                          <td className="px-4 py-3.5 text-right">
-                            {isSelf ? (
-                              <span className="text-[9px] text-gray-300 italic">—</span>
-                            ) : (
-                              <button
-                                onClick={() => toggleUserActive(u)}
-                                disabled={toggling}
-                                title={active ? 'Disable this account' : 'Enable this account'}
-                                className={`flex items-center gap-1.5 ml-auto text-[10px] font-bold uppercase tracking-wider px-3 py-1.5 border transition-all ${
-                                  active
-                                    ? 'border-red-200 text-red-600 hover:bg-red-50 bg-white'
-                                    : 'border-green-200 text-green-700 hover:bg-green-50 bg-white'
-                                } disabled:opacity-40`}
-                              >
-                                {toggling ? (
-                                  <Loader2 size={11} className="animate-spin" />
-                                ) : active ? (
-                                  <><ToggleRight size={13} /> Disable</>
+                          {/* District Access */}
+                          <td className="px-4 py-3.5 hidden lg:table-cell">
+                            <div className="flex items-center gap-1 flex-wrap">
+                              {districtAccess ? (
+                                (u.allowed_districts || []).length === 0 ? (
+                                  <span className="text-[9px] font-bold bg-red-50 text-red-600 border border-red-200 px-2 py-0.5">No Districts</span>
                                 ) : (
-                                  <><ToggleLeft size={13} /> Enable</>
-                                )}
-                              </button>
+                                  (u.allowed_districts || []).map(d => (
+                                    <span key={d} className="text-[9px] font-bold bg-blue-50 text-blue-700 border border-blue-200 px-1.5 py-0.5">
+                                      {d.replace(' ခရိုင်', '')}
+                                    </span>
+                                  ))
+                                )
+                              ) : (
+                                <span className="text-[9px] font-bold bg-gray-100 text-gray-500 border border-gray-200 px-2 py-0.5">Central</span>
+                              )}
+                            </div>
+                          </td>
+
+                          {/* Status */}
+                          <td className="px-4 py-3.5">
+                            {active ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[9px] font-bold bg-green-50 text-green-700 border border-green-200 uppercase tracking-wider">
+                                <Circle size={6} fill="#16A34A" stroke="none" /> Active
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[9px] font-bold bg-red-50 text-red-700 border border-red-200 uppercase tracking-wider">
+                                <Circle size={6} fill="#DC2626" stroke="none" /> Disabled
+                              </span>
                             )}
                           </td>
+
+                          {/* Last Seen */}
+                          <td className="px-4 py-3.5 hidden md:table-cell">
+                            <div className="flex items-center gap-1.5">
+                              <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: online ? '#22C55E' : '#D1D5DB' }} />
+                              <span className={`text-[10px] font-medium ${online ? 'text-green-700' : 'text-gray-400'}`}>
+                                {online ? 'Online' : formatLastSeen(u.last_seen_at)}
+                              </span>
+                            </div>
+                          </td>
+
+                          {/* Actions: toggle + edit districts */}
+                          {canToggleUsers && (
+                            <td className="px-4 py-3.5 text-right">
+                              {isSelf ? (
+                                <span className="text-[9px] text-gray-300 italic">—</span>
+                              ) : (
+                                <div className="flex items-center gap-2 justify-end">
+                                  <button
+                                    onClick={() => {
+                                      if (isEditingThis) { setEditingDistrictsFor(null); return; }
+                                      setEditedLevel(u.access_level || 'central');
+                                      setEditedDistricts(u.allowed_districts || []);
+                                      setEditingDistrictsFor(u.id);
+                                    }}
+                                    title="Edit district access"
+                                    className={`flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1.5 border transition-all ${
+                                      isEditingThis
+                                        ? 'bg-blue-900 text-white border-blue-900'
+                                        : 'border-blue-200 text-blue-600 hover:bg-blue-50 bg-white'
+                                    }`}
+                                  >
+                                    <MapPin size={11} /> Districts
+                                  </button>
+                                  <button
+                                    onClick={() => toggleUserActive(u)}
+                                    disabled={toggling}
+                                    title={active ? 'Disable this account' : 'Enable this account'}
+                                    className={`flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1.5 border transition-all ${
+                                      active
+                                        ? 'border-red-200 text-red-600 hover:bg-red-50 bg-white'
+                                        : 'border-green-200 text-green-700 hover:bg-green-50 bg-white'
+                                    } disabled:opacity-40`}
+                                  >
+                                    {toggling ? <Loader2 size={11} className="animate-spin" /> : active ? <><ToggleRight size={13} /> Disable</> : <><ToggleLeft size={13} /> Enable</>}
+                                  </button>
+                                </div>
+                              )}
+                            </td>
+                          )}
+                        </tr>
+
+                        {/* Inline district edit panel */}
+                        {isEditingThis && (
+                          <tr className="border-b border-blue-200">
+                            <td colSpan={6} className="px-6 py-5 bg-blue-50">
+                              <div className="flex flex-wrap gap-6 items-start">
+                                <div>
+                                  <div className="text-[9px] font-bold text-gray-500 uppercase tracking-wider mb-2">Access Level</div>
+                                  <div className="flex gap-2">
+                                    {[['central', 'Central — Full Access'], ['district', 'District — Restricted']].map(([val, lbl]) => (
+                                      <label key={val} className={`flex items-center gap-2 px-3 py-2 border cursor-pointer text-[11px] font-semibold transition-colors ${
+                                        editedLevel === val ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-400'
+                                      }`}>
+                                        <input type="radio" name={`level-${u.id}`} value={val}
+                                          checked={editedLevel === val}
+                                          onChange={() => { setEditedLevel(val); if (val === 'central') setEditedDistricts([]); }}
+                                          className="hidden" />
+                                        {lbl}
+                                      </label>
+                                    ))}
+                                  </div>
+                                </div>
+
+                                {editedLevel === 'district' && (
+                                  <div>
+                                    <div className="text-[9px] font-bold text-gray-500 uppercase tracking-wider mb-2">Allowed Districts</div>
+                                    <div className="flex flex-wrap gap-2">
+                                      {DISTRICTS.map(d => {
+                                        const checked = editedDistricts.includes(d);
+                                        return (
+                                          <label key={d} className={`flex items-center gap-2 px-3 py-2 border cursor-pointer text-[11px] font-semibold transition-colors ${
+                                            checked ? 'bg-blue-700 text-white border-blue-700' : 'bg-white text-gray-700 border-gray-200 hover:border-blue-400'
+                                          }`}>
+                                            <input type="checkbox" value={d} checked={checked}
+                                              onChange={e => setEditedDistricts(prev =>
+                                                e.target.checked ? [...prev, d] : prev.filter(x => x !== d)
+                                              )}
+                                              className="hidden" />
+                                            {d}
+                                          </label>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                )}
+
+                                <div className="flex gap-2 ml-auto self-end">
+                                  <button onClick={() => setEditingDistrictsFor(null)}
+                                    className="px-4 py-2 border border-gray-300 text-gray-600 text-[11px] font-bold uppercase tracking-wider hover:bg-gray-100 transition-colors">
+                                    Cancel
+                                  </button>
+                                  <button onClick={() => saveDistrictAccess(u.id)} disabled={savingDistricts}
+                                    className="flex items-center gap-1.5 px-4 py-2 bg-gray-900 text-white text-[11px] font-bold uppercase tracking-wider hover:bg-gray-700 transition-colors disabled:opacity-50">
+                                    {savingDistricts ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />} Save
+                                  </button>
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
                         )}
-                      </tr>
+                      </React.Fragment>
                     );
                   })
                 )}
@@ -535,6 +668,45 @@ const UserManagement = ({ user }) => {
                       <option value="system">System Admin</option>
                     </select>
                   </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase tracking-wider">Data Access Level</label>
+                    <div className="flex gap-2">
+                      {[['central', 'Central — Full Access'], ['district', 'District — Restricted']].map(([val, lbl]) => (
+                        <label key={val} className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 border cursor-pointer text-[11px] font-semibold transition-colors ${
+                          formData.access_level === val ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-400'
+                        }`}>
+                          <input type="radio" name="access_level" value={val}
+                            checked={formData.access_level === val} onChange={handleChange} className="hidden" />
+                          {lbl}
+                        </label>
+                      ))}
+                    </div>
+                    <p className="text-[10px] text-gray-400 mt-1">Central users see all districts. District users only see their assigned districts.</p>
+                  </div>
+
+                  {formData.access_level === 'district' && (
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-600 mb-2 uppercase tracking-wider">Allowed Districts</label>
+                      <div className="flex flex-wrap gap-2">
+                        {DISTRICTS.map(d => {
+                          const checked = formData.allowed_districts.includes(d);
+                          return (
+                            <label key={d} className={`flex items-center gap-2 px-3 py-2 border cursor-pointer text-[11px] font-semibold transition-colors ${
+                              checked ? 'bg-blue-700 text-white border-blue-700' : 'bg-white text-gray-700 border-gray-200 hover:border-blue-400'
+                            }`}>
+                              <input type="checkbox" name="allowed_districts" value={d}
+                                checked={checked} onChange={handleChange} className="hidden" />
+                              {d}
+                            </label>
+                          );
+                        })}
+                      </div>
+                      {formData.allowed_districts.length === 0 && (
+                        <p className="text-[10px] text-red-500 mt-1">Select at least one district.</p>
+                      )}
+                    </div>
+                  )}
 
                   <div className="pt-4">
                     <button

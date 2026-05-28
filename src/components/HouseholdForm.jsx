@@ -231,7 +231,11 @@ const validateDateOfBirth = (text) => {
   return null;
 };
 
-const HouseholdForm = () => {
+const DISTRICTS = ['နမ့်ခမ်း ခရိုင်', 'နမ့်ဆန် ခရိုင်', 'မန်တုံ ခရိုင်'];
+
+const HouseholdForm = ({ user }) => {
+  const districtFilter = (user?.access_level === 'district' && user?.allowed_districts?.length > 0)
+    ? user.allowed_districts : null;
   const [formData, setFormData] = useState({
     household_no: '',
     name: '',
@@ -978,7 +982,15 @@ const HouseholdForm = () => {
 
       <div style={{ ...groupStyle, gridColumn: 'span 1' }}>
         <label style={labelStyle}>DISTRICT</label>
-        <input type="text" name="district" value={formData.district} onChange={handleChange} placeholder="Enter district name" style={inputStyle} autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} />
+        {districtFilter ? (
+          <select name="district" value={formData.district} onChange={handleChange}
+            style={{ ...inputStyle, cursor: 'pointer' }}>
+            <option value="">-- Select District --</option>
+            {districtFilter.map(d => <option key={d} value={d}>{d}</option>)}
+          </select>
+        ) : (
+          <input type="text" name="district" value={formData.district} onChange={handleChange} placeholder="Enter district name" style={inputStyle} autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} />
+        )}
       </div>
 
       <div style={{ ...groupStyle, gridColumn: 'span 1' }}>

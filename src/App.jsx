@@ -29,13 +29,13 @@ const PageFallback = () => (
   </div>
 )
 
-const UploadPage = () => (
+const UploadPage = ({ user }) => (
   <div className="flex flex-col gap-8 p-6 sm:p-8 xl:p-10 max-w-7xl xl:max-w-[1440px] mx-auto">
     <div>
       <h2 style={{ fontSize: '20px', margin: '0 0 8px 0', color: '#1A1A1A', fontWeight: '500', letterSpacing: '0.02em' }}>DATA UPLOAD</h2>
       <p style={{ margin: 0, color: '#737373', fontSize: '12px' }}>Bulk import household records from Excel, CSV, or JSON files.</p>
     </div>
-    <CsvUploader />
+    <CsvUploader user={user} />
   </div>
 )
 
@@ -82,13 +82,13 @@ function App() {
     <Routes>
       <Route path="/" element={<Layout user={user} onLogout={handleLogout} />}>
         <Route index element={<Navigate to="/verification" replace />} />
-        <Route path="verification" element={<Suspense fallback={<PageFallback />}><Verification /></Suspense>} />
-        <Route path="upload" element={<Suspense fallback={<PageFallback />}><UploadPage /></Suspense>} />
+        <Route path="verification" element={<Suspense fallback={<PageFallback />}><Verification user={user} /></Suspense>} />
+        <Route path="upload" element={<Suspense fallback={<PageFallback />}><UploadPage user={user} /></Suspense>} />
         <Route path="scanner" element={<Suspense fallback={<PageFallback />}><IDCardScanner /></Suspense>} />
-        <Route path="central-database" element={<Suspense fallback={<PageFallback />}><Reports /></Suspense>} />
-        <Route path="statistics" element={<Suspense fallback={<PageFallback />}><PopulationStatistics /></Suspense>} />
-        <Route path="demographics" element={<Suspense fallback={<PageFallback />}><DemographicDashboard /></Suspense>} />
-        <Route path="registration" element={<Suspense fallback={<PageFallback />}><HouseholdForm /></Suspense>} />
+        <Route path="central-database" element={<Suspense fallback={<PageFallback />}><Reports user={user} /></Suspense>} />
+        <Route path="statistics" element={<Suspense fallback={<PageFallback />}><PopulationStatistics user={user} /></Suspense>} />
+        <Route path="demographics" element={<Suspense fallback={<PageFallback />}><DemographicDashboard user={user} /></Suspense>} />
+        <Route path="registration" element={<Suspense fallback={<PageFallback />}><HouseholdForm user={user} /></Suspense>} />
         <Route path="users" element={<Suspense fallback={<PageFallback />}><UserManagement user={user} /></Suspense>} />
         <Route path="settings" element={<Placeholder title="Settings" />} />
         <Route path="*" element={<Navigate to="/verification" replace />} />

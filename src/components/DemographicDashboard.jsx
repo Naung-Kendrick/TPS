@@ -572,7 +572,9 @@ const sectionTitleStyle = {
 };
 
 // ─── Main Component ────────────────────────────────────────
-const DemographicDashboard = () => {
+const DemographicDashboard = ({ user }) => {
+  const districtFilter = (user?.access_level === 'district' && user?.allowed_districts?.length > 0)
+    ? user.allowed_districts : null;
   const [statsData, setStatsData] = useState(null);
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState(null);
@@ -594,7 +596,10 @@ const DemographicDashboard = () => {
     try {
       const { data, error } = await supabase.rpc('stats_districts');
       if (error) throw error;
-      setDistricts(data?.map(d => d.name) || []);
+      let list = data?.map(d => d.name) || [];
+      if (districtFilter) list = list.filter(d => districtFilter.includes(d));
+      setDistricts(list);
+      if (districtFilter?.length === 1 && list.length === 1) setSelectedDistrict(list[0]);
     } catch (err) { console.error(err); }
   };
 

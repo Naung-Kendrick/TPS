@@ -68,7 +68,7 @@ const Login = ({ onLogin }) => {
       // 2. Fetch profile
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
-        .select('id, role, is_active, last_seen_at, access_level, allowed_districts')
+        .select('id, role, is_active, last_seen_at, access_level, allowed_districts, allowed_townships')
         .eq('id', authData.user.id)
         .single();
       if (profileError) { profileError.userId = authData.user.id; throw profileError; }
@@ -159,6 +159,7 @@ const Login = ({ onLogin }) => {
         role: pendingUser.profile.role,
         access_level: pendingUser.profile.access_level || 'central',
         allowed_districts: pendingUser.profile.allowed_districts || [],
+        allowed_townships: pendingUser.profile.allowed_townships || [],
       });
     } catch (err) {
       setError(err.message || 'Verification failed. Please try again.');

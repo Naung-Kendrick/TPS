@@ -96,8 +96,10 @@ const validateDateOfBirth = (text) => {
 };
 
 const Reports = ({ user }) => {
-  const districtFilter = (user?.access_level === 'district' && user?.allowed_districts?.length > 0)
+  const districtFilter = (user?.access_level !== 'central' && user?.allowed_districts?.length > 0)
     ? user.allowed_districts : null;
+  const townshipFilter = (user?.access_level === 'township' && user?.allowed_townships?.length > 0)
+    ? user.allowed_townships : null;
   const [level, setLevel] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -202,9 +204,11 @@ const Reports = ({ user }) => {
         // Townships
         const { data, error } = await supabase.rpc('report_townships', { p_district: path.district });
         if (error) throw error;
-        const list = (data || []).map(d => ({ id: d.township, name: d.township }));
+        let list = (data || []).map(d => ({ id: d.township, name: d.township }));
+        if (townshipFilter) list = list.filter(t => townshipFilter.includes(t.id));
         setDataList(list);
         cacheSet(cacheKey, list);
+        if (townshipFilter?.length === 1 && list.length === 1) handleNavigate(3, { township: list[0].name });
       }
       else if (level === 3) {
         // After Township, show BOTH Wards AND Groups as separate options

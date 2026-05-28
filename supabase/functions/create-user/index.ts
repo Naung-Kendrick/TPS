@@ -22,7 +22,7 @@ serve(async (req) => {
     )
 
     // Receive data from React frontend
-    const { username, password, role, displayName, email, access_level, allowed_districts } = await req.json()
+    const { username, password, role, displayName, email, access_level, allowed_districts, allowed_townships } = await req.json()
 
     if (!username || !password || !role) {
       throw new Error('Username, password, and role are required.')
@@ -49,7 +49,8 @@ serve(async (req) => {
       display_name: displayName,
       role: role,
       access_level: access_level || 'central',
-      allowed_districts: (access_level === 'district' && Array.isArray(allowed_districts)) ? allowed_districts : [],
+      allowed_districts: (access_level !== 'central' && Array.isArray(allowed_districts)) ? allowed_districts : [],
+      allowed_townships: (access_level === 'township' && Array.isArray(allowed_townships)) ? allowed_townships : [],
     }
     if (email) profilePayload.email = email
 

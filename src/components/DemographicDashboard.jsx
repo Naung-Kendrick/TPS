@@ -573,8 +573,10 @@ const sectionTitleStyle = {
 
 // ─── Main Component ────────────────────────────────────────
 const DemographicDashboard = ({ user }) => {
-  const districtFilter = (user?.access_level === 'district' && user?.allowed_districts?.length > 0)
+  const districtFilter = (user?.access_level !== 'central' && user?.allowed_districts?.length > 0)
     ? user.allowed_districts : null;
+  const townshipFilter = (user?.access_level === 'township' && user?.allowed_townships?.length > 0)
+    ? user.allowed_townships : null;
   const [statsData, setStatsData] = useState(null);
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState(null);
@@ -599,7 +601,7 @@ const DemographicDashboard = ({ user }) => {
       let list = data?.map(d => d.name) || [];
       if (districtFilter) list = list.filter(d => districtFilter.includes(d));
       setDistricts(list);
-      if (districtFilter?.length === 1 && list.length === 1) setSelectedDistrict(list[0]);
+      if (list.length === 1) setSelectedDistrict(list[0]);
     } catch (err) { console.error(err); }
   };
 
@@ -609,7 +611,10 @@ const DemographicDashboard = ({ user }) => {
     try {
       const { data, error } = await supabase.rpc('stats_townships', { p_district: district });
       if (error) throw error;
-      setTownships(data?.map(t => t.name) || []);
+      let list = data?.map(t => t.name) || [];
+      if (townshipFilter) list = list.filter(t => townshipFilter.includes(t));
+      setTownships(list);
+      if (list.length === 1) setSelectedTownship(list[0]);
     } catch { setTownships([]); }
   };
 

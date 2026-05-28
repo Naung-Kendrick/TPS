@@ -234,8 +234,10 @@ const validateDateOfBirth = (text) => {
 const DISTRICTS = ['နမ့်ခမ်း ခရိုင်', 'နမ့်ဆန် ခရိုင်', 'မန်တုံ ခရိုင်'];
 
 const HouseholdForm = ({ user }) => {
-  const districtFilter = (user?.access_level === 'district' && user?.allowed_districts?.length > 0)
+  const districtFilter = (user?.access_level !== 'central' && user?.allowed_districts?.length > 0)
     ? user.allowed_districts : null;
+  const townshipFilter = (user?.access_level === 'township' && user?.allowed_townships?.length > 0)
+    ? user.allowed_townships : null;
   const [formData, setFormData] = useState({
     household_no: '',
     name: '',
@@ -977,7 +979,15 @@ const HouseholdForm = ({ user }) => {
 
       <div style={{ ...groupStyle, gridColumn: 'span 1' }}>
         <label style={labelStyle}>TOWNSHIP</label>
-        <input type="text" name="township" value={formData.township} onChange={handleChange} placeholder="Enter township name" style={inputStyle} autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} />
+        {townshipFilter ? (
+          <select name="township" value={formData.township} onChange={handleChange}
+            style={{ ...inputStyle, cursor: 'pointer' }}>
+            <option value="">-- Select Township --</option>
+            {townshipFilter.map(t => <option key={t} value={t}>{t}</option>)}
+          </select>
+        ) : (
+          <input type="text" name="township" value={formData.township} onChange={handleChange} placeholder="Enter township name" style={inputStyle} autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} />
+        )}
       </div>
 
       <div style={{ ...groupStyle, gridColumn: 'span 1' }}>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import {
   UserPlus, Shield, User, Key, Hash, Loader2, CheckCircle2, AlertTriangle, X,
@@ -38,7 +38,7 @@ function isOnline(ts) {
 
 const UserManagement = ({ user }) => {
   // ── Create-user form ──────────────────────────────────────────────────────
-  const [formData, setFormData] = useState({ username: '', password: '', role: 'field', email: '', access_level: 'central', allowed_districts: [] });
+  const [formData, setFormData] = useState({ username: '', password: '', role: 'field', email: '', access_level: 'central', allowed_districts: [], allowed_townships: [] });
   const [loading,  setLoading]  = useState(false);
   const [status,   setStatus]   = useState(null);
 
@@ -51,11 +51,15 @@ const UserManagement = ({ user }) => {
   const [filterRole,   setFilterRole]   = useState('all');
   const [filterStatus, setFilterStatus] = useState('all'); // 'all' | 'active' | 'disabled'
 
-  // ── District edit state ───────────────────────────────────────────────────
+  // ── District / Township edit state ───────────────────────────────────────
   const [editingDistrictsFor, setEditingDistrictsFor] = useState(null);
-  const [editedLevel,    setEditedLevel]    = useState('central');
-  const [editedDistricts, setEditedDistricts] = useState([]);
-  const [savingDistricts, setSavingDistricts] = useState(false);
+  const [editedLevel,      setEditedLevel]      = useState('central');
+  const [editedDistricts,  setEditedDistricts]  = useState([]);
+  const [editedTownships,  setEditedTownships]  = useState([]);
+  const [savingDistricts,  setSavingDistricts]  = useState(false);
+  const [allTownships,     setAllTownships]     = useState({});
+  const [loadingTownships, setLoadingTownships] = useState(false);
+  const townshipsLoadedRef = useRef(false);
 
   const canToggleUsers = user?.role === 'system' || user?.role === 'master' || user?.role === 'admin';
 
@@ -67,7 +71,7 @@ const UserManagement = ({ user }) => {
       // Try full select first; fall back if username/email columns don't exist yet
       let { data, error } = await supabase
         .from('profiles')
-        .select('id, role, is_active, last_seen_at, created_at, username, email, access_level, allowed_districts')
+        .select('id, role, is_active, last_seen_at, created_at, username, email, access_level, allowed_districts, allowed_townships')
         .order('created_at', { ascending: false });
       if (error && error.message?.includes('username')) {
         // username column not yet in DB — run the migration SQL
@@ -88,7 +92,6 @@ const UserManagement = ({ user }) => {
     }
   }, []);
 
-  useEffect(() => { loadTokenStatus(); }, [loadTokenStatus]);
   useEffect(() => { loadUsers(); }, [loadUsers]);
 
   // ── Toggle active/disabled ────────────────────────────────────────────────
@@ -113,23 +116,55 @@ const UserManagement = ({ user }) => {
     }
   };
 
-  // ── Save district access for existing user ────────────────────────────────
+  // ── Load all townships grouped by district ────────────────────────────────
+  const loadAllTownships = useCallback(async () => {
+    if (townshipsLoadedRef.current) return;
+    setLoadingTownships(true);
+    try {
+      const results = await Promise.all(
+        DISTRICTS.map(d => supabase.rpc('stats_townships', { p_district: d }))
+      );
+      const grouped = {};
+      DISTRICTS.forEach((d, i) => {
+        grouped[d] = (results[i].data || []).map(t => t.name);
+      });
+      setAllTownships(grouped);
+      townshipsLoadedRef.current = true;
+    } catch (err) {
+      console.error('Failed to load townships:', err);
+    } finally {
+      setLoadingTownships(false);
+    }
+  }, []);
+
+  // ── Save district/township access for existing user ───────────────────────
   const saveDistrictAccess = async (userId) => {
     setSavingDistricts(true);
     try {
       const newLevel     = editedLevel;
-      const newDistricts = newLevel === 'district' ? editedDistricts : [];
+      let newDistricts   = newLevel === 'district' ? editedDistricts : [];
+      const newTownships = newLevel === 'township'  ? editedTownships : [];
+      // For township level: auto-compute parent districts from selected townships
+      if (newLevel === 'township' && newTownships.length > 0) {
+        const parentSet = new Set();
+        Object.entries(allTownships).forEach(([dist, towns]) => {
+          if (towns.some(t => newTownships.includes(t))) parentSet.add(dist);
+        });
+        newDistricts = Array.from(parentSet);
+      }
       const { error } = await supabase
         .from('profiles')
-        .update({ access_level: newLevel, allowed_districts: newDistricts })
+        .update({ access_level: newLevel, allowed_districts: newDistricts, allowed_townships: newTownships })
         .eq('id', userId);
       if (error) throw error;
       setUserList(prev => prev.map(u =>
-        u.id === userId ? { ...u, access_level: newLevel, allowed_districts: newDistricts } : u
+        u.id === userId
+          ? { ...u, access_level: newLevel, allowed_districts: newDistricts, allowed_townships: newTownships }
+          : u
       ));
       setEditingDistrictsFor(null);
     } catch (err) {
-      alert('Failed to save district access: ' + err.message);
+      alert('Failed to save access: ' + err.message);
     } finally {
       setSavingDistricts(false);
     }
@@ -137,18 +172,25 @@ const UserManagement = ({ user }) => {
 
   // ── Form ──────────────────────────────────────────────────────────────────
   const handleChange = e => {
-    const { name, value, type, checked } = e.target;
+    const { name, value, checked } = e.target;
     if (name === 'allowed_districts') {
       setFormData(prev => ({
         ...prev,
-        allowed_districts: checked
-          ? [...prev.allowed_districts, value]
-          : prev.allowed_districts.filter(d => d !== value),
+        allowed_districts: checked ? [...prev.allowed_districts, value] : prev.allowed_districts.filter(d => d !== value),
       }));
       return;
     }
-    if (name === 'access_level' && value === 'central') {
-      setFormData(prev => ({ ...prev, access_level: value, allowed_districts: [] }));
+    if (name === 'allowed_townships') {
+      setFormData(prev => ({
+        ...prev,
+        allowed_townships: checked ? [...prev.allowed_townships, value] : prev.allowed_townships.filter(t => t !== value),
+      }));
+      return;
+    }
+    if (name === 'access_level') {
+      if (value === 'central')   setFormData(prev => ({ ...prev, access_level: value, allowed_districts: [], allowed_townships: [] }));
+      else if (value === 'district') setFormData(prev => ({ ...prev, access_level: value, allowed_townships: [] }));
+      else if (value === 'township') { setFormData(prev => ({ ...prev, access_level: value, allowed_districts: [] })); loadAllTownships(); }
       return;
     }
     setFormData(prev => ({ ...prev, [name]: value }));
@@ -165,7 +207,7 @@ const UserManagement = ({ user }) => {
       if (error) throw error;
       const emailNote = formData.email ? ' Email OTP will be required at login.' : ' No email set — OTP step will be skipped.';
       setStatus({ type: 'success', text: `User account created successfully.${emailNote}` });
-      setFormData({ username: '', password: '', role: 'field', email: '', access_level: 'central', allowed_districts: [] });
+      setFormData({ username: '', password: '', role: 'field', email: '', access_level: 'central', allowed_districts: [], allowed_townships: [] });
       await loadUsers();
     } catch (err) {
       setStatus({ type: 'error', text: err.message || 'An unexpected error occurred during user creation.' });
@@ -342,8 +384,9 @@ const UserManagement = ({ user }) => {
                     const isSelf   = u.id === user?.id;
                     const toggling = togglingId === u.id;
                     const roleInfo = ROLE_LABELS[u.role] || { label: u.role, color: '#737373', bg: '#F5F5F5' };
-                    const isEditingThis = editingDistrictsFor === u.id;
-                    const districtAccess = u.access_level === 'district';
+                    const isEditingThis  = editingDistrictsFor === u.id;
+                    const isDistrictLevel = u.access_level === 'district';
+                    const isTownshipLevel = u.access_level === 'township';
 
                     return (
                       <React.Fragment key={u.id}>
@@ -377,19 +420,26 @@ const UserManagement = ({ user }) => {
                             </span>
                           </td>
 
-                          {/* District Access */}
+                          {/* District / Township Access */}
                           <td className="px-4 py-3.5 hidden lg:table-cell">
                             <div className="flex items-center gap-1 flex-wrap">
-                              {districtAccess ? (
-                                (u.allowed_districts || []).length === 0 ? (
-                                  <span className="text-[9px] font-bold bg-red-50 text-red-600 border border-red-200 px-2 py-0.5">No Districts</span>
-                                ) : (
-                                  (u.allowed_districts || []).map(d => (
-                                    <span key={d} className="text-[9px] font-bold bg-blue-50 text-blue-700 border border-blue-200 px-1.5 py-0.5">
-                                      {d.replace(' ခရိုင်', '')}
-                                    </span>
-                                  ))
-                                )
+                              {isDistrictLevel ? (
+                                (u.allowed_districts || []).length === 0
+                                  ? <span className="text-[9px] font-bold bg-red-50 text-red-600 border border-red-200 px-2 py-0.5">No Districts</span>
+                                  : (u.allowed_districts || []).map(d => (
+                                      <span key={d} className="text-[9px] font-bold bg-blue-50 text-blue-700 border border-blue-200 px-1.5 py-0.5">{d.replace(' ခရိုင်', '')}</span>
+                                    ))
+                              ) : isTownshipLevel ? (
+                                (u.allowed_townships || []).length === 0
+                                  ? <span className="text-[9px] font-bold bg-red-50 text-red-600 border border-red-200 px-2 py-0.5">No Townships</span>
+                                  : <>
+                                      {(u.allowed_townships || []).slice(0, 2).map(t => (
+                                        <span key={t} className="text-[9px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 px-1.5 py-0.5">{t}</span>
+                                      ))}
+                                      {(u.allowed_townships || []).length > 2 && (
+                                        <span className="text-[9px] text-gray-400">+{(u.allowed_townships || []).length - 2} more</span>
+                                      )}
+                                    </>
                               ) : (
                                 <span className="text-[9px] font-bold bg-gray-100 text-gray-500 border border-gray-200 px-2 py-0.5">Central</span>
                               )}
@@ -431,6 +481,8 @@ const UserManagement = ({ user }) => {
                                       if (isEditingThis) { setEditingDistrictsFor(null); return; }
                                       setEditedLevel(u.access_level || 'central');
                                       setEditedDistricts(u.allowed_districts || []);
+                                      setEditedTownships(u.allowed_townships || []);
+                                      if ((u.access_level === 'township')) loadAllTownships();
                                       setEditingDistrictsFor(u.id);
                                     }}
                                     title="Edit district access"
@@ -460,21 +512,26 @@ const UserManagement = ({ user }) => {
                           )}
                         </tr>
 
-                        {/* Inline district edit panel */}
+                        {/* Inline access edit panel */}
                         {isEditingThis && (
                           <tr className="border-b border-blue-200">
                             <td colSpan={6} className="px-6 py-5 bg-blue-50">
-                              <div className="flex flex-wrap gap-6 items-start">
+                              <div className="flex flex-col gap-4">
+                                {/* Row 1: access level radios */}
                                 <div>
                                   <div className="text-[9px] font-bold text-gray-500 uppercase tracking-wider mb-2">Access Level</div>
-                                  <div className="flex gap-2">
-                                    {[['central', 'Central — Full Access'], ['district', 'District — Restricted']].map(([val, lbl]) => (
+                                  <div className="flex flex-wrap gap-2">
+                                    {[['central','Central — Full Access'],['district','District — Restricted'],['township','Township — Most Restricted']].map(([val, lbl]) => (
                                       <label key={val} className={`flex items-center gap-2 px-3 py-2 border cursor-pointer text-[11px] font-semibold transition-colors ${
                                         editedLevel === val ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-400'
                                       }`}>
-                                        <input type="radio" name={`level-${u.id}`} value={val}
-                                          checked={editedLevel === val}
-                                          onChange={() => { setEditedLevel(val); if (val === 'central') setEditedDistricts([]); }}
+                                        <input type="radio" name={`level-${u.id}`} value={val} checked={editedLevel === val}
+                                          onChange={() => {
+                                            setEditedLevel(val);
+                                            if (val === 'central') { setEditedDistricts([]); setEditedTownships([]); }
+                                            else if (val === 'district') setEditedTownships([]);
+                                            else if (val === 'township') { setEditedDistricts([]); loadAllTownships(); }
+                                          }}
                                           className="hidden" />
                                         {lbl}
                                       </label>
@@ -482,20 +539,19 @@ const UserManagement = ({ user }) => {
                                   </div>
                                 </div>
 
+                                {/* Row 2: district checkboxes */}
                                 {editedLevel === 'district' && (
                                   <div>
                                     <div className="text-[9px] font-bold text-gray-500 uppercase tracking-wider mb-2">Allowed Districts</div>
                                     <div className="flex flex-wrap gap-2">
                                       {DISTRICTS.map(d => {
-                                        const checked = editedDistricts.includes(d);
+                                        const chk = editedDistricts.includes(d);
                                         return (
                                           <label key={d} className={`flex items-center gap-2 px-3 py-2 border cursor-pointer text-[11px] font-semibold transition-colors ${
-                                            checked ? 'bg-blue-700 text-white border-blue-700' : 'bg-white text-gray-700 border-gray-200 hover:border-blue-400'
+                                            chk ? 'bg-blue-700 text-white border-blue-700' : 'bg-white text-gray-700 border-gray-200 hover:border-blue-400'
                                           }`}>
-                                            <input type="checkbox" value={d} checked={checked}
-                                              onChange={e => setEditedDistricts(prev =>
-                                                e.target.checked ? [...prev, d] : prev.filter(x => x !== d)
-                                              )}
+                                            <input type="checkbox" value={d} checked={chk}
+                                              onChange={e => setEditedDistricts(prev => e.target.checked ? [...prev, d] : prev.filter(x => x !== d))}
                                               className="hidden" />
                                             {d}
                                           </label>
@@ -505,7 +561,42 @@ const UserManagement = ({ user }) => {
                                   </div>
                                 )}
 
-                                <div className="flex gap-2 ml-auto self-end">
+                                {/* Row 3: township checkboxes grouped by district */}
+                                {editedLevel === 'township' && (
+                                  <div>
+                                    <div className="text-[9px] font-bold text-gray-500 uppercase tracking-wider mb-2">Allowed Townships</div>
+                                    {loadingTownships ? (
+                                      <div className="flex items-center gap-2 text-[10px] text-gray-500">
+                                        <Loader2 size={12} className="animate-spin" /> Loading townships...
+                                      </div>
+                                    ) : (
+                                      <div className="space-y-3">
+                                        {DISTRICTS.map(d => (
+                                          <div key={d}>
+                                            <div className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">{d}</div>
+                                            <div className="flex flex-wrap gap-2">
+                                              {(allTownships[d] || []).map(t => {
+                                                const chk = editedTownships.includes(t);
+                                                return (
+                                                  <label key={t} className={`flex items-center gap-2 px-3 py-2 border cursor-pointer text-[11px] font-semibold transition-colors ${
+                                                    chk ? 'bg-indigo-700 text-white border-indigo-700' : 'bg-white text-gray-700 border-gray-200 hover:border-indigo-400'
+                                                  }`}>
+                                                    <input type="checkbox" value={t} checked={chk}
+                                                      onChange={e => setEditedTownships(prev => e.target.checked ? [...prev, t] : prev.filter(x => x !== t))}
+                                                      className="hidden" />
+                                                    {t}
+                                                  </label>
+                                                );
+                                              })}
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+
+                                <div className="flex gap-2">
                                   <button onClick={() => setEditingDistrictsFor(null)}
                                     className="px-4 py-2 border border-gray-300 text-gray-600 text-[11px] font-bold uppercase tracking-wider hover:bg-gray-100 transition-colors">
                                     Cancel
@@ -671,9 +762,9 @@ const UserManagement = ({ user }) => {
 
                   <div>
                     <label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase tracking-wider">Data Access Level</label>
-                    <div className="flex gap-2">
-                      {[['central', 'Central — Full Access'], ['district', 'District — Restricted']].map(([val, lbl]) => (
-                        <label key={val} className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 border cursor-pointer text-[11px] font-semibold transition-colors ${
+                    <div className="flex flex-wrap gap-2">
+                      {[['central', 'Central — Full Access'], ['district', 'District — Restricted'], ['township', 'Township — Most Restricted']].map(([val, lbl]) => (
+                        <label key={val} className={`flex items-center gap-2 px-3 py-2.5 border cursor-pointer text-[11px] font-semibold transition-colors ${
                           formData.access_level === val ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-400'
                         }`}>
                           <input type="radio" name="access_level" value={val}
@@ -682,7 +773,7 @@ const UserManagement = ({ user }) => {
                         </label>
                       ))}
                     </div>
-                    <p className="text-[10px] text-gray-400 mt-1">Central users see all districts. District users only see their assigned districts.</p>
+                    <p className="text-[10px] text-gray-400 mt-1">Central = all data. District = assigned districts only. Township = specific townships only.</p>
                   </div>
 
                   {formData.access_level === 'district' && (
@@ -690,21 +781,49 @@ const UserManagement = ({ user }) => {
                       <label className="block text-[10px] font-bold text-gray-600 mb-2 uppercase tracking-wider">Allowed Districts</label>
                       <div className="flex flex-wrap gap-2">
                         {DISTRICTS.map(d => {
-                          const checked = formData.allowed_districts.includes(d);
+                          const chk = formData.allowed_districts.includes(d);
                           return (
                             <label key={d} className={`flex items-center gap-2 px-3 py-2 border cursor-pointer text-[11px] font-semibold transition-colors ${
-                              checked ? 'bg-blue-700 text-white border-blue-700' : 'bg-white text-gray-700 border-gray-200 hover:border-blue-400'
+                              chk ? 'bg-blue-700 text-white border-blue-700' : 'bg-white text-gray-700 border-gray-200 hover:border-blue-400'
                             }`}>
-                              <input type="checkbox" name="allowed_districts" value={d}
-                                checked={checked} onChange={handleChange} className="hidden" />
+                              <input type="checkbox" name="allowed_districts" value={d} checked={chk} onChange={handleChange} className="hidden" />
                               {d}
                             </label>
                           );
                         })}
                       </div>
-                      {formData.allowed_districts.length === 0 && (
-                        <p className="text-[10px] text-red-500 mt-1">Select at least one district.</p>
+                      {formData.allowed_districts.length === 0 && <p className="text-[10px] text-red-500 mt-1">Select at least one district.</p>}
+                    </div>
+                  )}
+
+                  {formData.access_level === 'township' && (
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-600 mb-2 uppercase tracking-wider">Allowed Townships</label>
+                      {loadingTownships ? (
+                        <div className="flex items-center gap-2 text-[10px] text-gray-500"><Loader2 size={12} className="animate-spin" /> Loading townships...</div>
+                      ) : (
+                        <div className="space-y-3">
+                          {DISTRICTS.map(d => (
+                            <div key={d}>
+                              <div className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">{d}</div>
+                              <div className="flex flex-wrap gap-2">
+                                {(allTownships[d] || []).map(t => {
+                                  const chk = formData.allowed_townships.includes(t);
+                                  return (
+                                    <label key={t} className={`flex items-center gap-2 px-3 py-2 border cursor-pointer text-[11px] font-semibold transition-colors ${
+                                      chk ? 'bg-indigo-700 text-white border-indigo-700' : 'bg-white text-gray-700 border-gray-200 hover:border-indigo-400'
+                                    }`}>
+                                      <input type="checkbox" name="allowed_townships" value={t} checked={chk} onChange={handleChange} className="hidden" />
+                                      {t}
+                                    </label>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
                       )}
+                      {formData.allowed_townships.length === 0 && !loadingTownships && <p className="text-[10px] text-red-500 mt-1">Select at least one township.</p>}
                     </div>
                   )}
 

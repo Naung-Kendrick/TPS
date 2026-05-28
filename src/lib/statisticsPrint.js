@@ -1,4 +1,4 @@
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import taangFlag from '../assets/taang_flag.jpg';
 import taangLogo from '../assets/fonts/IDTL_logo.png';
 
@@ -10,7 +10,7 @@ const safeHtml = (v) => {
 };
 
 const toMM = (num) => {
-  if (num === null || num === undefined) return '0';
+  if (num === null || num === undefined) return '၀';
   const map = { '0':'၀','1':'၁','2':'၂','3':'၃','4':'၄','5':'၅','6':'၆','7':'၇','8':'၈','9':'၉' };
   return String(num).replace(/[0-9]/g, d => map[d]);
 };
@@ -48,132 +48,436 @@ const getAggregatedNatCount = (natCounts, normalizedNat, allNationalities) => {
   }, 0);
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
 // EXCEL EXPORT
 // ─────────────────────────────────────────────────────────────────────────────
-export const exportStatisticsExcel = ({
+export const exportStatisticsExcel = async ({
   groupLabel, wardStats, totalStats, allReligions, allNationalities,
   selectedDistrict, selectedTownship, selectedWard, selectedGroup, selectedVillage,
   isAtWardLevel, wardStatsList, villageStatsList, groupStatsList,
 }) => {
-  const wb = XLSX.utils.book_new();
   const now = new Date();
-  const dateStr = now.toLocaleDateString('en-GB');
+  const dateStr = now.toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: '2-digit' });
 
   const parts = [];
-  if (selectedDistrict) parts.push(`District: ${selectedDistrict}`);
-  if (selectedTownship) parts.push(`Township: ${selectedTownship}`);
-  if (selectedWard)     parts.push(`Ward: ${selectedWard}`);
-  if (selectedGroup)    parts.push(`Group: ${selectedGroup}`);
-  if (selectedVillage)  parts.push(`Village: ${selectedVillage}`);
-  const filterLine = parts.length > 0 ? parts.join(' | ') : 'All Districts';
-
-  // ── Sheet 1: Population, Age, Religion ──────────────────────────────────────
-  const relHeaders = allReligions.map(r => r);
-  const hdr1 = [
-    "Ta'ang Land Immigration Department — Population Statistics",
-    '', '', '', '', '', '', '', '', '', '', '', '', ...relHeaders.map(() => '')
-  ];
-  const hdr2 = [`Filter: ${filterLine}`, `Printed: ${dateStr}`];
-  const hdr3 = [];
-  const hdr4 = [
-    'No.', groupLabel, 'Households',
-    'Male', 'Female', 'Total',
-    '<16 Male', '<16 Female', '<16 Total',
-    '16-60 Male', '16-60 Female', '16-60 Total',
-    '>60 Male', '>60 Female', '>60 Total',
-    ...relHeaders
-  ];
-
-  const dataRows1 = wardStats.map((w, i) => [
-    i + 1, w.name, w.households,
-    w.male, w.female, w.total,
-    w.u16m, w.u16f, w.u16m + w.u16f,
-    w.b1660m, w.b1660f, w.b1660m + w.b1660f,
-    w.a60m, w.a60f, w.a60m + w.a60f,
-    ...allReligions.map(r => w.relCounts[r] || 0)
-  ]);
-
-  const totalRow1 = [
-    '', 'TOTAL', totalStats.households,
-    totalStats.male, totalStats.female, totalStats.total,
-    totalStats.u16m, totalStats.u16f, totalStats.u16m + totalStats.u16f,
-    totalStats.b1660m, totalStats.b1660f, totalStats.b1660m + totalStats.b1660f,
-    totalStats.a60m, totalStats.a60f, totalStats.a60m + totalStats.a60f,
-    ...allReligions.map(r => totalStats.relCounts[r] || 0)
-  ];
-
-  const aoa1 = [hdr1, hdr2, hdr3, hdr4, ...dataRows1, totalRow1];
-  const ws1 = XLSX.utils.aoa_to_sheet(aoa1);
-
-  const colCount1 = hdr4.length;
-  ws1['!merges'] = [
-    { s: { r: 0, c: 0 }, e: { r: 0, c: colCount1 - 1 } },
-    { s: { r: 1, c: 0 }, e: { r: 1, c: colCount1 - 1 } },
-  ];
-  ws1['!cols'] = [
-    { wch: 5 }, { wch: 22 }, { wch: 11 },
-    { wch: 9 }, { wch: 9 }, { wch: 10 },
-    { wch: 9 }, { wch: 9 }, { wch: 10 },
-    { wch: 10 }, { wch: 10 }, { wch: 10 },
-    { wch: 9 }, { wch: 9 }, { wch: 10 },
-    ...allReligions.map(() => ({ wch: 18 }))
-  ];
-  ws1['!rows'] = [{ hpt: 24 }, { hpt: 18 }, { hpt: 12 }, { hpt: 36 }];
-  XLSX.utils.book_append_sheet(wb, ws1, 'Population, Age, Religion');
-
-  // ── Sheet 2: Nationality ─────────────────────────────────────────────────────
-  // Use normalized aggregated nationalities (same as UI display)
-  const uniqueNormalizedNats = getUniqueNormalizedNats(allNationalities, totalStats.natCounts);
-  const natHeaders = uniqueNormalizedNats;
-  const hdr4b = [
-    'No.', groupLabel, 'Male', 'Female', 'Total',
-    ...natHeaders
-  ];
-
-  const dataRows2 = wardStats.map((w, i) => [
-    i + 1, w.name, w.male, w.female, w.total,
-    ...uniqueNormalizedNats.map(n => getAggregatedNatCount(w.natCounts, n, allNationalities))
-  ]);
-
-  const totalRow2 = [
-    '', 'TOTAL', totalStats.male, totalStats.female, totalStats.total,
-    ...uniqueNormalizedNats.map(n => {
-      const aggregated = allNationalities.reduce((sum, raw) => {
-        if (normalizeNationalityDisplay(raw) === n) {
-          return sum + (totalStats.natCounts?.[raw] || 0);
-        }
-        return sum;
-      }, 0);
-      return aggregated;
-    })
-  ];
-
-  const aoa2 = [
-    ["Ta'ang Land Immigration Department — Nationality Statistics"],
-    [`Filter: ${filterLine}`, `Printed: ${dateStr}`],
-    [],
-    hdr4b,
-    ...dataRows2,
-    totalRow2
-  ];
-  const ws2 = XLSX.utils.aoa_to_sheet(aoa2);
-  const colCount2 = hdr4b.length;
-  ws2['!merges'] = [
-    { s: { r: 0, c: 0 }, e: { r: 0, c: colCount2 - 1 } },
-    { s: { r: 1, c: 0 }, e: { r: 1, c: colCount2 - 1 } },
-  ];
-  ws2['!cols'] = [
-    { wch: 5 }, { wch: 22 }, { wch: 9 }, { wch: 9 }, { wch: 10 },
-    ...uniqueNormalizedNats.map(() => ({ wch: 18 })),
-    { wch: 14 }
-  ];
-  ws2['!rows'] = [{ hpt: 24 }, { hpt: 18 }, { hpt: 12 }, { hpt: 36 }];
-  XLSX.utils.book_append_sheet(wb, ws2, 'Nationality');
+  if (selectedDistrict) parts.push(selectedDistrict);
+  if (selectedTownship) parts.push(selectedTownship);
+  if (selectedWard)     parts.push(selectedWard);
+  if (selectedGroup)    parts.push(selectedGroup);
+  if (selectedVillage)  parts.push(selectedVillage);
+  const filterLine = parts.length > 0 ? parts.join(' / ') : 'All Districts';
 
   const suffix = selectedVillage || selectedGroup || selectedWard || selectedTownship || selectedDistrict || 'All';
   const filename = `TPS_Statistics_${suffix.replace(/[^a-zA-Z0-9_\u1000-\u109F]/g, '_')}_${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}.xlsx`;
-  XLSX.writeFile(wb, filename);
+
+  const levelSuffix = selectedTownship
+    ? '(WARD / GROUP / VILLAGE)'
+    : selectedDistrict
+      ? '(TOWNSHIP)'
+      : '(DISTRICT)';
+
+  const displayReligions = allReligions;
+  const displayNats = getUniqueNormalizedNats(allNationalities, totalStats.natCounts);
+
+  const workbook = new ExcelJS.Workbook();
+  const worksheet = workbook.addWorksheet('Population Statistics');
+
+  const maxCols = Math.max(15 + displayReligions.length, 5 + displayNats.length);
+
+  const applyBorder = (cell) => {
+    cell.border = {
+      top: { style: 'thin', color: { argb: 'FF000000' } },
+      left: { style: 'thin', color: { argb: 'FF000000' } },
+      bottom: { style: 'thin', color: { argb: 'FF000000' } },
+      right: { style: 'thin', color: { argb: 'FF000000' } }
+    };
+  };
+
+  // ── Header titles ──
+  worksheet.mergeCells(1, 1, 1, maxCols);
+  const c1 = worksheet.getCell(1, 1);
+  c1.value = "Ta'ang Land Government";
+  c1.font = { name: 'Pyidaungsu', size: 16, bold: true };
+  c1.alignment = { horizontal: 'center', vertical: 'middle' };
+  worksheet.getRow(1).height = 24;
+
+  worksheet.mergeCells(2, 1, 2, maxCols);
+  const c2 = worksheet.getCell(2, 1);
+  c2.value = "Ta'ang Land Immigration Department (IDTL)";
+  c2.font = { name: 'Pyidaungsu', size: 12, bold: true };
+  c2.alignment = { horizontal: 'center', vertical: 'middle' };
+  worksheet.getRow(2).height = 18;
+
+  worksheet.mergeCells(3, 1, 3, maxCols);
+  const c3 = worksheet.getCell(3, 1);
+  c3.value = "Population Statistics Report";
+  c3.font = { name: 'Pyidaungsu', size: 10, italic: true };
+  c3.alignment = { horizontal: 'center', vertical: 'middle' };
+  worksheet.getRow(3).height = 16;
+
+  // ── Info banner block ──
+  worksheet.mergeCells(5, 1, 5, Math.floor(maxCols / 2));
+  const fLeft = worksheet.getCell(5, 1);
+  fLeft.value = `Location Filter: ${filterLine}`;
+  fLeft.font = { name: 'Pyidaungsu', bold: true, size: 10 };
+  fLeft.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF9F9F9' } };
+  fLeft.alignment = { horizontal: 'left', vertical: 'middle', indent: 1 };
+
+  worksheet.mergeCells(5, Math.floor(maxCols / 2) + 1, 5, maxCols);
+  const fRight = worksheet.getCell(5, Math.floor(maxCols / 2) + 1);
+  fRight.value = `Printed: ${dateStr}`;
+  fRight.font = { name: 'Pyidaungsu', bold: true, size: 10 };
+  fRight.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF9F9F9' } };
+  fRight.alignment = { horizontal: 'right', vertical: 'middle' };
+
+  for (let c = 1; c <= maxCols; c++) {
+    const cell = worksheet.getRow(5).getCell(c);
+    cell.border = {
+      top: { style: 'thin', color: { argb: 'FFCCCCCC' } },
+      bottom: { style: 'thin', color: { argb: 'FFCCCCCC' } },
+      left: c === 1 ? { style: 'thin', color: { argb: 'FFCCCCCC' } } : undefined,
+      right: c === maxCols ? { style: 'thin', color: { argb: 'FFCCCCCC' } } : undefined
+    };
+  }
+  worksheet.getRow(5).height = 22;
+
+  let currentLine = 7;
+
+  // ── Helper to append Table 1 ──
+  const writeTable1Block = (title, colLabel, statsArr) => {
+    if (!statsArr || statsArr.length === 0) return;
+
+    worksheet.mergeCells(currentLine, 1, currentLine, maxCols);
+    const titleCell = worksheet.getCell(currentLine, 1);
+    titleCell.value = title;
+    titleCell.font = { name: 'Pyidaungsu', size: 11, bold: true };
+    titleCell.alignment = { horizontal: 'left', vertical: 'middle' };
+    worksheet.getRow(currentLine).height = 22;
+    currentLine += 1;
+
+    const row1 = currentLine;
+    const row2 = currentLine + 1;
+    const r1 = worksheet.getRow(row1);
+    const r2 = worksheet.getRow(row2);
+
+    r1.getCell(1).value = 'စဉ်';
+    r1.getCell(2).value = colLabel;
+    r1.getCell(3).value = 'အထစ';
+    r1.getCell(4).value = 'လူဦးရေပေါင်း';
+    r1.getCell(7).value = '၁၆ နှစ်အောက်';
+    r1.getCell(10).value = '၁၆ - ၆၀ နှစ်';
+    r1.getCell(13).value = '၆၀ နှစ်အထက်';
+    if (displayReligions.length > 0) {
+      r1.getCell(16).value = 'ကိုးကွယ်သည့်ဘာသာ';
+    }
+
+    r2.getCell(4).value = 'ကျား'; r2.getCell(5).value = 'မ'; r2.getCell(6).value = 'ပေါင်း';
+    r2.getCell(7).value = 'ကျား'; r2.getCell(8).value = 'မ'; r2.getCell(9).value = 'ပေါင်း';
+    r2.getCell(10).value = 'ကျား'; r2.getCell(11).value = 'မ'; r2.getCell(12).value = 'ပေါင်း';
+    r2.getCell(13).value = 'ကျား'; r2.getCell(14).value = 'မ'; r2.getCell(15).value = 'ပေါင်း';
+    displayReligions.forEach((r, idx) => {
+      r2.getCell(16 + idx).value = r;
+    });
+
+    for (let c = 1; c <= 15 + displayReligions.length; c++) {
+      const cell1 = r1.getCell(c);
+      const cell2 = r2.getCell(c);
+      applyBorder(cell1);
+      applyBorder(cell2);
+      cell1.font = { name: 'Pyidaungsu', size: 10, bold: true };
+      cell2.font = { name: 'Pyidaungsu', size: 10, bold: true };
+      cell1.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+      cell2.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+
+      const isGroupHeader = (c >= 4 && c <= 15) || (c >= 16 && c <= 15 + displayReligions.length);
+      const bg = isGroupHeader ? 'D4D4D4' : 'E8E8E8';
+      cell1.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + bg } };
+      cell2.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + bg } };
+    }
+
+    worksheet.mergeCells(row1, 1, row2, 1);
+    worksheet.mergeCells(row1, 2, row2, 2);
+    worksheet.mergeCells(row1, 3, row2, 3);
+    worksheet.mergeCells(row1, 4, row1, 6);
+    worksheet.mergeCells(row1, 7, row1, 9);
+    worksheet.mergeCells(row1, 10, row1, 12);
+    worksheet.mergeCells(row1, 13, row1, 15);
+    if (displayReligions.length > 0) {
+      worksheet.mergeCells(row1, 16, row1, 15 + displayReligions.length);
+    }
+
+    r1.height = 22;
+    r2.height = 22;
+    currentLine += 2;
+
+    const tableSum = statsArr.reduce((acc, w) => {
+      acc.households += (w.households || 0);
+      acc.male       += (w.male || 0);
+      acc.female     += (w.female || 0);
+      acc.total      += (w.total || 0);
+      acc.u16m       += (w.u16m || 0);
+      acc.u16f       += (w.u16f || 0);
+      acc.b1660m     += (w.b1660m || 0);
+      acc.b1660f     += (w.b1660f || 0);
+      acc.a60m       += (w.a60m || 0);
+      acc.a60f       += (w.a60f || 0);
+      displayReligions.forEach(r => {
+        acc.relCounts[r] = (acc.relCounts[r] || 0) + (w.relCounts?.[r] || 0);
+      });
+      return acc;
+    }, {
+      households: 0, male: 0, female: 0, total: 0,
+      u16m: 0, u16f: 0, b1660m: 0, b1660f: 0, a60m: 0, a60f: 0,
+      relCounts: {}
+    });
+
+    statsArr.forEach((w, idx) => {
+      const isEven = idx % 2 === 1;
+      const bg = isEven ? 'FFF5F5F5' : 'FFFFFFFF';
+      const row = worksheet.getRow(currentLine);
+
+      const rowCells = [
+        { val: toMM(idx + 1), align: 'center' },
+        { val: w.name, align: 'left', bold: true },
+        { val: toMM(w.households), align: 'center' },
+        { val: toMM(w.male), align: 'center' },
+        { val: toMM(w.female), align: 'center' },
+        { val: toMM(w.total), align: 'center', bold: true },
+        { val: toMM(w.u16m), align: 'center' },
+        { val: toMM(w.u16f), align: 'center' },
+        { val: toMM(w.u16m + w.u16f), align: 'center', bold: true },
+        { val: toMM(w.b1660m), align: 'center' },
+        { val: toMM(w.b1660f), align: 'center' },
+        { val: toMM(w.b1660m + w.b1660f), align: 'center', bold: true },
+        { val: toMM(w.a60m), align: 'center' },
+        { val: toMM(w.a60f), align: 'center' },
+        { val: toMM(w.a60m + w.a60f), align: 'center', bold: true }
+      ];
+      displayReligions.forEach(r => {
+        const c = w.relCounts?.[r];
+        rowCells.push({ val: c ? toMM(c) : '-', align: 'center' });
+      });
+
+      rowCells.forEach((c, cIdx) => {
+        const cell = row.getCell(cIdx + 1);
+        cell.value = c.val;
+        cell.font = { name: 'Pyidaungsu', size: 10, bold: c.bold || false };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } };
+        cell.alignment = { horizontal: c.align, vertical: 'middle', wrapText: true };
+        applyBorder(cell);
+      });
+      row.height = 20;
+      currentLine += 1;
+    });
+
+    const row = worksheet.getRow(currentLine);
+    const totalCells = [
+      { val: '', align: 'center' },
+      { val: 'စုစုပေါင်း', align: 'left', bold: true },
+      { val: toMM(tableSum.households), align: 'center', bold: true },
+      { val: toMM(tableSum.male), align: 'center', bold: true },
+      { val: toMM(tableSum.female), align: 'center', bold: true },
+      { val: toMM(tableSum.total), align: 'center', bold: true },
+      { val: toMM(tableSum.u16m), align: 'center', bold: true },
+      { val: toMM(tableSum.u16f), align: 'center', bold: true },
+      { val: toMM(tableSum.u16m + tableSum.u16f), align: 'center', bold: true },
+      { val: toMM(tableSum.b1660m), align: 'center', bold: true },
+      { val: toMM(tableSum.b1660f), align: 'center', bold: true },
+      { val: toMM(tableSum.b1660m + tableSum.b1660f), align: 'center', bold: true },
+      { val: toMM(tableSum.a60m), align: 'center', bold: true },
+      { val: toMM(tableSum.a60f), align: 'center', bold: true },
+      { val: toMM(tableSum.a60m + tableSum.a60f), align: 'center', bold: true }
+    ];
+    displayReligions.forEach(r => {
+      const c = tableSum.relCounts?.[r];
+      totalCells.push({ val: c ? toMM(c) : '-', align: 'center', bold: true });
+    });
+
+    totalCells.forEach((c, cIdx) => {
+      const cell = row.getCell(cIdx + 1);
+      cell.value = c.val;
+      cell.font = { name: 'Pyidaungsu', size: 10, bold: true };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8E8E8' } };
+      cell.alignment = { horizontal: c.align, vertical: 'middle', wrapText: true };
+      applyBorder(cell);
+    });
+    row.height = 22;
+    currentLine += 3;
+  };
+
+  // ── Helper to append Table 2 ──
+  const writeTable2Block = (title, colLabel, statsArr) => {
+    if (!statsArr || statsArr.length === 0) return;
+
+    worksheet.mergeCells(currentLine, 1, currentLine, maxCols);
+    const titleCell = worksheet.getCell(currentLine, 1);
+    titleCell.value = title;
+    titleCell.font = { name: 'Pyidaungsu', size: 11, bold: true };
+    titleCell.alignment = { horizontal: 'left', vertical: 'middle' };
+    worksheet.getRow(currentLine).height = 22;
+    currentLine += 1;
+
+    const row1 = currentLine;
+    const row2 = currentLine + 1;
+    const r1 = worksheet.getRow(row1);
+    const r2 = worksheet.getRow(row2);
+
+    r1.getCell(1).value = 'စဉ်';
+    r1.getCell(2).value = colLabel;
+    r1.getCell(3).value = 'လူဦးရေပေါင်း';
+    if (displayNats.length > 0) {
+      r1.getCell(6).value = 'လူမျိုးအလိုက်';
+    }
+
+    r2.getCell(3).value = 'ကျား'; r2.getCell(4).value = 'မ'; r2.getCell(5).value = 'ပေါင်း';
+    displayNats.forEach((n, idx) => {
+      r2.getCell(6 + idx).value = n;
+    });
+
+    for (let c = 1; c <= 5 + displayNats.length; c++) {
+      const cell1 = r1.getCell(c);
+      const cell2 = r2.getCell(c);
+      applyBorder(cell1);
+      applyBorder(cell2);
+      cell1.font = { name: 'Pyidaungsu', size: 10, bold: true };
+      cell2.font = { name: 'Pyidaungsu', size: 10, bold: true };
+      cell1.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+      cell2.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+
+      const isGroupHeader = c >= 3 && c <= 5 || (c >= 6 && c <= 5 + displayNats.length);
+      const bg = isGroupHeader ? 'D4D4D4' : 'E8E8E8';
+      cell1.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + bg } };
+      cell2.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + bg } };
+    }
+
+    worksheet.mergeCells(row1, 1, row2, 1);
+    worksheet.mergeCells(row1, 2, row2, 2);
+    worksheet.mergeCells(row1, 3, row1, 5);
+    if (displayNats.length > 0) {
+      worksheet.mergeCells(row1, 6, row1, 5 + displayNats.length);
+    }
+
+    r1.height = 22;
+    r2.height = 22;
+    currentLine += 2;
+
+    const tableSum = statsArr.reduce((acc, w) => {
+      acc.male   += (w.male || 0);
+      acc.female += (w.female || 0);
+      acc.total  += (w.total || 0);
+      displayNats.forEach(n => {
+        acc.natCounts[n] = (acc.natCounts[n] || 0) + getAggregatedNatCount(w.natCounts, n, allNationalities);
+      });
+      return acc;
+    }, { male: 0, female: 0, total: 0, natCounts: {} });
+
+    statsArr.forEach((w, idx) => {
+      const isEven = idx % 2 === 1;
+      const bg = isEven ? 'FFF5F5F5' : 'FFFFFFFF';
+      const row = worksheet.getRow(currentLine);
+
+      const rowCells = [
+        { val: toMM(idx + 1), align: 'center' },
+        { val: w.name, align: 'left', bold: true },
+        { val: toMM(w.male), align: 'center' },
+        { val: toMM(w.female), align: 'center' },
+        { val: toMM(w.total), align: 'center', bold: true }
+      ];
+      displayNats.forEach(n => {
+        const c = getAggregatedNatCount(w.natCounts, n, allNationalities);
+        rowCells.push({ val: c ? toMM(c) : '-', align: 'center' });
+      });
+
+      rowCells.forEach((c, cIdx) => {
+        const cell = row.getCell(cIdx + 1);
+        cell.value = c.val;
+        cell.font = { name: 'Pyidaungsu', size: 10, bold: c.bold || false };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } };
+        cell.alignment = { horizontal: c.align, vertical: 'middle', wrapText: true };
+        applyBorder(cell);
+      });
+      row.height = 20;
+      currentLine += 1;
+    });
+
+    const row = worksheet.getRow(currentLine);
+    const totalCells = [
+      { val: '', align: 'center' },
+      { val: 'စုစုပေါင်း', align: 'left', bold: true },
+      { val: toMM(tableSum.male), align: 'center', bold: true },
+      { val: toMM(tableSum.female), align: 'center', bold: true },
+      { val: toMM(tableSum.total), align: 'center', bold: true }
+    ];
+    displayNats.forEach(n => {
+      const c = tableSum.natCounts[n];
+      totalCells.push({ val: c ? toMM(c) : '-', align: 'center', bold: true });
+    });
+
+    totalCells.forEach((c, cIdx) => {
+      const cell = row.getCell(cIdx + 1);
+      cell.value = c.val;
+      cell.font = { name: 'Pyidaungsu', size: 10, bold: true };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8E8E8' } };
+      cell.alignment = { horizontal: c.align, vertical: 'middle', wrapText: true };
+      applyBorder(cell);
+    });
+    row.height = 22;
+    currentLine += 3;
+  };
+
+  const prefixedVillageStats = selectedGroup
+    ? (villageStatsList || []).map(v => ({ ...v, name: `${selectedGroup} — ${v.name}` }))
+    : (villageStatsList || []);
+
+  // ── Write sequential dynamic tables ──
+  if (isAtWardLevel) {
+    if (selectedVillage) {
+      writeTable1Block('SUMMARY TABLE (1) — POPULATION, AGE & RELIGION (VILLAGES)', 'ကျေးရွာ', prefixedVillageStats);
+      writeTable2Block('SUMMARY TABLE (2) — NATIONALITY (VILLAGES)', 'ကျေးရွာ', prefixedVillageStats);
+    } else if (selectedGroup) {
+      writeTable1Block('GRAND TOTAL — POPULATION, AGE & RELIGION (GROUP WIDE)', 'အုပ်စုစုစုပေါင်း', [{ name: selectedGroup, ...totalStats }]);
+      writeTable2Block('GRAND TOTAL — NATIONALITY (GROUP WIDE)', 'အုပ်စုစုစုပေါင်း', [{ name: selectedGroup, ...totalStats }]);
+      writeTable1Block('SUMMARY TABLE (1) — POPULATION, AGE & RELIGION (VILLAGES)', 'ကျေးရွာ', prefixedVillageStats);
+      writeTable2Block('SUMMARY TABLE (2) — NATIONALITY (VILLAGES)', 'ကျေးရွာ', prefixedVillageStats);
+    } else if (selectedWard) {
+      writeTable1Block('GRAND TOTAL — POPULATION, AGE & RELIGION (WARD WIDE)', 'ရပ်ကွက်စုစုပေါင်း', [{ name: selectedWard, ...totalStats }]);
+      writeTable2Block('GRAND TOTAL — NATIONALITY (WARD WIDE)', 'ရပ်ကွက်စုစုပေါင်း', [{ name: selectedWard, ...totalStats }]);
+      writeTable1Block('SUMMARY TABLE (1) — POPULATION, AGE & RELIGION (WARDS)', 'ရပ်ကွက်', wardStatsList || []);
+      writeTable2Block('SUMMARY TABLE (2) — NATIONALITY (WARDS)', 'ရပ်ကွက်', wardStatsList || []);
+    } else {
+      writeTable1Block('GRAND TOTAL — POPULATION, AGE & RELIGION (TOWNSHIP WIDE)', 'မြို့နယ်စုစုပေါင်း', [{ name: selectedTownship || 'Township Total', ...totalStats }]);
+      writeTable2Block('GRAND TOTAL — NATIONALITY (TOWNSHIP WIDE)', 'မြို့နယ်စုစုပေါင်း', [{ name: selectedTownship || 'Township Total', ...totalStats }]);
+      writeTable1Block('SUMMARY TABLE (1) — POPULATION, AGE & RELIGION (WARDS)', 'ရပ်ကွက်', wardStatsList || []);
+      writeTable2Block('SUMMARY TABLE (2) — NATIONALITY (WARDS)', 'ရပ်ကွက်', wardStatsList || []);
+      writeTable1Block('SUMMARY TABLE (1) — POPULATION, AGE & RELIGION (GROUPS)', 'ကျေးရွာအုပ်စု', groupStatsList || []);
+      writeTable2Block('SUMMARY TABLE (2) — NATIONALITY (GROUPS)', 'ကျေးရွာအုပ်စု', groupStatsList || []);
+    }
+  } else {
+    writeTable1Block(`SUMMARY TABLE (1) — POPULATION, AGE & RELIGION ${levelSuffix}`, groupLabel, wardStats);
+    writeTable2Block(`SUMMARY TABLE (2) — NATIONALITY ${levelSuffix}`, groupLabel, wardStats);
+  }
+
+  // Auto-fit column widths
+  worksheet.columns.forEach((column) => {
+    let maxLen = 10;
+    column.eachCell({ includeEmpty: true }, (cell) => {
+      if (cell.row > 7 && cell.value) {
+        let len = String(cell.value).length;
+        if (len > maxLen) maxLen = len;
+      }
+    });
+    column.width = Math.min(Math.max(maxLen + 4, 10), 30);
+  });
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -276,6 +580,29 @@ export const printStatistics = ({
 
   const makeTable1Block = (title, colLabel, statsArr) => {
     if (!statsArr || statsArr.length === 0) return '';
+
+    // Calculate correct sums for this specific table (statsArr)
+    const tableSum = statsArr.reduce((acc, w) => {
+      acc.households += (w.households || 0);
+      acc.male       += (w.male || 0);
+      acc.female     += (w.female || 0);
+      acc.total      += (w.total || 0);
+      acc.u16m       += (w.u16m || 0);
+      acc.u16f       += (w.u16f || 0);
+      acc.b1660m     += (w.b1660m || 0);
+      acc.b1660f     += (w.b1660f || 0);
+      acc.a60m       += (w.a60m || 0);
+      acc.a60f       += (w.a60f || 0);
+      displayReligions.forEach(r => {
+        acc.relCounts[r] = (acc.relCounts[r] || 0) + (w.relCounts?.[r] || 0);
+      });
+      return acc;
+    }, {
+      households: 0, male: 0, female: 0, total: 0,
+      u16m: 0, u16f: 0, b1660m: 0, b1660f: 0, a60m: 0, a60f: 0,
+      relCounts: {}
+    });
+
     const hdr = `
       <thead>
         <tr>
@@ -301,20 +628,20 @@ export const printStatistics = ({
       <tr class="total-row">
         <td class="num"></td>
         <td class="name bold">စုစုပေါင်း</td>
-        <td class="num bold">${toMM(totalStats.households)}</td>
-        <td class="num bold">${toMM(totalStats.male)}</td>
-        <td class="num bold">${toMM(totalStats.female)}</td>
-        <td class="num bold green">${toMM(totalStats.total)}</td>
-        <td class="num bold">${toMM(totalStats.u16m)}</td>
-        <td class="num bold">${toMM(totalStats.u16f)}</td>
-        <td class="num bold">${toMM(totalStats.u16m + totalStats.u16f)}</td>
-        <td class="num bold">${toMM(totalStats.b1660m)}</td>
-        <td class="num bold">${toMM(totalStats.b1660f)}</td>
-        <td class="num bold">${toMM(totalStats.b1660m + totalStats.b1660f)}</td>
-        <td class="num bold">${toMM(totalStats.a60m)}</td>
-        <td class="num bold">${toMM(totalStats.a60f)}</td>
-        <td class="num bold">${toMM(totalStats.a60m + totalStats.a60f)}</td>
-        ${displayReligions.map(r => `<td class="num bold">${totalStats.relCounts[r] ? toMM(totalStats.relCounts[r]) : '-'}</td>`).join('')}
+        <td class="num bold">${toMM(tableSum.households)}</td>
+        <td class="num bold">${toMM(tableSum.male)}</td>
+        <td class="num bold">${toMM(tableSum.female)}</td>
+        <td class="num bold green">${toMM(tableSum.total)}</td>
+        <td class="num bold">${toMM(tableSum.u16m)}</td>
+        <td class="num bold">${toMM(tableSum.u16f)}</td>
+        <td class="num bold">${toMM(tableSum.u16m + tableSum.u16f)}</td>
+        <td class="num bold">${toMM(tableSum.b1660m)}</td>
+        <td class="num bold">${toMM(tableSum.b1660f)}</td>
+        <td class="num bold">${toMM(tableSum.b1660m + tableSum.b1660f)}</td>
+        <td class="num bold">${toMM(tableSum.a60m)}</td>
+        <td class="num bold">${toMM(tableSum.a60f)}</td>
+        <td class="num bold">${toMM(tableSum.a60m + tableSum.a60f)}</td>
+        ${displayReligions.map(r => `<td class="num bold">${tableSum.relCounts[r] ? toMM(tableSum.relCounts[r]) : '-'}</td>`).join('')}
       </tr>`;
     const truncationNote = hasMoreReligions 
       ? `<div style="font-size:8px;color:#666;margin-top:4px;font-style:italic;">Showing top ${MAX_REL_COLS} of ${allReligions.length} religions. View full statistics online.</div>` 
@@ -325,15 +652,6 @@ export const printStatistics = ({
   const prefixedVillageStats = selectedGroup
     ? (villageStatsList || []).map(v => ({ ...v, name: `${selectedGroup} — ${v.name}` }))
     : (villageStatsList || []);
-
-  const table1Html = isAtWardLevel
-    ? [
-        makeTable1Block('SUMMARY TABLE (1) — POPULATION, AGE & RELIGION (WARDS)', 'ရပ်ကွက်', wardStatsList || []),
-        makeTable1Block('SUMMARY TABLE (1) — POPULATION, AGE & RELIGION (GROUPS)', 'ကျေးရွာအုပ်စု', groupStatsList || []),
-        makeTable1Block('SUMMARY TABLE (1) — POPULATION, AGE & RELIGION (VILLAGES)', 'ကျေးရွာ', prefixedVillageStats),
-      ].join('')
-    : `<div class="section-title">SUMMARY TABLE (1) — POPULATION, AGE &amp; RELIGION ${safeHtml(levelSuffix)}</div>
-       <table>${table1Header}<tbody>${wardStats.map((w, i) => makeTable1Row(w, i)).join('')}${table1TotalRow}</tbody></table>`;
 
   // ── Table 2: Nationality ─────────────────────────────────────────────────────
   // Use normalized aggregated nationalities (same as UI display)
@@ -346,6 +664,18 @@ export const printStatistics = ({
 
   const makeTable2Block = (title, colLabel, statsArr) => {
     if (!statsArr || statsArr.length === 0) return '';
+
+    // Calculate correct sums for this specific table (statsArr)
+    const tableSum = statsArr.reduce((acc, w) => {
+      acc.male   += (w.male || 0);
+      acc.female += (w.female || 0);
+      acc.total  += (w.total || 0);
+      displayNats.forEach(n => {
+        acc.natCounts[n] = (acc.natCounts[n] || 0) + getAggregatedNatCount(w.natCounts, n, allNationalities);
+      });
+      return acc;
+    }, { male: 0, female: 0, total: 0, natCounts: {} });
+
     const hdr = `
       <thead>
         <tr>
@@ -372,10 +702,10 @@ export const printStatistics = ({
       <tr class="total-row">
         <td class="num"></td>
         <td class="name bold">စုစုပေါင်း</td>
-        <td class="num bold">${toMM(totalStats.male)}</td>
-        <td class="num bold">${toMM(totalStats.female)}</td>
-        <td class="num bold green">${toMM(totalStats.total)}</td>
-        ${displayNats.map(n => `<td class="num bold">${toMM(getAggregatedNatCount(totalStats.natCounts, n, allNationalities)) || '-'}</td>`).join('')}
+        <td class="num bold">${toMM(tableSum.male)}</td>
+        <td class="num bold">${toMM(tableSum.female)}</td>
+        <td class="num bold green">${toMM(tableSum.total)}</td>
+        ${displayNats.map(n => `<td class="num bold">${toMM(tableSum.natCounts[n]) || '-'}</td>`).join('')}
       </tr>`;
     const natTruncationNote = hasMoreNats 
       ? `<div style="font-size:8px;color:#666;margin-top:4px;font-style:italic;">Showing top ${MAX_NAT_COLS} of ${uniqueNormalizedNats.length} nationalities. View full statistics online.</div>` 
@@ -417,14 +747,46 @@ export const printStatistics = ({
       </tr>
     </thead>`;
 
-  const table2Html = isAtWardLevel
-    ? [
-        makeTable2Block('SUMMARY TABLE (2) — NATIONALITY (WARDS)', 'ရပ်ကွက်', wardStatsList || []),
-        makeTable2Block('SUMMARY TABLE (2) — NATIONALITY (GROUPS)', 'ကျေးရွာအုပ်စု', groupStatsList || []),
+  let tablesHtml = '';
+  if (isAtWardLevel) {
+    if (selectedVillage) {
+      tablesHtml = [
+        makeTable1Block('SUMMARY TABLE (1) — POPULATION, AGE & RELIGION (VILLAGES)', 'ကျေးရွာ', prefixedVillageStats),
         makeTable2Block('SUMMARY TABLE (2) — NATIONALITY (VILLAGES)', 'ကျေးရွာ', prefixedVillageStats),
-      ].join('')
-    : `<div class="section-title">SUMMARY TABLE (2) — NATIONALITY ${levelSuffix}</div>
-       <table>${table2Header}<tbody>${wardStats.map((w, i) => makeTable2Row(w, i)).join('')}${table2TotalRow}</tbody></table>`;
+      ].join('');
+    } else if (selectedGroup) {
+      tablesHtml = [
+        makeTable1Block('GRAND TOTAL — POPULATION, AGE & RELIGION (GROUP WIDE)', 'အုပ်စုစုစုပေါင်း', [{ name: selectedGroup, ...totalStats }]),
+        makeTable2Block('GRAND TOTAL — NATIONALITY (GROUP WIDE)', 'အုပ်စုစုစုပေါင်း', [{ name: selectedGroup, ...totalStats }]),
+        makeTable1Block('SUMMARY TABLE (1) — POPULATION, AGE & RELIGION (VILLAGES)', 'ကျေးရွာ', prefixedVillageStats),
+        makeTable2Block('SUMMARY TABLE (2) — NATIONALITY (VILLAGES)', 'ကျေးရွာ', prefixedVillageStats),
+      ].join('');
+    } else if (selectedWard) {
+      tablesHtml = [
+        makeTable1Block('GRAND TOTAL — POPULATION, AGE & RELIGION (WARD WIDE)', 'ရပ်ကွက်စုစုပေါင်း', [{ name: selectedWard, ...totalStats }]),
+        makeTable2Block('GRAND TOTAL — NATIONALITY (WARD WIDE)', 'ရပ်ကွက်စုစုပေါင်း', [{ name: selectedWard, ...totalStats }]),
+        makeTable1Block('SUMMARY TABLE (1) — POPULATION, AGE & RELIGION (WARDS)', 'ရပ်ကွက်', wardStatsList || []),
+        makeTable2Block('SUMMARY TABLE (2) — NATIONALITY (WARDS)', 'ရပ်ကွက်', wardStatsList || []),
+      ].join('');
+    } else {
+      tablesHtml = [
+        makeTable1Block('GRAND TOTAL — POPULATION, AGE & RELIGION (TOWNSHIP WIDE)', 'မြို့နယ်စုစုပေါင်း', [{ name: selectedTownship || 'Township Total', ...totalStats }]),
+        makeTable2Block('GRAND TOTAL — NATIONALITY (TOWNSHIP WIDE)', 'မြို့နယ်စုစုပေါင်း', [{ name: selectedTownship || 'Township Total', ...totalStats }]),
+        makeTable1Block('SUMMARY TABLE (1) — POPULATION, AGE & RELIGION (WARDS)', 'ရပ်ကွက်', wardStatsList || []),
+        makeTable2Block('SUMMARY TABLE (2) — NATIONALITY (WARDS)', 'ရပ်ကွက်', wardStatsList || []),
+        makeTable1Block('SUMMARY TABLE (1) — POPULATION, AGE & RELIGION (GROUPS)', 'ကျေးရွာအုပ်စု', groupStatsList || []),
+        makeTable2Block('SUMMARY TABLE (2) — NATIONALITY (GROUPS)', 'ကျေးရွာအုပ်စု', groupStatsList || []),
+      ].join('');
+    }
+  } else {
+    tablesHtml = `
+       <div class="section-title">SUMMARY TABLE (1) — POPULATION, AGE &amp; RELIGION ${safeHtml(levelSuffix)}</div>
+       <table>${table1Header}<tbody>${wardStats.map((w, i) => makeTable1Row(w, i)).join('')}${table1TotalRow}</tbody></table>
+       
+       <div class="section-title">SUMMARY TABLE (2) — NATIONALITY ${safeHtml(levelSuffix)}</div>
+       <table>${table2Header}<tbody>${wardStats.map((w, i) => makeTable2Row(w, i)).join('')}${table2TotalRow}</tbody></table>
+      `;
+  }
 
   const html = `<!DOCTYPE html>
 <html>
@@ -432,7 +794,7 @@ export const printStatistics = ({
   <meta charset="utf-8" />
   <title>Population Statistics — ${safeHtml(filterLine)}</title>
   <style>
-    @page { size: legal landscape; margin: 5mm 6mm; }
+    @page { size: legal landscape; margin: 3mm; }
     @font-face {
       font-family: 'Pyidaungsu';
       src: url('/assets/fonts/Pyidaungsu.ttf') format('truetype');
@@ -555,7 +917,8 @@ export const printStatistics = ({
     td.name { 
       text-align: left; 
       font-weight: 500; 
-      white-space: nowrap;
+      white-space: normal;
+      word-break: break-word;
     }
     td.bold { font-weight: 700; }
     td.green { 
@@ -610,8 +973,7 @@ export const printStatistics = ({
       <span><b>Printed:</b> ${safeHtml(dateStr)}</span>
     </div>
 
-    ${table1Html}
-    ${table2Html}
+    ${tablesHtml}
 
     <div class="doc-footer">
       <span>Ta'ang Land Immigration Department &mdash; Confidential</span>
@@ -753,7 +1115,7 @@ export const printDemographicDashboard = ({
   <meta charset="utf-8" />
   <title>Demographic Dashboard — ${safeHtml(filterLine)}</title>
   <style>
-    @page { size: legal landscape; margin: 5mm 6mm; }
+    @page { size: legal landscape; margin: 3mm; }
     @font-face {
       font-family: 'Pyidaungsu';
       src: url('/assets/fonts/Pyidaungsu.ttf') format('truetype');

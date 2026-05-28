@@ -2,6 +2,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { Users, UserPlus, LineChart, PieChart, FileText, Settings, Upload, ScanLine, Menu, X, MoreHorizontal, LogOut, CircleUserRound, UserCheck, Database } from 'lucide-react';
 import logo from '../../assets/fonts/IDTL_logo.png';
+import { getProfileType } from '../../lib/roleHelper';
+import { getUnreadCount } from '../../lib/notifications';
+import { Bell } from 'lucide-react';
 
 const Sidebar = ({ user, onLogout }) => {
   const [open, setOpen] = useState(false);
@@ -12,53 +15,16 @@ const Sidebar = ({ user, onLogout }) => {
   const touchStartX = useRef(null);
   const touchStartY = useRef(null);
 
-  const getRoleLabel = (role) => {
-    const roles = {
-      field: 'Field Staff',
-      ops: 'Operations',
-      regional: 'Regional Admin',
-      system: 'System Admin',
-      admin: 'Admin',
-      master: 'Master Admin',
-    };
-    return roles[role] || (role ? role.charAt(0).toUpperCase() + role.slice(1) : 'User');
-  };
+  const [unreadCount, setUnreadCount] = useState(0);
 
-  const getRoleBgColor = (role) => {
-    const colors = {
-      field: '#E6FDF5',      // Soft Emerald Green
-      ops: '#EFF6FF',        // Soft Sky Blue
-      regional: '#F5F3FF',   // Soft Lavender Purple
-      system: '#FEF2F2',     // Soft Coral Red
-      admin: '#FDF2F8',      // Soft Rose Pink
-      master: '#FFFBEB',     // Soft Amber Gold
-    };
-    return colors[role] || '#FAFAFA';
-  };
+  useEffect(() => {
+    setUnreadCount(getUnreadCount());
+    const handleNotif = () => setUnreadCount(getUnreadCount());
+    window.addEventListener('tps:notifications', handleNotif);
+    return () => window.removeEventListener('tps:notifications', handleNotif);
+  }, []);
 
-  const getRoleBorderColor = (role) => {
-    const colors = {
-      field: '#A7F3D0',      // Emerald Green border
-      ops: '#BFDBFE',        // Sky Blue border
-      regional: '#DDD6FE',   // Lavender Purple border
-      system: '#FECACA',     // Coral Red border
-      admin: '#FBCFE8',      // Rose Pink border
-      master: '#FDE68A',     // Amber Gold border
-    };
-    return colors[role] || '#E5E7EB';
-  };
 
-  const getRoleTextColor = (role) => {
-    const colors = {
-      field: '#065F46',      // Dark Emerald Green
-      ops: '#1E40AF',        // Dark Sky Blue
-      regional: '#5B21B6',   // Dark Lavender Purple
-      system: '#991B1B',     // Dark Coral Red
-      admin: '#9D174D',      // Dark Rose Pink
-      master: '#92400E',     // Dark Amber Gold
-    };
-    return colors[role] || '#1A1A1A'; // Fallback to main theme text color
-  };
 
   // Close drawer/more on route change (mobile)
   useEffect(() => { setOpen(false); setMoreOpen(false); }, [location.pathname]);
@@ -119,12 +85,12 @@ const Sidebar = ({ user, onLogout }) => {
     { id: 'registration',     path: '/registration',     label: 'Household Registration', icon: UserPlus       },
     { id: 'central-database', path: '/central-database', label: 'Central Database',       icon: Database       },
     { id: 'users',            path: '/users',            label: 'User Management',        icon: Users          },
-    { id: 'settings',         path: '/settings',         label: 'Settings',               icon: Settings       },
+    { id: 'notifications-requests', path: '/notifications-requests', label: 'Notifications & Requests', icon: Bell },
   ];
 
   // Role-based + access-level filtering
   const filteredMenuItems = menuItems.filter(item => {
-    if (item.id === 'users') return user?.role === 'system' || user?.role === 'master' || user?.role === 'admin';
+    if (item.id === 'users') return user?.role === 'system' || user?.role === 'master';
     if (item.id === 'upload') return user?.role === 'system' || user?.role === 'master' || user?.role === 'admin' || user?.role === 'ops';
     if (item.id === 'central-database') return user?.access_level !== 'viewer' && user?.access_level !== 'sub_township';
     return true;
@@ -213,7 +179,22 @@ const Sidebar = ({ user, onLogout }) => {
             {({ isActive }) => (
               <>
                 <item.icon size={14} strokeWidth={isActive ? 2 : 1.5} style={{ color: '#1A1A1A', flexShrink: 0 }} />
-                <span>{item.label}</span>
+                <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.label}</span>
+                {item.id === 'notifications-requests' && unreadCount > 0 && (
+                  <span style={{
+                    backgroundColor: '#DC2626',
+                    color: '#FFFFFF',
+                    fontSize: '9px',
+                    fontWeight: '700',
+                    padding: '1px 5px',
+                    borderRadius: '10px',
+                    lineHeight: 1,
+                    marginLeft: 'auto',
+                    flexShrink: 0
+                  }}>
+                    {unreadCount}
+                  </span>
+                )}
               </>
             )}
           </NavLink>
@@ -221,19 +202,107 @@ const Sidebar = ({ user, onLogout }) => {
       </div>
 
       {/* User + Logout */}
-      <div style={{ borderTop: '1px solid #E5E7EB', padding: '10px 8px 12px' }}>
-        {/* Signed-in user row */}
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: '8px',
-          padding: '8px 12px', marginBottom: '4px',
-          backgroundColor: getRoleBgColor(user?.role || user?.profile?.role),
-          border: `1px solid ${getRoleBorderColor(user?.role || user?.profile?.role)}`,
-        }}>
-          <CircleUserRound size={14} style={{ color: getRoleTextColor(user?.role || user?.profile?.role), flexShrink: 0 }} />
-          <span style={{ fontSize: '11px', fontWeight: '700', color: '#1A1A1A', letterSpacing: '0.04em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {getRoleLabel(user?.role || user?.profile?.role)}
-          </span>
-        </div>
+      <div style={{ borderTop: '1px solid #E5E7EB', padding: '12px 10px 14px', backgroundColor: '#FAFAFA' }}>
+        {/* Signed-in user card */}
+        {(() => {
+          const uRole = user?.role || user?.profile?.role || 'field';
+          const uLevel = user?.access_level || user?.profile?.access_level || 'central';
+          const prof = getProfileType(uRole, uLevel);
+          const displayName = user?.profile?.display_name || user?.profile?.username || user?.username || 'Officer';
+          const allowedDistricts = user?.allowed_districts || user?.profile?.allowed_districts || [];
+          const allowedTownships = user?.allowed_townships || user?.profile?.allowed_townships || [];
+          
+          return (
+            <div style={{
+              padding: '10px 12px',
+              backgroundColor: '#FFFFFF',
+              border: `1px solid ${prof.border}`,
+              borderLeft: `4px solid ${prof.color}`,
+              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
+              marginBottom: '8px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '4px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <CircleUserRound size={13} style={{ color: prof.color, flexShrink: 0 }} />
+                <span style={{ fontSize: '11px', fontWeight: '700', color: '#1A1A1A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {displayName.toUpperCase()}
+                </span>
+              </div>
+              <div style={{ fontSize: '10px', fontWeight: '600', color: '#404040', letterSpacing: '0.01em' }}>
+                {prof.typicalPerson}
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px', marginTop: '2px' }}>
+                <span style={{
+                  fontSize: '8px',
+                  fontWeight: '700',
+                  color: prof.color,
+                  backgroundColor: prof.bg,
+                  padding: '1px 4px',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.03em',
+                  border: `1px solid ${prof.border}`
+                }}>
+                  {prof.roleName}
+                </span>
+                <span style={{
+                  fontSize: '8px',
+                  fontWeight: '700',
+                  color: '#4B5563',
+                  backgroundColor: '#F3F4F6',
+                  padding: '1px 4px',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.03em',
+                  border: '1px solid #E5E7EB'
+                }}>
+                  {prof.accessLevel}
+                </span>
+              </div>
+
+              {/* Allowed District/Township names */}
+              {(uLevel === 'district' || uLevel === 'viewer') && allowedDistricts.length > 0 && (
+                <div style={{
+                  fontSize: '9.5px',
+                  fontWeight: '600',
+                  color: '#1E40AF',
+                  backgroundColor: '#EFF6FF',
+                  padding: '4px 6px',
+                  border: '1px solid #BFDBFE',
+                  marginTop: '4px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '2px'
+                }}>
+                  <span style={{ fontSize: '7.5px', fontWeight: '800', color: '#1D4ED8', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Allowed Districts:</span>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#1E3A8A' }}>
+                    {allowedDistricts.join(', ')}
+                  </span>
+                </div>
+              )}
+
+              {(uLevel === 'township' || uLevel === 'sub_township') && allowedTownships.length > 0 && (
+                <div style={{
+                  fontSize: '9.5px',
+                  fontWeight: '600',
+                  color: '#3730A3',
+                  backgroundColor: '#EEF2FF',
+                  padding: '4px 6px',
+                  border: '1px solid #C7D2FE',
+                  marginTop: '4px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '2px'
+                }}>
+                  <span style={{ fontSize: '7.5px', fontWeight: '800', color: '#4338CA', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Allowed Townships:</span>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#312E81' }}>
+                    {allowedTownships.join(', ')}
+                  </span>
+                </div>
+              )}
+            </div>
+          );
+        })()}
         {/* Sign Out button */}
         <button
           onClick={onLogout}
@@ -357,9 +426,23 @@ const Sidebar = ({ user, onLogout }) => {
             justifyContent: 'center', gap: '3px', background: 'none', border: 'none',
             cursor: 'pointer', padding: '6px 4px',
             color: moreOpen || moreNav.some(i => location.pathname === i.path) ? '#1A1A1A' : '#9CA3AF',
+            position: 'relative'
           }}
         >
-          <MoreHorizontal size={20} strokeWidth={1.5} />
+          <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <MoreHorizontal size={20} strokeWidth={1.5} />
+            {unreadCount > 0 && (
+              <span style={{
+                position: 'absolute',
+                top: -2,
+                right: -2,
+                width: '6px',
+                height: '6px',
+                backgroundColor: '#DC2626',
+                borderRadius: '50%'
+              }} />
+            )}
+          </div>
           <span style={{ fontSize: '9px', fontWeight: '400', letterSpacing: '0.03em', textTransform: 'uppercase' }}>More</span>
         </button>
       </div>
@@ -397,7 +480,21 @@ const Sidebar = ({ user, onLogout }) => {
                   }}
                 >
                   <item.icon size={18} strokeWidth={isActive ? 2 : 1.5} />
-                  {item.label}
+                  <span style={{ flex: 1 }}>{item.label}</span>
+                  {item.id === 'notifications-requests' && unreadCount > 0 && (
+                    <span style={{
+                      backgroundColor: '#DC2626',
+                      color: '#FFFFFF',
+                      fontSize: '9px',
+                      fontWeight: '700',
+                      padding: '1px 5px',
+                      borderRadius: '10px',
+                      lineHeight: 1,
+                      marginLeft: 'auto'
+                    }}>
+                      {unreadCount}
+                    </span>
+                  )}
                 </button>
               );
             })}

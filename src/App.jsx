@@ -14,6 +14,7 @@ const HouseholdForm      = lazy(() => import('./components/HouseholdForm'))
 const IDCardScanner      = lazy(() => import('./components/IDCardScanner'))
 const Login              = lazy(() => import('./components/Login'))
 const UserManagement     = lazy(() => import('./components/UserManagement'))
+const NotificationsRequests = lazy(() => import('./components/NotificationsRequests'))
 
 const PageFallback = () => (
   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
@@ -118,8 +119,12 @@ function App() {
         <Route path="statistics" element={<Suspense fallback={<PageFallback />}><PopulationStatistics user={user} /></Suspense>} />
         <Route path="demographics" element={<Suspense fallback={<PageFallback />}><DemographicDashboard user={user} /></Suspense>} />
         <Route path="registration" element={<Suspense fallback={<PageFallback />}><HouseholdForm user={user} /></Suspense>} />
-        <Route path="users" element={<Suspense fallback={<PageFallback />}><UserManagement user={user} /></Suspense>} />
-        <Route path="settings" element={<Placeholder title="Settings" />} />
+        <Route path="users" element={
+          (user?.role === 'system' || user?.role === 'master')
+            ? <Suspense fallback={<PageFallback />}><UserManagement user={user} /></Suspense>
+            : <Navigate to="/verification" replace />
+        } />
+        <Route path="notifications-requests" element={<Suspense fallback={<PageFallback />}><NotificationsRequests user={user} /></Suspense>} />
         <Route path="*" element={<Navigate to="/verification" replace />} />
       </Route>
       <Route path="/login" element={<Navigate to="/verification" replace />} />

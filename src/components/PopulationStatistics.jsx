@@ -184,6 +184,7 @@ const PopulationStatistics = ({ user }) => {
   const [villages, setVillages] = useState([]);
   const [groups, setGroups] = useState([]);
   const [filteredVillages, setFilteredVillages] = useState([]);
+  const [townshipLocations, setTownshipLocations] = useState([]);
 
   // Selected filters
   const [selectedDistrict, setSelectedDistrict] = useState('');
@@ -203,8 +204,44 @@ const PopulationStatistics = ({ user }) => {
   const [villagePage2, setVillagePage2] = useState(1);
   const [groupPage1, setGroupPage1] = useState(1);
   const [groupPage2, setGroupPage2] = useState(1);
-  const [reqSending, setReqSending] = useState(false);
-  const [reqSent,    setReqSent]    = useState(null); // 'print' | 'excel' | null
+  const [reqSending,    setReqSending]    = useState(false);
+  const [reqSent,       setReqSent]       = useState(null); // 'print' | 'excel' | null
+  const [approvedTypes, setApprovedTypes] = useState(new Set());
+
+  // Load already-approved requests + subscribe to live approval changes
+  useEffect(() => {
+    if (!isViewer || !user?.id) return;
+    supabase
+      .from('print_export_requests')
+      .select('export_type')
+      .eq('requester_id', user.id)
+      .eq('page', 'statistics')
+      .eq('status', 'resolved')
+      .then(({ data }) => {
+        if (data?.length) setApprovedTypes(new Set(data.map(r => r.export_type)));
+      });
+    const ch = supabase
+      .channel(`stats-req-${user.id}`)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'print_export_requests',
+        filter: `requester_id=eq.${user.id}` }, (payload) => {
+        if (payload.new.page === 'statistics' && payload.new.status === 'resolved') {
+          setApprovedTypes(prev => new Set([...prev, payload.new.export_type]));
+        }
+      })
+      .subscribe();
+    return () => supabase.removeChannel(ch);
+  }, [isViewer, user?.id]);
+
+  const markUsed = async (exportType) => {
+    await supabase
+      .from('print_export_requests')
+      .update({ status: 'used' })
+      .eq('requester_id', user.id)
+      .eq('page', 'statistics')
+      .eq('export_type', exportType)
+      .eq('status', 'resolved');
+    setApprovedTypes(prev => { const n = new Set(prev); n.delete(exportType); return n; });
+  };
 
   // ─── Fetch districts via RPC ──────────────────────────────
   const submitRequest = async (exportType) => {
@@ -374,6 +411,13 @@ const PopulationStatistics = ({ user }) => {
     loadStats();
   }, [loadStats]);
 
+  // Cache township sub-location stats when full township is loaded
+  useEffect(() => {
+    if (statsData?.groupKey === 'wvg' && !selectedGroup && !selectedWard) {
+      setTownshipLocations(statsData.groupStats || []);
+    }
+  }, [statsData, selectedGroup, selectedWard]);
+
   // Load townships when district changes
   useEffect(() => {
     loadTownships(selectedDistrict);
@@ -399,6 +443,7 @@ const PopulationStatistics = ({ user }) => {
     setWardPage1(1); setWardPage2(1);
     setVillagePage1(1); setVillagePage2(1);
     setGroupPage1(1); setGroupPage2(1);
+    setTownshipLocations([]);
   }, [selectedTownship]);
 
   // Reset village and load filtered villages when group changes
@@ -700,11 +745,15 @@ const PopulationStatistics = ({ user }) => {
       {/* ─── Comprehensive Summary Tables ─────────────────────── */}
       {(() => {
         // Group label based on filter level
-        const groupLabel = selectedTownship
-          ? 'ရပ်ကွက်/အုပ်စု'
-          : selectedDistrict
-            ? 'မြို့နယ်'
-            : 'ခရိုင်';
+        const groupLabel = selectedVillage || selectedGroup
+          ? 'ကျေးရွာ'
+          : selectedWard
+            ? 'ရပ်ကွက်'
+            : selectedTownship
+              ? 'ရပ်ကွက်/အုပ်စု'
+              : selectedDistrict
+                ? 'မြို့နယ်'
+                : 'ခရိုင်';
 
         // Level suffix for table titles
         const levelSuffix = selectedTownship
@@ -721,8 +770,12 @@ const PopulationStatistics = ({ user }) => {
         let groupStatsList = [];
 
         if (isAtWardLevel) {
-          // Split groupStats by kind
-          (groupStats || []).forEach(g => {
+          // If we have selected a group or a ward, pull from the cached township sub-locations
+          const sourceStats = (selectedGroup || selectedWard)
+            ? townshipLocations
+            : (groupStats || []);
+
+          sourceStats.forEach(g => {
             if (g.kind === 'ward') wardStatsList.push(g);
             else if (g.kind === 'village') villageStatsList.push(g);
             else if (g.kind === 'group') groupStatsList.push(g);
@@ -733,6 +786,13 @@ const PopulationStatistics = ({ user }) => {
           wardStatsList = groupStats || [];
         }
 
+        // Prefix village names with group name and filter to only those in the group, and by selectedVillage if active
+        const prefixedVillageStatsList = selectedGroup
+          ? villageStatsList
+              .filter(v => filteredVillages.includes(v.name) && (!selectedVillage || v.name === selectedVillage))
+              .map(v => ({ ...v, name: `${selectedGroup} — ${v.name}` }))
+          : villageStatsList;
+
         // Pagination for combined view
         const totalPages1 = Math.max(1, Math.ceil(wardStatsList.length / PAGE_SIZE));
         const totalPages2 = Math.max(1, Math.ceil(wardStatsList.length / PAGE_SIZE));
@@ -742,23 +802,24 @@ const PopulationStatistics = ({ user }) => {
         // Pagination for separate views
         const wardPages1 = Math.max(1, Math.ceil(wardStatsList.length / PAGE_SIZE));
         const wardPages2 = Math.max(1, Math.ceil(wardStatsList.length / PAGE_SIZE));
-        const villagePages1 = Math.max(1, Math.ceil(villageStatsList.length / PAGE_SIZE));
-        const villagePages2 = Math.max(1, Math.ceil(villageStatsList.length / PAGE_SIZE));
+        const villagePages1 = Math.max(1, Math.ceil(prefixedVillageStatsList.length / PAGE_SIZE));
+        const villagePages2 = Math.max(1, Math.ceil(prefixedVillageStatsList.length / PAGE_SIZE));
         const groupPages1 = Math.max(1, Math.ceil(groupStatsList.length / PAGE_SIZE));
         const groupPages2 = Math.max(1, Math.ceil(groupStatsList.length / PAGE_SIZE));
-
-        // Prefix village names with group name when group is selected
-        const prefixedVillageStatsList = selectedGroup
-          ? villageStatsList.map(v => ({ ...v, name: `${selectedGroup} — ${v.name}` }))
-          : villageStatsList;
 
         const thS = { padding: '12px 8px', fontSize: '10px', fontWeight: '600', color: '#737373', borderBottom: '1px solid #E5E7EB', borderRight: '1px solid #E5E7EB', textAlign: 'center', whiteSpace: 'nowrap', textTransform: 'uppercase', letterSpacing: '0.05em', backgroundColor: '#FAFAFA' };
         const tdS = { padding: '10px 8px', fontSize: '12px', textAlign: 'center', borderBottom: '1px solid #E5E7EB', borderRight: '1px solid #E5E7EB', color: '#1A1A1A' };
         const tdMonoS = { ...tdS, fontFamily: 'var(--font-mono)' };
         const tdBold = { ...tdMonoS, fontWeight: '600', backgroundColor: '#FAFAFA' };
 
+        const activeStatsForPrint = selectedGroup
+          ? prefixedVillageStatsList
+          : wardStatsList;
+
         const printArgs = {
-          groupLabel, wardStats: wardStatsList, totalStats, allReligions, allNationalities,
+          groupLabel,
+          wardStats: activeStatsForPrint,
+          totalStats, allReligions, allNationalities,
           selectedDistrict, selectedTownship, selectedWard, selectedGroup, selectedVillage,
           isAtWardLevel,
           wardStatsList, villageStatsList, groupStatsList,
@@ -790,6 +851,18 @@ const PopulationStatistics = ({ user }) => {
         const renderTable2 = (title, statsArray, pageNum, setPageFunc, totalPages) => {
           if (statsArray.length === 0) return null;
           const pagedStats = statsArray.slice((pageNum - 1) * PAGE_SIZE, pageNum * PAGE_SIZE);
+
+          // Calculate correct sums for this specific table (statsArray)
+          const tableSum = statsArray.reduce((acc, w) => {
+            acc.male   += (w.male || 0);
+            acc.female += (w.female || 0);
+            acc.total  += (w.total || 0);
+            uniqueNormalizedNats.forEach(n => {
+              acc.natCounts[n] = (acc.natCounts[n] || 0) + getAggregatedNatCount(w.natCounts, n);
+            });
+            return acc;
+          }, { male: 0, female: 0, total: 0, natCounts: {} });
+
           return (
             <div style={sectionCardStyle}>
               <div style={sectionTitleStyle}>{title}</div>
@@ -821,10 +894,10 @@ const PopulationStatistics = ({ user }) => {
                     <tr>
                       <td style={tdBold}></td>
                       <td style={{ ...tdS, textAlign: 'left', fontWeight: '600', backgroundColor: '#FAFAFA' }}>စုစုပေါင်း</td>
-                      <td style={tdBold}>{toMyanmarNum(totalStats.male)}</td>
-                      <td style={tdBold}>{toMyanmarNum(totalStats.female)}</td>
-                      <td style={{ ...tdBold, color: colors.black }}>{toMyanmarNum(totalStats.total)}</td>
-                      {uniqueNormalizedNats.map(n => <td key={n} style={tdBold}>{toMyanmarNum(aggregatedNatCounts[n]) || '-'}</td>)}
+                      <td style={tdBold}>{toMyanmarNum(tableSum.male)}</td>
+                      <td style={tdBold}>{toMyanmarNum(tableSum.female)}</td>
+                      <td style={{ ...tdBold, color: colors.black }}>{toMyanmarNum(tableSum.total)}</td>
+                      {uniqueNormalizedNats.map(n => <td key={n} style={tdBold}>{tableSum.natCounts[n] ? toMyanmarNum(tableSum.natCounts[n]) : '-'}</td>)}
                     </tr>
                   </tbody>
                 </table>
@@ -857,6 +930,29 @@ const PopulationStatistics = ({ user }) => {
         const renderTable1 = (title, statsArray, pageNum, setPageFunc, totalPages) => {
           if (statsArray.length === 0) return null;
           const pagedStats = statsArray.slice((pageNum - 1) * PAGE_SIZE, pageNum * PAGE_SIZE);
+
+          // Calculate correct sums for this specific table (statsArray)
+          const tableSum = statsArray.reduce((acc, w) => {
+            acc.households += (w.households || 0);
+            acc.male       += (w.male || 0);
+            acc.female     += (w.female || 0);
+            acc.total      += (w.total || 0);
+            acc.u16m       += (w.u16m || 0);
+            acc.u16f       += (w.u16f || 0);
+            acc.b1660m     += (w.b1660m || 0);
+            acc.b1660f     += (w.b1660f || 0);
+            acc.a60m       += (w.a60m || 0);
+            acc.a60f       += (w.a60f || 0);
+            allReligions.forEach(r => {
+              acc.relCounts[r] = (acc.relCounts[r] || 0) + (w.relCounts?.[r] || 0);
+            });
+            return acc;
+          }, {
+            households: 0, male: 0, female: 0, total: 0,
+            u16m: 0, u16f: 0, b1660m: 0, b1660f: 0, a60m: 0, a60f: 0,
+            relCounts: {}
+          });
+
           return (
             <div style={sectionCardStyle}>
               <div style={sectionTitleStyle}>{title}</div>
@@ -886,20 +982,20 @@ const PopulationStatistics = ({ user }) => {
                     <tr>
                       <td style={tdBold}></td>
                       <td style={{ ...tdS, textAlign: 'left', fontWeight: '600', backgroundColor: '#FAFAFA' }}>စုစုပေါင်း</td>
-                      <td style={tdBold}>{toMyanmarNum(totalStats.households)}</td>
-                      <td style={tdBold}>{toMyanmarNum(totalStats.male)}</td>
-                      <td style={tdBold}>{toMyanmarNum(totalStats.female)}</td>
-                      <td style={{ ...tdBold, color: colors.black }}>{toMyanmarNum(totalStats.total)}</td>
-                      <td style={tdBold}>{toMyanmarNum(totalStats.u16m)}</td>
-                      <td style={tdBold}>{toMyanmarNum(totalStats.u16f)}</td>
-                      <td style={{ ...tdBold, color: colors.black }}>{toMyanmarNum(totalStats.u16m + totalStats.u16f)}</td>
-                      <td style={tdBold}>{toMyanmarNum(totalStats.b1660m)}</td>
-                      <td style={tdBold}>{toMyanmarNum(totalStats.b1660f)}</td>
-                      <td style={{ ...tdBold, color: colors.black }}>{toMyanmarNum(totalStats.b1660m + totalStats.b1660f)}</td>
-                      <td style={tdBold}>{toMyanmarNum(totalStats.a60m)}</td>
-                      <td style={tdBold}>{toMyanmarNum(totalStats.a60f)}</td>
-                      <td style={{ ...tdBold, color: colors.black }}>{toMyanmarNum(totalStats.a60m + totalStats.a60f)}</td>
-                      {allReligions.map(r => <td key={r} style={tdBold}>{totalStats.relCounts[r] ? toMyanmarNum(totalStats.relCounts[r]) : '-'}</td>)}
+                      <td style={tdBold}>{toMyanmarNum(tableSum.households)}</td>
+                      <td style={tdBold}>{toMyanmarNum(tableSum.male)}</td>
+                      <td style={tdBold}>{toMyanmarNum(tableSum.female)}</td>
+                      <td style={{ ...tdBold, color: colors.black }}>{toMyanmarNum(tableSum.total)}</td>
+                      <td style={tdBold}>{toMyanmarNum(tableSum.u16m)}</td>
+                      <td style={tdBold}>{toMyanmarNum(tableSum.u16f)}</td>
+                      <td style={{ ...tdBold, color: colors.black }}>{toMyanmarNum(tableSum.u16m + tableSum.u16f)}</td>
+                      <td style={tdBold}>{toMyanmarNum(tableSum.b1660m)}</td>
+                      <td style={tdBold}>{toMyanmarNum(tableSum.b1660f)}</td>
+                      <td style={{ ...tdBold, color: colors.black }}>{toMyanmarNum(tableSum.b1660m + tableSum.b1660f)}</td>
+                      <td style={tdBold}>{toMyanmarNum(tableSum.a60m)}</td>
+                      <td style={tdBold}>{toMyanmarNum(tableSum.a60f)}</td>
+                      <td style={{ ...tdBold, color: colors.black }}>{toMyanmarNum(tableSum.a60m + tableSum.a60f)}</td>
+                      {allReligions.map(r => <td key={r} style={tdBold}>{tableSum.relCounts[r] ? toMyanmarNum(tableSum.relCounts[r]) : '-'}</td>)}
                     </tr>
                   </tbody>
                 </table>
@@ -930,187 +1026,240 @@ const PopulationStatistics = ({ user }) => {
 
         return (
           <>
-            {/* ── Table 1: Population + Age + Religious ─────── */}
             {isAtWardLevel ? (
               <>
-                {renderTable1(`SUMMARY TABLE (1) — POPULATION, AGE & RELIGION (WARDS)`, wardStatsList, wardPage1, setWardPage1, wardPages1)}
-                {renderTable1(`SUMMARY TABLE (1) — POPULATION, AGE & RELIGION (GROUPS)`, groupStatsList, groupPage1, setGroupPage1, groupPages1)}
-                {renderTable1(`SUMMARY TABLE (1) — POPULATION, AGE & RELIGION (VILLAGES)`, prefixedVillageStatsList, villagePage1, setVillagePage1, villagePages1)}
-              </>
-            ) : (
-              <div style={sectionCardStyle}>
-                <div style={sectionTitleStyle}>{`SUMMARY TABLE (1) — POPULATION, AGE & RELIGION ${levelSuffix}`}</div>
-              <div className="tps-responsive-table">
-                <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #E5E7EB', minWidth: '900px' }}>
-                  <thead>
-                    <tr>
-                      <th rowSpan={2} style={thS}>စဉ်</th>
-                      <th rowSpan={2} style={thS}>{groupLabel}</th>
-                      <th rowSpan={2} style={thS}>အထစ</th>
-                      <th colSpan={3} style={thS}>လူဦးရေပေါင်း</th>
-                      <th colSpan={3} style={thS}>၁၆ နှစ်အောက်</th>
-                      <th colSpan={3} style={thS}>၁၆ - ၆၀ နှစ်အကြား</th>
-                      <th colSpan={3} style={thS}>၆၀ နှစ်အထက်</th>
-                      {allReligions.length > 0 && <th colSpan={allReligions.length} style={thS}>ကိုးကွယ်သည့်ဘာသာ</th>}
-                    </tr>
-                    <tr>
-                      <th style={thS}>ကျား</th><th style={thS}>မ</th><th style={thS}>ပေါင်း</th>
-                      <th style={thS}>ကျား</th><th style={thS}>မ</th><th style={thS}>ပေါင်း</th>
-                      <th style={thS}>ကျား</th><th style={thS}>မ</th><th style={thS}>ပေါင်း</th>
-                      <th style={thS}>ကျား</th><th style={thS}>မ</th><th style={thS}>ပေါင်း</th>
-                      {allReligions.map(r => <th key={r} style={thS}>{r}</th>)}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {pagedStats1.map((w, i) => (
-                      <tr key={w.name || i} style={{ backgroundColor: '#FFFFFF' }}>
-                        <td style={tdMonoS}>{toMyanmarNum((page1 - 1) * PAGE_SIZE + i + 1)}</td>
-                        <td style={{ ...tdS, textAlign: 'left', fontWeight: '500' }}>{w.name}</td>
-                        <td style={tdMonoS}>{toMyanmarNum(w.households)}</td>
-                        <td style={tdMonoS}>{toMyanmarNum(w.male)}</td>
-                        <td style={tdMonoS}>{toMyanmarNum(w.female)}</td>
-                        <td style={{ ...tdMonoS, fontWeight: '600', color: colors.black }}>{toMyanmarNum(w.total)}</td>
-                        <td style={tdMonoS}>{toMyanmarNum(w.u16m)}</td>
-                        <td style={tdMonoS}>{toMyanmarNum(w.u16f)}</td>
-                        <td style={{ ...tdMonoS, fontWeight: '600', color: colors.black }}>{toMyanmarNum(w.u16m + w.u16f)}</td>
-                        <td style={tdMonoS}>{toMyanmarNum(w.b1660m)}</td>
-                        <td style={tdMonoS}>{toMyanmarNum(w.b1660f)}</td>
-                        <td style={{ ...tdMonoS, fontWeight: '600', color: colors.black }}>{toMyanmarNum(w.b1660m + w.b1660f)}</td>
-                        <td style={tdMonoS}>{toMyanmarNum(w.a60m)}</td>
-                        <td style={tdMonoS}>{toMyanmarNum(w.a60f)}</td>
-                        <td style={{ ...tdMonoS, fontWeight: '600', color: colors.black }}>{toMyanmarNum(w.a60m + w.a60f)}</td>
-                        {allReligions.map(r => <td key={r} style={tdMonoS}>{w.relCounts[r] ? toMyanmarNum(w.relCounts[r]) : '-'}</td>)}
-                      </tr>
-                    ))}
-                    {/* Total Row */}
-                    <tr>
-                      <td style={tdBold}></td>
-                      <td style={{ ...tdS, textAlign: 'left', fontWeight: '600', backgroundColor: '#FAFAFA' }}>စုစုပေါင်း</td>
-                      <td style={tdBold}>{toMyanmarNum(totalStats.households)}</td>
-                      <td style={tdBold}>{toMyanmarNum(totalStats.male)}</td>
-                      <td style={tdBold}>{toMyanmarNum(totalStats.female)}</td>
-                      <td style={{ ...tdBold, color: colors.black }}>{toMyanmarNum(totalStats.total)}</td>
-                      <td style={tdBold}>{toMyanmarNum(totalStats.u16m)}</td>
-                      <td style={tdBold}>{toMyanmarNum(totalStats.u16f)}</td>
-                      <td style={{ ...tdBold, color: colors.black }}>{toMyanmarNum(totalStats.u16m + totalStats.u16f)}</td>
-                      <td style={tdBold}>{toMyanmarNum(totalStats.b1660m)}</td>
-                      <td style={tdBold}>{toMyanmarNum(totalStats.b1660f)}</td>
-                      <td style={{ ...tdBold, color: colors.black }}>{toMyanmarNum(totalStats.b1660m + totalStats.b1660f)}</td>
-                      <td style={tdBold}>{toMyanmarNum(totalStats.a60m)}</td>
-                      <td style={tdBold}>{toMyanmarNum(totalStats.a60f)}</td>
-                      <td style={{ ...tdBold, color: colors.black }}>{toMyanmarNum(totalStats.a60m + totalStats.a60f)}</td>
-                      {allReligions.map(r => <td key={r} style={tdBold}>{totalStats.relCounts[r] ? toMyanmarNum(totalStats.relCounts[r]) : '-'}</td>)}
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-              {wardStatsList.length > PAGE_SIZE && (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0 4px', borderTop: '1px solid #E5E7EB', marginTop: '4px' }}>
-                  <span style={{ fontSize: '11px', color: '#737373' }}>
-                    {toMyanmarNum((page1 - 1) * PAGE_SIZE + 1)}–{toMyanmarNum(Math.min(page1 * PAGE_SIZE, wardStatsList.length))} / {toMyanmarNum(wardStatsList.length)} rows
-                  </span>
-                  <div style={{ display: 'flex', gap: '6px' }}>
-                    <button onClick={() => setPage1(p => Math.max(1, p - 1))} disabled={page1 === 1}
-                      style={{ padding: '4px 12px', border: '1px solid #E5E7EB', background: page1 === 1 ? '#F9FAFB' : '#FFFFFF', color: page1 === 1 ? '#D1D5DB' : '#1A1A1A', fontSize: '11px', cursor: page1 === 1 ? 'default' : 'pointer' }}>
-                      ← Prev
-                    </button>
-                    <span style={{ padding: '4px 10px', fontSize: '11px', color: '#1A1A1A', border: '1px solid #E5E7EB', background: '#FAFAFA' }}>
-                      {toMyanmarNum(page1)} / {toMyanmarNum(totalPages1)}
-                    </span>
-                    <button onClick={() => setPage1(p => Math.min(totalPages1, p + 1))} disabled={page1 === totalPages1}
-                      style={{ padding: '4px 12px', border: '1px solid #E5E7EB', background: page1 === totalPages1 ? '#F9FAFB' : '#FFFFFF', color: page1 === totalPages1 ? '#D1D5DB' : '#1A1A1A', fontSize: '11px', cursor: page1 === totalPages1 ? 'default' : 'pointer' }}>
-                      Next →
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-            )}
+                {selectedVillage ? (
+                  <>
+                    {/* ── Villages Group (Summary Table 1 & 2) ── */}
+                    {renderTable1(`SUMMARY TABLE (1) — POPULATION, AGE & RELIGION (VILLAGES)`, prefixedVillageStatsList, villagePage1, setVillagePage1, villagePages1)}
+                    {renderTable2(`SUMMARY TABLE (2) — NATIONALITY (VILLAGES)`, prefixedVillageStatsList, villagePage2, setVillagePage2, villagePages2)}
+                  </>
+                ) : selectedGroup ? (
+                  <>
+                    {/* ── Grand Total (Group Wide) ── */}
+                    {renderTable1(`GRAND TOTAL — POPULATION, AGE & RELIGION (GROUP WIDE)`, [{ name: selectedGroup, ...totalStats }], 1, () => {}, 1)}
+                    {renderTable2(`GRAND TOTAL — NATIONALITY (GROUP WIDE)`, [{ name: selectedGroup, ...totalStats }], 1, () => {}, 1)}
 
-            {/* ── Table 2: Population + Nationality ──────────── */}
-            {isAtWardLevel ? (
-              <>
-                {renderTable2(`SUMMARY TABLE (2) — NATIONALITY (WARDS)`, wardStatsList, wardPage2, setWardPage2, wardPages2)}
-                {renderTable2(`SUMMARY TABLE (2) — NATIONALITY (GROUPS)`, groupStatsList, groupPage2, setGroupPage2, groupPages2)}
-                {renderTable2(`SUMMARY TABLE (2) — NATIONALITY (VILLAGES)`, prefixedVillageStatsList, villagePage2, setVillagePage2, villagePages2)}
+                    {/* ── Villages Group (Summary Table 1 & 2) ── */}
+                    {renderTable1(`SUMMARY TABLE (1) — POPULATION, AGE & RELIGION (VILLAGES)`, prefixedVillageStatsList, villagePage1, setVillagePage1, villagePages1)}
+                    {renderTable2(`SUMMARY TABLE (2) — NATIONALITY (VILLAGES)`, prefixedVillageStatsList, villagePage2, setVillagePage2, villagePages2)}
+                  </>
+                ) : selectedWard ? (
+                  <>
+                    {/* ── Grand Total (Ward Wide) ── */}
+                    {renderTable1(`GRAND TOTAL — POPULATION, AGE & RELIGION (WARD WIDE)`, [{ name: selectedWard, ...totalStats }], 1, () => {}, 1)}
+                    {renderTable2(`GRAND TOTAL — NATIONALITY (WARD WIDE)`, [{ name: selectedWard, ...totalStats }], 1, () => {}, 1)}
+
+                    {/* ── Wards Group (Summary Table 1 & 2) ── */}
+                    {renderTable1(`SUMMARY TABLE (1) — POPULATION, AGE & RELIGION (WARDS)`, wardStatsList, wardPage1, setWardPage1, wardPages1)}
+                    {renderTable2(`SUMMARY TABLE (2) — NATIONALITY (WARDS)`, wardStatsList, wardPage2, setWardPage2, wardPages2)}
+                  </>
+                ) : (
+                  <>
+                    {/* ── Grand Total (Township Wide) ── */}
+                    {renderTable1(`GRAND TOTAL — POPULATION, AGE & RELIGION (TOWNSHIP WIDE)`, [{ name: selectedTownship || 'Township Total', ...totalStats }], 1, () => {}, 1)}
+                    {renderTable2(`GRAND TOTAL — NATIONALITY (TOWNSHIP WIDE)`, [{ name: selectedTownship || 'Township Total', ...totalStats }], 1, () => {}, 1)}
+
+                    {/* ── Wards Group (Summary Table 1 & 2) ── */}
+                    {renderTable1(`SUMMARY TABLE (1) — POPULATION, AGE & RELIGION (WARDS)`, wardStatsList, wardPage1, setWardPage1, wardPages1)}
+                    {renderTable2(`SUMMARY TABLE (2) — NATIONALITY (WARDS)`, wardStatsList, wardPage2, setWardPage2, wardPages2)}
+
+                    {/* ── Groups Group (Summary Table 1 & 2) ── */}
+                    {renderTable1(`SUMMARY TABLE (1) — POPULATION, AGE & RELIGION (GROUPS)`, groupStatsList, groupPage1, setGroupPage1, groupPages1)}
+                    {renderTable2(`SUMMARY TABLE (2) — NATIONALITY (GROUPS)`, groupStatsList, groupPage2, setGroupPage2, groupPages2)}
+                  </>
+                )}
               </>
             ) : (
-            <div style={sectionCardStyle}>
-              <div style={sectionTitleStyle}>{`SUMMARY TABLE (2) — NATIONALITY ${levelSuffix}`}</div>
-              <div className="tps-responsive-table">
-                <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #E5E7EB', minWidth: '600px' }}>
-                  <thead>
-                    <tr>
-                      <th rowSpan={2} style={thS}>စဉ်</th>
-                      <th rowSpan={2} style={thS}>{groupLabel}</th>
-                      <th colSpan={3} style={thS}>လူဦးရေပေါင်း</th>
-                      {uniqueNormalizedNats.length > 0 && <th colSpan={uniqueNormalizedNats.length} style={thS}>လူမျိုးအလိုက်</th>}
-                    </tr>
-                    <tr>
-                      <th style={thS}>ကျား</th><th style={thS}>မ</th><th style={thS}>ပေါင်း</th>
-                      {uniqueNormalizedNats.map(n => <th key={n} style={thS}>{n}</th>)}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {pagedStats2.map((w, i) => (
-                      <tr key={w.name || i} style={{ backgroundColor: '#FFFFFF' }}>
-                        <td style={tdMonoS}>{toMyanmarNum((page2 - 1) * PAGE_SIZE + i + 1)}</td>
-                        <td style={{ ...tdS, textAlign: 'left', fontWeight: '500' }}>{w.name}</td>
-                        <td style={tdMonoS}>{toMyanmarNum(w.male)}</td>
-                        <td style={tdMonoS}>{toMyanmarNum(w.female)}</td>
-                        <td style={{ ...tdMonoS, fontWeight: '600', color: colors.black }}>{toMyanmarNum(w.total)}</td>
-                        {uniqueNormalizedNats.map(n => <td key={n} style={tdMonoS}>{toMyanmarNum(getAggregatedNatCount(w.natCounts, n)) || '-'}</td>)}
-                      </tr>
-                    ))}
-                    {/* Total Row */}
-                    <tr>
-                      <td style={tdBold}></td>
-                      <td style={{ ...tdS, textAlign: 'left', fontWeight: '600', backgroundColor: '#FAFAFA' }}>စုစုပေါင်း</td>
-                      <td style={tdBold}>{toMyanmarNum(totalStats.male)}</td>
-                      <td style={tdBold}>{toMyanmarNum(totalStats.female)}</td>
-                      <td style={{ ...tdBold, color: colors.black }}>{toMyanmarNum(totalStats.total)}</td>
-                      {uniqueNormalizedNats.map(n => <td key={n} style={tdBold}>{toMyanmarNum(aggregatedNatCounts[n]) || '-'}</td>)}
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-              {wardStatsList.length > PAGE_SIZE && (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0 4px', borderTop: '1px solid #E5E7EB', marginTop: '4px' }}>
-                  <span style={{ fontSize: '11px', color: '#737373' }}>
-                    {toMyanmarNum((page2 - 1) * PAGE_SIZE + 1)}–{toMyanmarNum(Math.min(page2 * PAGE_SIZE, wardStatsList.length))} / {toMyanmarNum(wardStatsList.length)} rows
-                  </span>
-                  <div style={{ display: 'flex', gap: '6px' }}>
-                    <button onClick={() => setPage2(p => Math.max(1, p - 1))} disabled={page2 === 1}
-                      style={{ padding: '4px 12px', border: '1px solid #E5E7EB', background: page2 === 1 ? '#F9FAFB' : '#FFFFFF', color: page2 === 1 ? '#D1D5DB' : '#1A1A1A', fontSize: '11px', cursor: page2 === 1 ? 'default' : 'pointer' }}>
-                      ← Prev
-                    </button>
-                    <span style={{ padding: '4px 10px', fontSize: '11px', color: '#1A1A1A', border: '1px solid #E5E7EB', background: '#FAFAFA' }}>
-                      {toMyanmarNum(page2)} / {toMyanmarNum(totalPages2)}
-                    </span>
-                    <button onClick={() => setPage2(p => Math.min(totalPages2, p + 1))} disabled={page2 === totalPages2}
-                      style={{ padding: '4px 12px', border: '1px solid #E5E7EB', background: page2 === totalPages2 ? '#F9FAFB' : '#FFFFFF', color: page2 === totalPages2 ? '#D1D5DB' : '#1A1A1A', fontSize: '11px', cursor: page2 === totalPages2 ? 'default' : 'pointer' }}>
-                      Next →
-                    </button>
+              <>
+                {/* ── Table 1: Population + Age + Religious ─────── */}
+                <div style={sectionCardStyle}>
+                  <div style={sectionTitleStyle}>{`SUMMARY TABLE (1) — POPULATION, AGE & RELIGION ${levelSuffix}`}</div>
+                  <div className="tps-responsive-table">
+                    <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #E5E7EB', minWidth: '900px' }}>
+                      <thead>
+                        <tr>
+                          <th rowSpan={2} style={thS}>စဉ်</th>
+                          <th rowSpan={2} style={thS}>{groupLabel}</th>
+                          <th rowSpan={2} style={thS}>အထစ</th>
+                          <th colSpan={3} style={thS}>လူဦးရေပေါင်း</th>
+                          <th colSpan={3} style={thS}>၁၆ နှစ်အောက်</th>
+                          <th colSpan={3} style={thS}>၁၆ - ၆၀ နှစ်အကြား</th>
+                          <th colSpan={3} style={thS}>၆၀ နှစ်အထက်</th>
+                          {allReligions.length > 0 && <th colSpan={allReligions.length} style={thS}>ကိုးကွယ်သည့်ဘာသာ</th>}
+                        </tr>
+                        <tr>
+                          <th style={thS}>ကျား</th><th style={thS}>မ</th><th style={thS}>ပေါင်း</th>
+                          <th style={thS}>ကျား</th><th style={thS}>မ</th><th style={thS}>ပေါင်း</th>
+                          <th style={thS}>ကျား</th><th style={thS}>မ</th><th style={thS}>ပေါင်း</th>
+                          <th style={thS}>ကျား</th><th style={thS}>မ</th><th style={thS}>ပေါင်း</th>
+                          {allReligions.map(r => <th key={r} style={thS}>{r}</th>)}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {pagedStats1.map((w, i) => (
+                          <tr key={w.name || i} style={{ backgroundColor: '#FFFFFF' }}>
+                            <td style={tdMonoS}>{toMyanmarNum((page1 - 1) * PAGE_SIZE + i + 1)}</td>
+                            <td style={{ ...tdS, textAlign: 'left', fontWeight: '500' }}>{w.name}</td>
+                            <td style={tdMonoS}>{toMyanmarNum(w.households)}</td>
+                            <td style={tdMonoS}>{toMyanmarNum(w.male)}</td>
+                            <td style={tdMonoS}>{toMyanmarNum(w.female)}</td>
+                            <td style={{ ...tdMonoS, fontWeight: '600', color: colors.black }}>{toMyanmarNum(w.total)}</td>
+                            <td style={tdMonoS}>{toMyanmarNum(w.u16m)}</td>
+                            <td style={tdMonoS}>{toMyanmarNum(w.u16f)}</td>
+                            <td style={{ ...tdMonoS, fontWeight: '600', color: colors.black }}>{toMyanmarNum(w.u16m + w.u16f)}</td>
+                            <td style={tdMonoS}>{toMyanmarNum(w.b1660m)}</td>
+                            <td style={tdMonoS}>{toMyanmarNum(w.b1660f)}</td>
+                            <td style={{ ...tdMonoS, fontWeight: '600', color: colors.black }}>{toMyanmarNum(w.b1660m + w.b1660f)}</td>
+                            <td style={tdMonoS}>{toMyanmarNum(w.a60m)}</td>
+                            <td style={tdMonoS}>{toMyanmarNum(w.a60f)}</td>
+                            <td style={{ ...tdMonoS, fontWeight: '600', color: colors.black }}>{toMyanmarNum(w.a60m + w.a60f)}</td>
+                            {allReligions.map(r => <td key={r} style={tdMonoS}>{w.relCounts[r] ? toMyanmarNum(w.relCounts[r]) : '-'}</td>)}
+                          </tr>
+                        ))}
+                        {/* Total Row */}
+                        <tr>
+                          <td style={tdBold}></td>
+                          <td style={{ ...tdS, textAlign: 'left', fontWeight: '600', backgroundColor: '#FAFAFA' }}>စုစုပေါင်း</td>
+                          <td style={tdBold}>{toMyanmarNum(totalStats.households)}</td>
+                          <td style={tdBold}>{toMyanmarNum(totalStats.male)}</td>
+                          <td style={tdBold}>{toMyanmarNum(totalStats.female)}</td>
+                          <td style={{ ...tdBold, color: colors.black }}>{toMyanmarNum(totalStats.total)}</td>
+                          <td style={tdBold}>{toMyanmarNum(totalStats.u16m)}</td>
+                          <td style={tdBold}>{toMyanmarNum(totalStats.u16f)}</td>
+                          <td style={{ ...tdBold, color: colors.black }}>{toMyanmarNum(totalStats.u16m + totalStats.u16f)}</td>
+                          <td style={tdBold}>{toMyanmarNum(totalStats.b1660m)}</td>
+                          <td style={tdBold}>{toMyanmarNum(totalStats.b1660f)}</td>
+                          <td style={{ ...tdBold, color: colors.black }}>{toMyanmarNum(totalStats.b1660m + totalStats.b1660f)}</td>
+                          <td style={tdBold}>{toMyanmarNum(totalStats.a60m)}</td>
+                          <td style={tdBold}>{toMyanmarNum(totalStats.a60f)}</td>
+                          <td style={{ ...tdBold, color: colors.black }}>{toMyanmarNum(totalStats.a60m + totalStats.a60f)}</td>
+                          {allReligions.map(r => <td key={r} style={tdBold}>{totalStats.relCounts[r] ? toMyanmarNum(totalStats.relCounts[r]) : '-'}</td>)}
+                        </tr>
+                      </tbody>
+                    </table>
                   </div>
+                  {wardStatsList.length > PAGE_SIZE && (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0 4px', borderTop: '1px solid #E5E7EB', marginTop: '4px' }}>
+                      <span style={{ fontSize: '11px', color: '#737373' }}>
+                        {toMyanmarNum((page1 - 1) * PAGE_SIZE + 1)}–{toMyanmarNum(Math.min(page1 * PAGE_SIZE, wardStatsList.length))} / {toMyanmarNum(wardStatsList.length)} rows
+                      </span>
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <button onClick={() => setPage1(p => Math.max(1, p - 1))} disabled={page1 === 1}
+                          style={{ padding: '4px 12px', border: '1px solid #E5E7EB', background: page1 === 1 ? '#F9FAFB' : '#FFFFFF', color: page1 === 1 ? '#D1D5DB' : '#1A1A1A', fontSize: '11px', cursor: page1 === 1 ? 'default' : 'pointer' }}>
+                          ← Prev
+                        </button>
+                        <span style={{ padding: '4px 10px', fontSize: '11px', color: '#1A1A1A', border: '1px solid #E5E7EB', background: '#FAFAFA' }}>
+                          {toMyanmarNum(page1)} / {toMyanmarNum(totalPages1)}
+                        </span>
+                        <button onClick={() => setPage1(p => Math.min(totalPages1, p + 1))} disabled={page1 === totalPages1}
+                          style={{ padding: '4px 12px', border: '1px solid #E5E7EB', background: page1 === totalPages1 ? '#F9FAFB' : '#FFFFFF', color: page1 === totalPages1 ? '#D1D5DB' : '#1A1A1A', fontSize: '11px', cursor: page1 === totalPages1 ? 'default' : 'pointer' }}>
+                          Next →
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
+
+                {/* ── Table 2: Population + Nationality ──────────── */}
+                <div style={sectionCardStyle}>
+                  <div style={sectionTitleStyle}>{`SUMMARY TABLE (2) — NATIONALITY ${levelSuffix}`}</div>
+                  <div className="tps-responsive-table">
+                    <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #E5E7EB', minWidth: '600px' }}>
+                      <thead>
+                        <tr>
+                          <th rowSpan={2} style={thS}>စဉ်</th>
+                          <th rowSpan={2} style={thS}>{groupLabel}</th>
+                          <th colSpan={3} style={thS}>လူဦးရေပေါင်း</th>
+                          {uniqueNormalizedNats.length > 0 && <th colSpan={uniqueNormalizedNats.length} style={thS}>လူမျိုးအလိုက်</th>}
+                        </tr>
+                        <tr>
+                          <th style={thS}>ကျား</th><th style={thS}>မ</th><th style={thS}>ပေါင်း</th>
+                          {uniqueNormalizedNats.map(n => <th key={n} style={thS}>{n}</th>)}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {pagedStats2.map((w, i) => (
+                          <tr key={w.name || i} style={{ backgroundColor: '#FFFFFF' }}>
+                            <td style={tdMonoS}>{toMyanmarNum((page2 - 1) * PAGE_SIZE + i + 1)}</td>
+                            <td style={{ ...tdS, textAlign: 'left', fontWeight: '500' }}>{w.name}</td>
+                            <td style={tdMonoS}>{toMyanmarNum(w.male)}</td>
+                            <td style={tdMonoS}>{toMyanmarNum(w.female)}</td>
+                            <td style={{ ...tdMonoS, fontWeight: '600', color: colors.black }}>{toMyanmarNum(w.total)}</td>
+                            {uniqueNormalizedNats.map(n => <td key={n} style={tdMonoS}>{toMyanmarNum(getAggregatedNatCount(w.natCounts, n)) || '-'}</td>)}
+                          </tr>
+                        ))}
+                        {/* Total Row */}
+                        <tr>
+                          <td style={tdBold}></td>
+                          <td style={{ ...tdS, textAlign: 'left', fontWeight: '600', backgroundColor: '#FAFAFA' }}>စုစုပေါင်း</td>
+                          <td style={tdBold}>{toMyanmarNum(totalStats.male)}</td>
+                          <td style={tdBold}>{toMyanmarNum(totalStats.female)}</td>
+                          <td style={{ ...tdBold, color: colors.black }}>{toMyanmarNum(totalStats.total)}</td>
+                          {uniqueNormalizedNats.map(n => <td key={n} style={tdBold}>{toMyanmarNum(aggregatedNatCounts[n]) || '-'}</td>)}
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  {wardStatsList.length > PAGE_SIZE && (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0 4px', borderTop: '1px solid #E5E7EB', marginTop: '4px' }}>
+                      <span style={{ fontSize: '11px', color: '#737373' }}>
+                        {toMyanmarNum((page2 - 1) * PAGE_SIZE + 1)}–{toMyanmarNum(Math.min(page2 * PAGE_SIZE, wardStatsList.length))} / {toMyanmarNum(wardStatsList.length)} rows
+                      </span>
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <button onClick={() => setPage2(p => Math.max(1, p - 1))} disabled={page2 === 1}
+                          style={{ padding: '4px 12px', border: '1px solid #E5E7EB', background: page2 === 1 ? '#F9FAFB' : '#FFFFFF', color: page2 === 1 ? '#D1D5DB' : '#1A1A1A', fontSize: '11px', cursor: page2 === 1 ? 'default' : 'pointer' }}>
+                          ← Prev
+                        </button>
+                        <span style={{ padding: '4px 10px', fontSize: '11px', color: '#1A1A1A', border: '1px solid #E5E7EB', background: '#FAFAFA' }}>
+                          {toMyanmarNum(page2)} / {toMyanmarNum(totalPages2)}
+                        </span>
+                        <button onClick={() => setPage2(p => Math.min(totalPages2, p + 1))} disabled={page2 === totalPages2}
+                          style={{ padding: '4px 12px', border: '1px solid #E5E7EB', background: page2 === totalPages2 ? '#F9FAFB' : '#FFFFFF', color: page2 === totalPages2 ? '#D1D5DB' : '#1A1A1A', fontSize: '11px', cursor: page2 === totalPages2 ? 'default' : 'pointer' }}>
+                          Next →
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </>
             )}
 
             {/* ── Print / Export toolbar ─────────────────────── */}
             {isViewer ? (
               <div className="tps-stats-toolbar">
-                <button type="button" onClick={() => submitRequest('excel')} disabled={reqSending || reqSent === 'excel'}
-                  style={{ display:'flex', alignItems:'center', gap:'6px', padding:'8px 16px', border:'1px solid #1A1A1A', backgroundColor:'#FFFFFF', color:'#1A1A1A', fontSize:'11px', fontWeight:'500', cursor: reqSending ? 'not-allowed' : 'pointer', textTransform:'uppercase', letterSpacing:'0.05em', opacity: reqSent === 'excel' ? 0.6 : 1 }}>
-                  {reqSent === 'excel' ? <><CheckCircle2 size={13} /> Requested</> : <><Send size={13} /> Request Excel Export</>}
-                </button>
-                <button type="button" onClick={() => submitRequest('print')} disabled={reqSending || reqSent === 'print'}
-                  style={{ display:'flex', alignItems:'center', gap:'6px', padding:'8px 16px', border:'1px solid #1A1A1A', backgroundColor:'#1A1A1A', color:'#FFFFFF', fontSize:'11px', fontWeight:'500', cursor: reqSending ? 'not-allowed' : 'pointer', textTransform:'uppercase', letterSpacing:'0.05em', opacity: reqSent === 'print' ? 0.6 : 1 }}>
-                  {reqSent === 'print' ? <><CheckCircle2 size={13} /> Requested</> : <><Send size={13} /> Request Print</>}
-                </button>
-                {reqSent && (
+                {approvedTypes.has('excel') ? (
+                  <button type="button" onClick={() => { exportStatisticsExcel(printArgs); markUsed('excel'); }}
+                    style={{ display:'flex', alignItems:'center', gap:'6px', padding:'8px 16px', border:'1px solid #065F46', backgroundColor:'#F0FDF4', color:'#065F46', fontSize:'11px', fontWeight:'600', cursor:'pointer', textTransform:'uppercase', letterSpacing:'0.05em' }}>
+                    <FileSpreadsheet size={13} /> Export Excel (Approved)
+                  </button>
+                ) : (
+                  <button type="button" onClick={() => submitRequest('excel')} disabled={reqSending || reqSent === 'excel'}
+                    style={{ display:'flex', alignItems:'center', gap:'6px', padding:'8px 16px', border:'1px solid #1A1A1A', backgroundColor:'#FFFFFF', color:'#1A1A1A', fontSize:'11px', fontWeight:'500', cursor: reqSending ? 'not-allowed' : 'pointer', textTransform:'uppercase', letterSpacing:'0.05em', opacity: reqSent === 'excel' ? 0.6 : 1 }}>
+                    {reqSent === 'excel' ? <><CheckCircle2 size={13} /> Requested</> : <><Send size={13} /> Request Excel Export</>}
+                  </button>
+                )}
+                {approvedTypes.has('print') ? (
+                  <button type="button" onClick={() => { printStatistics(printArgs); markUsed('print'); }}
+                    onMouseOver={e => { e.currentTarget.style.backgroundColor='#065F46'; }}
+                    onMouseOut={e => { e.currentTarget.style.backgroundColor='#15803D'; }}
+                    style={{ display:'flex', alignItems:'center', gap:'6px', padding:'8px 16px', border:'1px solid #15803D', backgroundColor:'#15803D', color:'#FFFFFF', fontSize:'11px', fontWeight:'600', cursor:'pointer', textTransform:'uppercase', letterSpacing:'0.05em', transition:'background-color 120ms' }}>
+                    <Printer size={13} /> Print — Legal (Approved)
+                  </button>
+                ) : (
+                  <button type="button" onClick={() => submitRequest('print')} disabled={reqSending || reqSent === 'print'}
+                    style={{ display:'flex', alignItems:'center', gap:'6px', padding:'8px 16px', border:'1px solid #1A1A1A', backgroundColor:'#1A1A1A', color:'#FFFFFF', fontSize:'11px', fontWeight:'500', cursor: reqSending ? 'not-allowed' : 'pointer', textTransform:'uppercase', letterSpacing:'0.05em', opacity: reqSent === 'print' ? 0.6 : 1 }}>
+                    {reqSent === 'print' ? <><CheckCircle2 size={13} /> Requested</> : <><Send size={13} /> Request Print</>}
+                  </button>
+                )}
+                {approvedTypes.size > 0 && (
                   <span style={{ fontSize:'10px', color:'#065F46', fontWeight:'600', display:'flex', alignItems:'center', gap:'4px' }}>
-                    <CheckCircle2 size={12} /> Request sent. District administrator has been notified.
+                    <CheckCircle2 size={12} /> Permission granted by administrator.
+                  </span>
+                )}
+                {reqSent && approvedTypes.size === 0 && (
+                  <span style={{ fontSize:'10px', color:'#065F46', fontWeight:'600', display:'flex', alignItems:'center', gap:'4px' }}>
+                    <CheckCircle2 size={12} /> Request sent. Administrator has been notified.
                   </span>
                 )}
               </div>

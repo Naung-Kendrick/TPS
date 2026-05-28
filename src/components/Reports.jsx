@@ -5,7 +5,7 @@ import { SkeletonTable, SkeletonBar } from './Skeleton';
 import { ChevronRight, Search, Map as MapIcon, MapPin, Home, Users, User, ArrowLeft, Loader2, AlertCircle, Printer, FileSpreadsheet, Pencil, Trash2, Check, X, Download } from 'lucide-react';
 import EmptyState from './EmptyState';
 import TpsScrollWrapper from './layout/TpsScrollWrapper';
-import { exportHouseholdExcel, printHouseholdPdf } from '../lib/householdPrint';
+import { exportHouseholdExcel, printHouseholdPdf, exportAllExcel } from '../lib/householdPrint';
 import { deepEnsureUnicode } from './CsvUploader';
 import { buildExportFilename } from '../lib/exportFilename';
 
@@ -121,6 +121,9 @@ const Reports = ({ user }) => {
 
   // Export All JSON state
   const [exportingJson, setExportingJson] = useState(false);
+
+  // Export All Excel state
+  const [exportingExcel, setExportingExcel] = useState(false);
 
   // Edit / delete state
   const [editingId, setEditingId] = useState(null);
@@ -465,7 +468,15 @@ const Reports = ({ user }) => {
 
       if (path.district) query = query.eq('district', path.district);
       if (path.township) query = query.eq('township', path.township);
-      if (path.village)  query = query.eq('ward_village_group', path.village);
+      if (path.locationType === 'ward' && path.ward) {
+        query = query.ilike('ward_village_group', '%' + path.ward.trim() + '%');
+      } else if (path.locationType === 'group') {
+        if (path.village) {
+          query = query.ilike('ward_village_group', '%' + path.village.trim() + '%');
+        } else if (path.group) {
+          query = query.ilike('ward_village_group', '%' + path.group.trim() + '%');
+        }
+      }
 
       const { data, error } = await query;
       if (error) throw error;
@@ -482,12 +493,12 @@ const Reports = ({ user }) => {
       }
       const nested = deepEnsureUnicode(order.map(hn => buildNestedHousehold(hn, householdsMap.get(hn))));
 
-      const sanitize = (str) => String(str || '').trim().replace(/[/\:*?"<>|]/g, '').replace(/\s+/g, '_') || null;
+      const sanitize = (str) => String(str || '').trim().replace(/[\/\\:*?"<>|]/g, '').replace(/\s+/g, '_') || null;
       const today = new Date().toISOString().split('T')[0];
       const parts = [
         sanitize(path.district),
         sanitize(path.township),
-        sanitize(path.village),
+        sanitize(path.ward || path.group || path.village),
       ].filter(Boolean);
       const prefix = parts.length ? parts.join('_') : 'TPS_FullExport';
       downloadJson(nested, `${prefix}_${today}.json`);
@@ -495,6 +506,42 @@ const Reports = ({ user }) => {
       alert('Export failed: ' + err.message);
     } finally {
       setExportingJson(false);
+    }
+  };
+
+  const exportAllExcelData = async () => {
+    setExportingExcel(true);
+    try {
+      let query = supabase
+        .from('households')
+        .select('*');
+
+      if (path.district) query = query.eq('district', path.district);
+      if (path.township) query = query.eq('township', path.township);
+      if (path.locationType === 'ward' && path.ward) {
+        query = query.ilike('ward_village_group', '%' + path.ward.trim() + '%');
+      } else if (path.locationType === 'group') {
+        if (path.village) {
+          query = query.ilike('ward_village_group', '%' + path.village.trim() + '%');
+        } else if (path.group) {
+          query = query.ilike('ward_village_group', '%' + path.group.trim() + '%');
+        }
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      await exportAllExcel(data, {
+        district: path.district,
+        township: path.township,
+        ward: path.ward,
+        group: path.group,
+        village: path.village
+      });
+    } catch (err) {
+      alert('Excel export failed: ' + err.message);
+    } finally {
+      setExportingExcel(false);
     }
   };
 
@@ -608,28 +655,52 @@ const Reports = ({ user }) => {
               Browse and manage household records and family rosters across regions.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={exportAllJson}
-            disabled={exportingJson}
-            className="flex items-center justify-center gap-2 hover:bg-[#1A1A1A] hover:text-white transition-colors disabled:opacity-50 w-full sm:w-auto"
-            style={{
-              padding: '10px 24px',
-              backgroundColor: '#FFFFFF',
-              color: '#1A1A1A',
-              fontSize: '12px',
-              fontWeight: '700',
-              border: '1px solid #1A1A1A',
-              borderRadius: '0px',
-              cursor: exportingJson ? 'not-allowed' : 'pointer',
-              textTransform: 'uppercase',
-              letterSpacing: '0.05em',
-              marginTop: '4px'
-            }}
-          >
-            {exportingJson ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
-            {exportingJson ? 'Exporting...' : 'Export All JSON'}
-          </button>
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            <button
+              type="button"
+              onClick={exportAllExcelData}
+              disabled={exportingExcel}
+              className="flex items-center justify-center gap-2 hover:bg-[#1A1A1A] hover:text-white transition-colors disabled:opacity-50 w-full sm:w-auto"
+              style={{
+                padding: '10px 24px',
+                backgroundColor: '#FFFFFF',
+                color: '#1A1A1A',
+                fontSize: '12px',
+                fontWeight: '700',
+                border: '1px solid #1A1A1A',
+                borderRadius: '0px',
+                cursor: exportingExcel ? 'not-allowed' : 'pointer',
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+                marginTop: '4px'
+              }}
+            >
+              {exportingExcel ? <Loader2 size={12} className="animate-spin" /> : <FileSpreadsheet size={12} />}
+              {exportingExcel ? 'Exporting...' : 'Export All Excel'}
+            </button>
+            <button
+              type="button"
+              onClick={exportAllJson}
+              disabled={exportingJson}
+              className="flex items-center justify-center gap-2 hover:bg-[#1A1A1A] hover:text-white transition-colors disabled:opacity-50 w-full sm:w-auto"
+              style={{
+                padding: '10px 24px',
+                backgroundColor: '#FFFFFF',
+                color: '#1A1A1A',
+                fontSize: '12px',
+                fontWeight: '700',
+                border: '1px solid #1A1A1A',
+                borderRadius: '0px',
+                cursor: exportingJson ? 'not-allowed' : 'pointer',
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+                marginTop: '4px'
+              }}
+            >
+              {exportingJson ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
+              {exportingJson ? 'Exporting...' : 'Export All JSON'}
+            </button>
+          </div>
         </div>
 
         {/* Breadcrumb — scrollable horizontally on mobile */}

@@ -5,19 +5,10 @@ import {
   Users, Circle, ToggleLeft, ToggleRight, UserCheck, UserX, Activity, ChevronDown, Mail,
   RefreshCw, MapPin, Pencil, Save
 } from 'lucide-react';
+import { getProfileType, ROLE_LABELS } from '../lib/roleHelper';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const DISTRICTS = ['နမ့်ခမ်း ခရိုင်', 'နမ့်ဆန် ခရိုင်', 'မန်တုံ ခရိုင်'];
-
-// ─── Helpers ────────────────────────────────────────────────────────────────
-
-const ROLE_LABELS = {
-  system:   { label: 'System Admin',    color: '#1A1A1A', bg: '#F3F3F3' },
-  master:   { label: 'Master',          color: '#7C3AED', bg: '#F5F3FF' },
-  admin:    { label: 'Regional Admin',  color: '#0369A1', bg: '#EFF6FF' },
-  ops:      { label: 'Operations',      color: '#B45309', bg: '#FFFBEB' },
-  field:    { label: 'Field Staff',     color: '#065F46', bg: '#ECFDF5' },
-};
 
 function formatLastSeen(ts) {
   if (!ts) return 'Never';
@@ -51,9 +42,7 @@ const UserManagement = ({ user }) => {
   const [filterRole,   setFilterRole]   = useState('all');
   const [filterStatus, setFilterStatus] = useState('all'); // 'all' | 'active' | 'disabled'
 
-  // ── Print/Export requests (visible to central/district admins) ──────────
-  const [requests,    setRequests]    = useState([]);
-  const [reqLoading,  setReqLoading]  = useState(false);
+
 
   // ── District / Township edit state ───────────────────────────────────────
   const [editingDistrictsFor, setEditingDistrictsFor] = useState(null);
@@ -66,35 +55,19 @@ const UserManagement = ({ user }) => {
   const [loadingTownships, setLoadingTownships] = useState(false);
   const townshipsLoadedRef = useRef(false);
 
-  const canToggleUsers = user?.role === 'system' || user?.role === 'master' || user?.role === 'admin';
+  const canToggleUsers = user?.role === 'system' || user?.role === 'master';
   const isAdminLevel   = user?.access_level === 'central' || user?.access_level === 'district' || user?.access_level === 'township';
 
-  // ── Load print/export requests ───────────────────────────────────
-  const loadRequests = useCallback(async () => {
-    if (!isAdminLevel) return;
-    setReqLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('print_export_requests')
-        .select('*')
-        .eq('status', 'pending')
-        .order('requested_at', { ascending: false });
-      if (error) throw error;
-      setRequests(data || []);
-    } catch (err) {
-      console.error('Failed to load requests:', err);
-    } finally {
-      setReqLoading(false);
-    }
-  }, [isAdminLevel]);
+  if (user?.role !== 'system' && user?.role !== 'master') {
+    return (
+      <div style={{ padding: '3rem', textAlign: 'center', color: '#737373', fontFamily: "Inter, sans-serif" }}>
+        <h2 style={{ color: '#DC2626', fontSize: '20px', fontWeight: '600', marginBottom: '12px' }}>ACCESS DENIED</h2>
+        <p style={{ fontSize: '13px' }}>Only System Administrators are authorized to view or manage user accounts.</p>
+      </div>
+    );
+  }
 
-  const resolveRequest = async (id) => {
-    const { error } = await supabase
-      .from('print_export_requests')
-      .update({ status: 'resolved', resolved_by: user.id, resolved_at: new Date().toISOString() })
-      .eq('id', id);
-    if (!error) setRequests(prev => prev.filter(r => r.id !== id));
-  };
+
 
   // ── Load user list ────────────────────────────────────────────────────────
   const loadUsers = useCallback(async () => {
@@ -127,17 +100,7 @@ const UserManagement = ({ user }) => {
 
   useEffect(() => { loadUsers(); }, [loadUsers]);
 
-  // ── Realtime subscription for print/export requests ───────────────────
-  useEffect(() => {
-    if (!isAdminLevel) return;
-    loadRequests();
-    const ch = supabase
-      .channel('print_export_requests_ch')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'print_export_requests' },
-        () => loadRequests())
-      .subscribe();
-    return () => { supabase.removeChannel(ch); };
-  }, [isAdminLevel, loadRequests]);
+
 
   // ── Toggle active/disabled ────────────────────────────────────────────────
   const toggleUserActive = async (targetUser) => {
@@ -314,11 +277,10 @@ const UserManagement = ({ user }) => {
         {[
           { key: 'list',     label: 'User Accounts',            icon: <Users size={13} /> },
           { key: 'create',   label: 'Create Account',           icon: <UserPlus size={13} /> },
-          ...(isAdminLevel ? [{ key: 'requests', label: 'Print / Export Requests', icon: <RefreshCw size={13} /> }] : []),
         ].map(tab => (
           <button
             key={tab.key}
-            onClick={() => { setActiveTab(tab.key); if (tab.key === 'requests') loadRequests(); }}
+            onClick={() => setActiveTab(tab.key)}
             className={`flex items-center gap-2 px-5 py-3 text-[11px] font-bold uppercase tracking-wider border-b-2 transition-colors ${
               activeTab === tab.key
                 ? 'border-gray-900 text-gray-900'
@@ -329,11 +291,6 @@ const UserManagement = ({ user }) => {
             {tab.key === 'list' && (
               <span className={`ml-1 px-1.5 py-0.5 text-[9px] font-bold rounded-full ${activeTab === 'list' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-500'}`}>
                 {totalUsers}
-              </span>
-            )}
-            {tab.key === 'requests' && requests.length > 0 && (
-              <span className="ml-1 px-1.5 py-0.5 text-[9px] font-bold rounded-full bg-red-500 text-white animate-pulse">
-                {requests.length}
               </span>
             )}
           </button>
@@ -449,7 +406,8 @@ const UserManagement = ({ user }) => {
                           <td className="px-4 py-3.5">
                             <div className="flex items-center gap-2.5">
                               <div className="relative flex-shrink-0">
-                                <div className="w-7 h-7 bg-gray-100 border border-gray-200 flex items-center justify-center text-[11px] font-bold text-gray-600 select-none uppercase">
+                                <div className="w-7 h-7 bg-gray-100 border border-gray-200 flex items-center justify-center text-[11px] font-bold text-gray-600 select-none uppercase"
+                                  style={{ borderLeft: `3px solid ${getProfileType(u.role, u.access_level).color}` }}>
                                   {(u.username || u.id || '?')[0]}
                                 </div>
                                 <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-white"
@@ -460,7 +418,10 @@ const UserManagement = ({ user }) => {
                                   {u.username || <span className="text-gray-400 italic text-[10px]">{u.id.slice(0, 8)}</span>}
                                   {isSelf && <span className="ml-1.5 text-[9px] font-bold text-gray-400 bg-gray-100 px-1 py-0.5">(YOU)</span>}
                                 </div>
-                                <div className="text-[9px] text-gray-400 font-mono">{u.username ? `${u.username}@tps.idtl` : u.email || '—'}</div>
+                                <div className="text-[9px] text-gray-400 font-mono leading-none mb-1">{u.username ? `${u.username}@tps.idtl` : u.email || '—'}</div>
+                                <div style={{ fontSize: '9px', fontWeight: '600', color: getProfileType(u.role, u.access_level).color, letterSpacing: '0.01em' }}>
+                                  {getProfileType(u.role, u.access_level).typicalPerson}
+                                </div>
                               </div>
                             </div>
                           </td>
@@ -682,6 +643,29 @@ const UserManagement = ({ user }) => {
                                   </div>
                                 )}
 
+                                {/* Live Profile Preview */}
+                                {(() => {
+                                  const preview = getProfileType(editedRole, editedLevel);
+                                  return (
+                                    <div style={{
+                                      padding: '10px 12px',
+                                      backgroundColor: '#FFFFFF',
+                                      border: `1px solid ${preview.border}`,
+                                      borderLeft: `4px solid ${preview.color}`,
+                                      width: '100%',
+                                      maxWidth: '340px',
+                                      marginBottom: '8px'
+                                    }}>
+                                      <div style={{ fontSize: '9px', fontWeight: '700', color: '#737373', textTransform: 'uppercase', marginBottom: '2px' }}>
+                                        Preview Profile Persona
+                                      </div>
+                                      <div style={{ fontSize: '11px', fontWeight: '700', color: '#1A1A1A' }}>
+                                        {preview.typicalPerson}
+                                      </div>
+                                    </div>
+                                  );
+                                })()}
+
                                 <div className="flex gap-2">
                                   <button onClick={() => setEditingDistrictsFor(null)}
                                     className="px-4 py-2 border border-gray-300 text-gray-600 text-[11px] font-bold uppercase tracking-wider hover:bg-gray-100 transition-colors">
@@ -745,21 +729,50 @@ const UserManagement = ({ user }) => {
               </ul>
             </div>
 
-            <div className="border border-gray-200 p-6">
-              <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider mb-4">System Roles</h3>
-              <div className="space-y-4">
-                {[
-                  ['Level 1: Field Staff',      'Standard data entry and identity verification capabilities.'],
-                  ['Level 2: Operations',        'Access to bulk upload and data correction tools.'],
-                  ['Level 3: Regional Admin',    'Full access to statistics and reports for assigned districts.'],
-                  ['Level 4: System Admin',      'Master control over database schema and user management.'],
-                ].map(([title, desc]) => (
-                  <div key={title}>
-                    <div className="text-[10px] font-bold text-gray-900 uppercase mb-1">{title}</div>
-                    <div className="text-[11px] text-gray-500">{desc}</div>
-                  </div>
-                ))}
+            <div className="border border-gray-200 p-6 bg-white shadow-sm">
+              <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider mb-4 flex items-center gap-2">
+                <Shield size={14} className="text-gray-900" /> System Roles & Access Matrix
+              </h3>
+              
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-[10px] border-collapse">
+                  <thead>
+                    <tr className="border-b border-gray-200 bg-gray-50 font-bold text-gray-500 uppercase tracking-wider">
+                      <th className="py-2 px-3 text-left">Typical Person (Profile)</th>
+                      <th className="py-2 px-3 text-left">System Role</th>
+                      <th className="py-2 px-3 text-left">Access Level</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[
+                      { person: 'Head system administrator', role: 'System Admin', level: 'Central', color: '#DC2626', bg: '#FEF2F2', border: '#FECACA' },
+                      { person: 'Central Immigration Officer', role: 'Regional Admin', level: 'Ta\'ang Land', color: '#0F766E', bg: '#F0FDFA', border: '#CCFBF1' },
+                      { person: 'District officer (manager)', role: 'Regional Admin', level: 'District', color: '#7C3AED', bg: '#F5F3FF', border: '#DDD6FE' },
+                      { person: 'Township officer', role: 'Operations / Field Staff', level: 'Township', color: '#1E40AF', bg: '#EFF6FF', border: '#BFDBFE' },
+                      { person: 'View-only observer (district)', role: 'Field Staff', level: 'Viewer', color: '#D97706', bg: '#FFFBEB', border: '#FDE68A' },
+                      { person: 'View-only observer (township)', role: 'Field Staff', level: 'Sub-Township', color: '#B45309', bg: '#FFF7ED', border: '#FED7AA' },
+                    ].map((row, idx) => (
+                      <tr key={idx} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                        <td className="py-2.5 px-3 font-semibold text-gray-800">{row.person}</td>
+                        <td className="py-2.5 px-3">
+                          <span className="inline-block px-1.5 py-0.5 text-[8.5px] font-bold border uppercase tracking-wider"
+                            style={{ color: row.color, backgroundColor: row.bg, borderColor: row.border }}>
+                            {row.role}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3">
+                          <span className="inline-block px-1.5 py-0.5 text-[8.5px] font-bold bg-gray-100 text-gray-600 border border-gray-200 uppercase tracking-wider">
+                            {row.level}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
+              <p className="text-[10px] text-gray-400 mt-4 leading-relaxed">
+                * Mappings systematically enforce Row Level Security (RLS) and Sidebar navigation scopes. Field staff with view-only levels are restricted from modification.
+              </p>
             </div>
           </div>
 
@@ -860,6 +873,51 @@ const UserManagement = ({ user }) => {
                       ))}
                     </div>
                     <p className="text-[10px] text-gray-400 mt-1">Central = all. District = districts only. Township = specific townships. Viewer = district view-only. Sub-Township = township view-only, no print/export.</p>
+
+                    {/* Live Profile Preview Card */}
+                    {(() => {
+                      const preview = getProfileType(formData.role, formData.access_level);
+                      return (
+                        <div style={{
+                          padding: '12px 14px',
+                          backgroundColor: '#FAFAFA',
+                          border: `1px solid ${preview.border}`,
+                          borderLeft: `4px solid ${preview.color}`,
+                          marginTop: '16px'
+                        }}>
+                          <div style={{ fontSize: '9px', fontWeight: '700', color: '#737373', textTransform: 'uppercase', tracking: '0.05em', marginBottom: '4px' }}>
+                            Live Profile Persona Preview
+                          </div>
+                          <div style={{ fontSize: '12px', fontWeight: '700', color: '#1A1A1A', marginBottom: '2px' }}>
+                            {preview.typicalPerson}
+                          </div>
+                          <div className="flex gap-2 mt-1">
+                            <span style={{
+                              fontSize: '8px',
+                              fontWeight: '700',
+                              color: preview.color,
+                              backgroundColor: preview.bg,
+                              border: `1px solid ${preview.border}`,
+                              padding: '1px 5px',
+                              textTransform: 'uppercase'
+                            }}>
+                              {preview.roleName}
+                            </span>
+                            <span style={{
+                              fontSize: '8px',
+                              fontWeight: '700',
+                              color: '#4B5563',
+                              backgroundColor: '#F3F4F6',
+                              border: '1px solid #E5E7EB',
+                              padding: '1px 5px',
+                              textTransform: 'uppercase'
+                            }}>
+                              {preview.accessLevel}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
 
                   {(formData.access_level === 'district' || formData.access_level === 'viewer') && (  /* district picker */
@@ -925,75 +983,6 @@ const UserManagement = ({ user }) => {
               </div>
             </div>
           </div>
-        </div>
-      )}
-
-      {/* ── PRINT / EXPORT REQUESTS TAB ─────────────────────────────────────── */}
-      {activeTab === 'requests' && isAdminLevel && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-[13px] font-bold text-gray-900 uppercase tracking-wider">Pending Print / Export Requests</h3>
-              <p className="text-[10px] text-gray-400 mt-0.5">Viewer-level officers who need to print or export data will appear here.</p>
-            </div>
-            <button onClick={loadRequests} disabled={reqLoading}
-              className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 text-[10px] font-bold uppercase tracking-wider text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50">
-              <RefreshCw size={11} className={reqLoading ? 'animate-spin' : ''} /> Refresh
-            </button>
-          </div>
-
-          {reqLoading ? (
-            <div className="flex items-center gap-2 text-[11px] text-gray-400 py-8 justify-center">
-              <Loader2 size={14} className="animate-spin" /> Loading requests...
-            </div>
-          ) : requests.length === 0 ? (
-            <div className="border border-gray-100 bg-gray-50 text-center py-12">
-              <CheckCircle2 size={28} className="text-gray-300 mx-auto mb-3" />
-              <p className="text-[11px] text-gray-400 uppercase tracking-wider font-bold">No Pending Requests</p>
-              <p className="text-[10px] text-gray-300 mt-1">All caught up.</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {requests.map(r => {
-                const pageName = r.page === 'statistics' ? 'Population Statistics' : 'Demographic Dashboard';
-                const typeLabel = r.export_type === 'print' ? 'Print (Legal)' : 'Export Excel';
-                const f = r.filters || {};
-                const filterStr = [
-                  f.district  && `District: ${f.district}`,
-                  f.township  && `Township: ${f.township}`,
-                  f.ward      && `Ward: ${f.ward}`,
-                  f.group     && `Group: ${f.group}`,
-                  f.village   && `Village: ${f.village}`,
-                ].filter(Boolean).join(' › ') || 'All data (no filter selected)';
-
-                return (
-                  <div key={r.id} className="border border-amber-200 bg-amber-50 p-4 flex flex-col sm:flex-row sm:items-start gap-4">
-                    <div className="flex-1 space-y-1.5">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-[11px] font-bold text-gray-900">{r.requester_name || 'Unknown Officer'}</span>
-                        <span className={`text-[9px] font-bold px-2 py-0.5 uppercase tracking-wider ${
-                                  (f._level === 'sub_township') ? 'bg-orange-100 text-orange-800' : 'bg-amber-200 text-amber-800'
-                                }`}>{f._level === 'sub_township' ? 'Sub-Township' : 'Viewer'}</span>
-                        <span className="text-[9px] text-gray-400">{formatLastSeen(r.requested_at)}</span>
-                      </div>
-                      <div className="text-[11px] text-gray-700">
-                        Requests to <strong>{typeLabel}</strong> on <strong>{pageName}</strong>
-                      </div>
-                      <div className="text-[10px] text-gray-500 font-mono bg-white border border-amber-100 px-2 py-1 inline-block">
-                        {filterStr}
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => resolveRequest(r.id)}
-                      className="flex items-center gap-1.5 px-4 py-2 bg-gray-900 text-white text-[10px] font-bold uppercase tracking-wider hover:bg-gray-700 transition-colors self-start sm:self-auto whitespace-nowrap"
-                    >
-                      <CheckCircle2 size={12} /> Mark Resolved
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          )}
         </div>
       )}
     </div>

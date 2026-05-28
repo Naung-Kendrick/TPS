@@ -12,7 +12,7 @@ const PAGE_ORDER = [
   '/demographics',
   '/registration',
   '/central-database',
-  '/settings',
+  '/notifications-requests',
 ];
 
 const Layout = ({ user, onLogout }) => {

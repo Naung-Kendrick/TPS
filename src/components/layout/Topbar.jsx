@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Search, Bell, ChevronDown, X, CheckCircle2, Upload, ScanLine, Wifi, WifiOff, RefreshCw, Info, AlertTriangle, AlertCircle } from 'lucide-react';
 import flag from "../../assets/taang_flag.jpg";
 import { getNotifications, getUnreadCount, markAllRead, clearAll, NOTIF_TYPES } from '../../lib/notifications';
+import { getProfileType } from '../../lib/roleHelper';
 
 const TYPE_META = {
   [NOTIF_TYPES.SYNC]:         { icon: RefreshCw,    color: '#2563EB', bg: '#EFF6FF' },
@@ -22,11 +23,24 @@ function timeAgo(iso) {
   return new Date(iso).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
 }
 
-const Topbar = () => {
+const Topbar = ({ user }) => {
   const [panelOpen, setPanelOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [unread, setUnread] = useState(0);
   const panelRef = useRef(null);
+  const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  // Close profile dropdown on outside click
+  useEffect(() => {
+    if (!profileDropdownOpen) return;
+    const handler = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) setProfileDropdownOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    document.addEventListener('touchstart', handler);
+    return () => { document.removeEventListener('mousedown', handler); document.removeEventListener('touchstart', handler); };
+  }, [profileDropdownOpen]);
 
   const refresh = useCallback(() => {
     setNotifications(getNotifications());
@@ -189,14 +203,160 @@ const Topbar = () => {
         <div style={{ width: '1px', height: '20px', backgroundColor: '#E5E7EB', margin: '0 4px' }} />
 
         {/* Profile */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', padding: '6px 8px', transition: 'background-color 120ms cubic-bezier(0.23,1,0.32,1)' }}
-          onMouseOver={e => e.currentTarget.style.backgroundColor = '#F3F4F6'}
-          onMouseOut={e => e.currentTarget.style.backgroundColor = 'transparent'}
-        >
-          <div style={{ width: '24px', height: '24px', backgroundColor: '#1A1A1A', color: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: '600', flexShrink: 0 }}>UM</div>
-          <span style={{ fontSize: '12px', fontWeight: '500', color: '#1A1A1A' }}>U MYO MIN</span>
-          <ChevronDown size={12} color="#737373" />
-        </div>
+        {(() => {
+          const uRole = user?.role || user?.profile?.role || 'field';
+          const uLevel = user?.access_level || user?.profile?.access_level || 'central';
+          const prof = getProfileType(uRole, uLevel);
+          const displayName = user?.profile?.display_name || user?.profile?.username || user?.username || 'Officer';
+          
+          // Initials (e.g. Zaw Myint -> ZM)
+          const initials = displayName
+            .split('.')
+            .map(n => n.charAt(0))
+            .join('')
+            .substring(0, 2)
+            .toUpperCase();
+
+          return (
+            <div ref={dropdownRef} style={{ position: 'relative' }}>
+              <div
+                onClick={() => setProfileDropdownOpen(v => !v)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  cursor: 'pointer',
+                  padding: '6px 10px',
+                  backgroundColor: profileDropdownOpen ? '#F3F4F6' : 'transparent',
+                  transition: 'background-color 120ms cubic-bezier(0.23,1,0.32,1)',
+                  border: '1px solid transparent',
+                  borderRadius: '0px'
+                }}
+                onMouseOver={e => { if (!profileDropdownOpen) e.currentTarget.style.backgroundColor = '#F9FAFB'; }}
+                onMouseOut={e => { if (!profileDropdownOpen) e.currentTarget.style.backgroundColor = 'transparent'; }}
+              >
+                <div style={{
+                  width: '24px',
+                  height: '24px',
+                  backgroundColor: prof.color,
+                  color: '#FFFFFF',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '10px',
+                  fontWeight: '700',
+                  flexShrink: 0,
+                  boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.1)'
+                }}>
+                  {initials || 'UM'}
+                </div>
+                <span style={{ fontSize: '12px', fontWeight: '600', color: '#1A1A1A', letterSpacing: '0.01em' }}>
+                  {displayName.toUpperCase()}
+                </span>
+                <ChevronDown size={12} color="#737373" style={{ transform: profileDropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform 150ms' }} />
+              </div>
+
+              {/* Profile Details Dropdown */}
+              {profileDropdownOpen && (
+                <div className="tps-panel-enter" style={{
+                  position: 'absolute',
+                  top: 'calc(100% + 8px)',
+                  right: 0,
+                  width: '260px',
+                  backgroundColor: '#FFFFFF',
+                  border: '1px solid #E5E7EB',
+                  boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+                  padding: '16px',
+                  zIndex: 300,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '12px'
+                }}>
+                  <div>
+                    <div style={{ fontSize: '9px', fontWeight: '700', color: '#9CA3AF', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '4px' }}>
+                      Organisational Profile
+                    </div>
+                    <div style={{ fontSize: '14px', fontWeight: '700', color: '#111827' }}>
+                      {displayName}
+                    </div>
+                    <div style={{ fontSize: '10px', color: '#6B7280', fontFamily: 'monospace', marginTop: '2px' }}>
+                      {user?.profile?.username ? `${user.profile.username}@tps.idtl` : user?.email || 'officer@tps.idtl'}
+                    </div>
+                  </div>
+
+                  <div style={{ borderTop: '1px solid #F3F4F6', paddingTop: '10px' }}>
+                    <div style={{ fontSize: '9px', fontWeight: '700', color: '#9CA3AF', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '6px' }}>
+                      System Permissions
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px' }}>
+                        <span style={{ color: '#6B7280', fontWeight: '500' }}>Persona:</span>
+                        <span style={{ color: '#111827', fontWeight: '600', marginLeft: 'auto' }}>{prof.typicalPerson}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px' }}>
+                        <span style={{ color: '#6B7280', fontWeight: '500' }}>System Role:</span>
+                        <span style={{
+                          color: prof.color,
+                          backgroundColor: prof.bg,
+                          borderColor: prof.border,
+                          borderWidth: '1px',
+                          borderStyle: 'solid',
+                          padding: '1px 5px',
+                          fontSize: '9.5px',
+                          fontWeight: '700',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.02em',
+                          marginLeft: 'auto'
+                        }}>{prof.roleName}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px' }}>
+                        <span style={{ color: '#6B7280', fontWeight: '500' }}>Access Level:</span>
+                        <span style={{
+                          color: '#4F46E5',
+                          backgroundColor: '#EEF2FF',
+                          borderColor: '#C7D2FE',
+                          borderWidth: '1px',
+                          borderStyle: 'solid',
+                          padding: '1px 5px',
+                          fontSize: '9.5px',
+                          fontWeight: '700',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.02em',
+                          marginLeft: 'auto'
+                        }}>{prof.accessLevel}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {(() => {
+                    const uDistricts = user?.allowed_districts || user?.profile?.allowed_districts || [];
+                    const uTownships = user?.allowed_townships || user?.profile?.allowed_townships || [];
+                    if (uDistricts.length === 0 && uTownships.length === 0) return null;
+                    return (
+                      <div style={{ borderTop: '1px solid #F3F4F6', paddingTop: '10px', fontSize: '11px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <div style={{ fontSize: '9px', fontWeight: '700', color: '#9CA3AF', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '2px' }}>
+                          Geographic Scope
+                        </div>
+                        {uDistricts.length > 0 && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ color: '#6B7280', fontWeight: '500' }}>District:</span>
+                            <span style={{ color: '#111827', fontWeight: '600', marginLeft: 'auto' }}>{uDistricts.join(', ').replace(/ ခရိုင်/g, '')}</span>
+                          </div>
+                        )}
+                        {uTownships.length > 0 && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ color: '#6B7280', fontWeight: '500' }}>Township:</span>
+                            <span style={{ color: '#111827', fontWeight: '600', marginLeft: 'auto' }}>{uTownships.join(', ')}</span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
       </div>
     </header>

@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import logo from '../assets/fonts/IDTL_logo.png';
 
 const RESEND_COOLDOWN = 60; // seconds before user can resend OTP
+const SKIP_OTP = false;  // ← set false to re-enable OTP
 
 const Login = ({ onLogin }) => {
   // Step 1: username+PIN  →  Step 2: email OTP
@@ -73,7 +74,20 @@ const Login = ({ onLogin }) => {
         .single();
       if (profileError) { profileError.userId = authData.user.id; throw profileError; }
 
-      // 3. Send OTP via edge function (uses Resend to deliver to profile.email)
+      // 3. Send OTP (skip if SKIP_OTP is enabled)
+      if (SKIP_OTP) {
+        await supabase.from('profiles').update({ last_seen_at: new Date().toISOString() }).eq('id', authData.user.id);
+        onLogin?.({
+          ...authData.user,
+          profile,
+          role: profile.role,
+          access_level: profile.access_level || 'central',
+          allowed_districts: profile.allowed_districts || [],
+          allowed_townships: profile.allowed_townships || [],
+        });
+        return;
+      }
+
       const { data: otpResult, error: otpFnError } = await supabase.functions.invoke('send-otp', {
         body: { user_id: authData.user.id },
       });

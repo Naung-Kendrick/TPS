@@ -92,6 +92,12 @@ function dispatch() {
 }
 
 export function pushNotification({ type = NOTIF_TYPES.INFO, title, message }) {
+  // Only notify emergency and urgent cases (ERROR, WARNING, OFFLINE)
+  const isEmergencyOrUrgent = type === NOTIF_TYPES.ERROR || type === NOTIF_TYPES.WARNING || type === NOTIF_TYPES.OFFLINE;
+  if (!isEmergencyOrUrgent) {
+    return null;
+  }
+
   const list = load();
   const notif = {
     id: crypto.randomUUID(),
@@ -109,11 +115,12 @@ export function pushNotification({ type = NOTIF_TYPES.INFO, title, message }) {
 }
 
 export function getNotifications() {
-  return load();
+  const all = load();
+  return all.filter(n => n.type === NOTIF_TYPES.ERROR || n.type === NOTIF_TYPES.WARNING || n.type === NOTIF_TYPES.OFFLINE);
 }
 
 export function getUnreadCount() {
-  return load().filter(n => !n.read).length;
+  return getNotifications().filter(n => !n.read).length;
 }
 
 export function markAllRead() {
@@ -131,4 +138,30 @@ export function markRead(id) {
 export function clearAll() {
   save([]);
   dispatch();
+}
+
+// ── Custom Triad & Interval Triad Chimes ──────────────────────────────────
+
+export function playRequestChime() {
+  const ctx = getAudioCtx();
+  if (!ctx) return;
+  // A professional three-note major triad chime (A5 -> C#6 -> E6)
+  playTone({ freq: 880, type: 'sine', volume: 0.12, duration: 0.15, decay: 0.20 });
+  playTone({ freq: 1109, type: 'sine', volume: 0.10, duration: 0.15, delay: 0.10, decay: 0.20 });
+  playTone({ freq: 1318, type: 'sine', volume: 0.08, duration: 0.20, delay: 0.20, decay: 0.30 });
+}
+
+export function playResolveChime() {
+  const ctx = getAudioCtx();
+  if (!ctx) return;
+  // Satisfying rising success interval ping (G6 -> C7)
+  playTone({ freq: 1568, type: 'sine', volume: 0.10, duration: 0.10, decay: 0.15 });
+  playTone({ freq: 2093, type: 'sine', volume: 0.08, duration: 0.15, delay: 0.08, decay: 0.25 });
+}
+
+export function playMarkReadChime() {
+  const ctx = getAudioCtx();
+  if (!ctx) return;
+  // Soft descending sliding tick
+  playTone({ freq: 660, freq2: 440, type: 'sine', volume: 0.08, duration: 0.08, decay: 0.06 });
 }

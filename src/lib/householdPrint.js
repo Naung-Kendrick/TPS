@@ -1,4 +1,5 @@
 import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import taangFlag from '../assets/taang_flag.jpg';
 import taangLogo from '../assets/fonts/IDTL_logo.png';
 import { buildExportFilename } from './exportFilename';
@@ -18,61 +19,39 @@ const safeHtml = (v) => {
   }[c]));
 };
 
-export const exportHouseholdExcel = (householdNo, members) => {
+export const exportHouseholdExcel = async (householdNo, members) => {
   if (!members || members.length === 0) return;
   const first = members[0] || {};
-  const aoa = [
-    ['', '', '', '', '', "Ta'ang Land Government", '', '', '', '', '', '', '', "Ta'ang Flag"],
-    ['', '', '', '', '', "Ta'ang Land Immigration Department"],
-    [
-      `District - ${escVal(first.district)}`, '', '', '',
-      `Ward / Village / Group - ${escVal(first.ward_village_group)}`, '', '', '', '', '', '', '',
-      `Household No. - ${escVal(first.household_no || householdNo)}`
-    ],
-    [
-      `Township - ${escVal(first.township)}`, '', '', '', '', '', '', '', '', '', '', '',
-      `House NO. - ${escVal(first.house_no)}`
-    ],
-    [],
-    ['No.', 'Name', 'Date of birth', 'Gender', "Father's Name", "Mother's Name",
-      'Household Relationship', 'Occupation', 'Previous ID No.', "Ta'ang Land ID No.",
-      'Nationality', 'Resident Status', 'Religious', 'Submission Date'],
-    ...members.map((m, i) => [
-      i + 1,
-      escVal(m.name),
-      escVal(m.date_of_birth),
-      escVal(m.gender),
-      escVal(m.fathers_name),
-      escVal(m.mothers_name),
-      escVal(m.household_relationship),
-      escVal(m.occupation),
-      escVal(m.previous_id_no),
-      escVal(m.taang_land_id_no),
-      escVal(m.nationality),
-      escVal(m.resident_status),
-      escVal(m.religious),
-      escVal(m.submission_date || (m.created_at ? m.created_at.split('T')[0] : ''))
-    ])
-  ];
-  const ws = XLSX.utils.aoa_to_sheet(aoa);
-  ws['!merges'] = [
-    { s: { r: 0, c: 5 }, e: { r: 0, c: 9 } },
-    { s: { r: 1, c: 5 }, e: { r: 1, c: 9 } },
-    { s: { r: 2, c: 0 }, e: { r: 2, c: 1 } },
-    { s: { r: 2, c: 4 }, e: { r: 2, c: 5 } },
-    { s: { r: 2, c: 12 }, e: { r: 2, c: 13 } },
-    { s: { r: 3, c: 0 }, e: { r: 3, c: 1 } },
-    { s: { r: 3, c: 12 }, e: { r: 3, c: 13 } },
-  ];
-  ws['!cols'] = [
-    { wch: 5 }, { wch: 18 }, { wch: 14 }, { wch: 8 }, { wch: 18 }, { wch: 18 },
-    { wch: 22 }, { wch: 14 }, { wch: 16 }, { wch: 18 }, { wch: 14 }, { wch: 16 },
-    { wch: 12 }, { wch: 16 }
-  ];
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Household');
+
+  // ── Age helpers for summary statistics ──
+  const myanmarToArabic = { '၀':'0','၁':'1','၂':'2','၃':'3','၄':'4','၅':'5','၆':'6','၇':'7','၈':'8','၉':'9' };
+  const parseAge = (dateStr) => {
+    if (!dateStr) return null;
+    const s = String(dateStr).split('').map(c => myanmarToArabic[c] ?? c).join('');
+    const parts = s.split(/[.\-\/]/);
+    if (parts.length < 3) return null;
+    const [d, m, y] = parts.map(Number);
+    if (isNaN(d) || isNaN(m) || isNaN(y) || y < 1900) return null;
+    const dob = new Date(y, m - 1, d);
+    const today = new Date();
+    let age = today.getFullYear() - dob.getFullYear();
+    if (today < new Date(today.getFullYear(), dob.getMonth(), dob.getDate())) age--;
+    return age;
+  };
+
+  const isMale   = (g) => { const s = (g || '').trim(); return s === 'က' || s === 'male' || s.toLowerCase() === 'male'; };
+  const isFemale = (g) => { const s = (g || '').trim(); return s === 'မ' || s === 'female' || s.toLowerCase() === 'female'; };
+
+  const totalMembers = members.length;
+  const maleCount    = members.filter(m => isMale(m.gender)).length;
+  const femaleCount  = members.filter(m => isFemale(m.gender)).length;
+  const ages         = members.map(m => parseAge(m.date_of_birth));
+  const under16      = ages.filter(a => a !== null && a < 16).length;
+  const age1660      = ages.filter(a => a !== null && a >= 16 && a <= 60).length;
+  const above60      = ages.filter(a => a !== null && a > 60).length;
+
   const head = members.find(m => m.household_relationship === 'ဦးစီး') || first;
-  XLSX.writeFile(wb, buildExportFilename({
+  const filename = buildExportFilename({
     type: 'household',
     district: first.district,
     township: first.township,
@@ -80,7 +59,183 @@ export const exportHouseholdExcel = (householdNo, members) => {
     householdNo,
     headName: head.name,
     ext: 'xlsx',
-  }));
+  });
+
+  const workbook = new ExcelJS.Workbook();
+  const worksheet = workbook.addWorksheet('Household Members');
+
+  worksheet.columns = [
+    { key: 'no', width: 6 },
+    { key: 'name', width: 24 },
+    { key: 'dob', width: 14 },
+    { key: 'gender', width: 9 },
+    { key: 'father', width: 20 },
+    { key: 'mother', width: 20 },
+    { key: 'rel', width: 14 },
+    { key: 'occ', width: 20 },
+    { key: 'prevId', width: 18 },
+    { key: 'taangId', width: 20 },
+    { key: 'nat', width: 14 },
+    { key: 'status', width: 14 },
+    { key: 'religion', width: 12 },
+    { key: 'subDate', width: 16 }
+  ];
+
+  const applyBorder = (cell) => {
+    cell.border = {
+      top: { style: 'thin', color: { argb: 'FF000000' } },
+      left: { style: 'thin', color: { argb: 'FF000000' } },
+      bottom: { style: 'thin', color: { argb: 'FF000000' } },
+      right: { style: 'thin', color: { argb: 'FF000000' } }
+    };
+  };
+
+  // ── Header titles ──
+  worksheet.mergeCells('A1:N1');
+  const c1 = worksheet.getCell('A1');
+  c1.value = "Ta'ang Land Government";
+  c1.font = { name: 'Pyidaungsu', size: 16, bold: true };
+  c1.alignment = { horizontal: 'center', vertical: 'middle' };
+  worksheet.getRow(1).height = 24;
+
+  worksheet.mergeCells('A2:N2');
+  const c2 = worksheet.getCell('A2');
+  c2.value = "Ta'ang Land Immigration Department";
+  c2.font = { name: 'Pyidaungsu', size: 12, bold: true };
+  c2.alignment = { horizontal: 'center', vertical: 'middle' };
+  worksheet.getRow(2).height = 18;
+
+  worksheet.mergeCells('A3:N3');
+  const c3 = worksheet.getCell('A3');
+  c3.value = `Household Registration — ${first.household_no || householdNo}`;
+  c3.font = { name: 'Pyidaungsu', size: 10, italic: true };
+  c3.alignment = { horizontal: 'center', vertical: 'middle' };
+  worksheet.getRow(3).height = 16;
+
+  // ── Info block row 5 ──
+  const r5 = worksheet.getRow(5);
+  r5.getCell(1).value = "District:";
+  r5.getCell(1).font = { name: 'Pyidaungsu', bold: true, size: 11 };
+  r5.getCell(2).value = first.district;
+  r5.getCell(2).font = { name: 'Pyidaungsu', size: 11 };
+  worksheet.mergeCells('B5:D5');
+  
+  r5.getCell(5).value = "Ward / Village / Group:";
+  r5.getCell(5).font = { name: 'Pyidaungsu', bold: true, size: 11 };
+  r5.getCell(6).value = first.ward_village_group;
+  r5.getCell(6).font = { name: 'Pyidaungsu', size: 11 };
+  worksheet.mergeCells('F5:K5');
+  
+  r5.getCell(12).value = "Household No.:";
+  r5.getCell(12).font = { name: 'Pyidaungsu', bold: true, size: 11 };
+  r5.getCell(13).value = first.household_no || householdNo;
+  r5.getCell(13).font = { name: 'Pyidaungsu', size: 11 };
+  worksheet.mergeCells('M5:N5');
+  r5.height = 20;
+
+  // ── Info block row 6 ──
+  const r6 = worksheet.getRow(6);
+  r6.getCell(1).value = "Township:";
+  r6.getCell(1).font = { name: 'Pyidaungsu', bold: true, size: 11 };
+  r6.getCell(2).value = first.township;
+  r6.getCell(2).font = { name: 'Pyidaungsu', size: 11 };
+  worksheet.mergeCells('B6:D6');
+  
+  r6.getCell(12).value = "House No.:";
+  r6.getCell(12).font = { name: 'Pyidaungsu', bold: true, size: 11 };
+  r6.getCell(13).value = toMyanmarNum(first.house_no);
+  r6.getCell(13).font = { name: 'Pyidaungsu', size: 11 };
+  worksheet.mergeCells('M6:N6');
+  r6.height = 20;
+
+  // ── Table headers at Row 8 ──
+  const headers = [
+    'No.', 'Name', 'Date of Birth', 'Gender', "Father's Name", "Mother's Name",
+    'Relationship', 'Occupation', 'Previous ID No.', "Ta'ang Land ID No.",
+    'Nationality', 'Resident Status', 'Religious', 'Submission Date'
+  ];
+  const r8 = worksheet.getRow(8);
+  headers.forEach((h, idx) => {
+    const cell = r8.getCell(idx + 1);
+    cell.value = h;
+    cell.font = { name: 'Pyidaungsu', size: 11, bold: true, color: { argb: 'FF000000' } };
+    cell.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FFE8E8E8' }
+    };
+    cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+    applyBorder(cell);
+  });
+  r8.height = 26;
+
+  // ── Members rows starting at Row 9 ──
+  members.forEach((m, i) => {
+    const rowIdx = 9 + i;
+    const row = worksheet.getRow(rowIdx);
+    const isEven = i % 2 === 1;
+    const bg = isEven ? 'FFF5F5F5' : 'FFFFFFFF';
+
+    const cells = [
+      { val: toMyanmarNum(i + 1), align: 'center' },
+      { val: `${m.name}${m.household_relationship === 'ဦးစီး' ? ' [HEAD]' : ''}`, align: 'left', bold: true },
+      { val: m.date_of_birth, align: 'center' },
+      { val: m.gender, align: 'center' },
+      { val: m.fathers_name, align: 'left' },
+      { val: m.mothers_name, align: 'left' },
+      { val: m.household_relationship, align: 'center' },
+      { val: m.occupation, align: 'left' },
+      { val: m.previous_id_no, align: 'center' },
+      { val: m.taang_land_id_no, align: 'center' },
+      { val: m.nationality, align: 'center' },
+      { val: m.resident_status, align: 'center' },
+      { val: m.religious, align: 'center' },
+      { val: m.submission_date || (m.created_at ? m.created_at.split('T')[0] : ''), align: 'center' }
+    ];
+
+    cells.forEach((c, idx) => {
+      const cell = row.getCell(idx + 1);
+      cell.value = c.val;
+      cell.font = { name: 'Pyidaungsu', size: 11, bold: c.bold || false };
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: bg }
+      };
+      cell.alignment = { horizontal: c.align, vertical: 'middle', wrapText: true };
+      applyBorder(cell);
+    });
+    row.height = 22;
+  });
+
+  // ── Summary statistics row ──
+  const footerIdx = 9 + members.length;
+  worksheet.mergeCells(`A${footerIdx}:N${footerIdx}`);
+  const footerCell = worksheet.getCell(`A${footerIdx}`);
+  footerCell.value = `Total Members: ${toMyanmarNum(totalMembers)}  |  Male: ${toMyanmarNum(maleCount)}  |  Female: ${toMyanmarNum(femaleCount)}  |  Under 16: ${toMyanmarNum(under16)}  |  16 – 60: ${toMyanmarNum(age1660)}  |  Above 60: ${toMyanmarNum(above60)}`;
+  footerCell.font = { name: 'Pyidaungsu', size: 11, bold: true };
+  footerCell.fill = {
+    type: 'pattern',
+    pattern: 'solid',
+    fgColor: { argb: 'FFFAFAFA' }
+  };
+  footerCell.alignment = { horizontal: 'left', vertical: 'middle', indent: 1 };
+  
+  for (let c = 1; c <= 14; c++) {
+    applyBorder(worksheet.getRow(footerIdx).getCell(c));
+  }
+  worksheet.getRow(footerIdx).height = 24;
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 };
 
 export const printHouseholdPdf = (householdNo, members) => {
@@ -238,7 +393,7 @@ export const printHouseholdPdf = (householdNo, members) => {
   <meta charset="utf-8" />
   <title>Household Registration — ${safeHtml(householdNo)}</title>
   <style>
-    @page { size: legal landscape; margin: 8mm 10mm; }
+    @page { size: legal landscape; margin: 3mm; }
     @font-face {
       font-family: 'Pyidaungsu';
       src: url('/assets/fonts/Pyidaungsu.ttf') format('truetype');
@@ -350,4 +505,173 @@ export const printHouseholdPdf = (householdNo, members) => {
   w.document.open();
   w.document.write(html);
   w.document.close();
+};
+
+export const exportAllExcel = async (data, activeFilters) => {
+  if (!data || data.length === 0) return;
+
+  const now = new Date();
+
+  // Filename logic matching exportAllJson
+  const sanitize = (str) => String(str || '').trim().replace(/[\/\\:*?"<>|]/g, '').replace(/\s+/g, '_') || null;
+  const today = now.toISOString().split('T')[0];
+  const locationText = activeFilters.ward || activeFilters.group || activeFilters.village;
+  const fileParts = [
+    sanitize(activeFilters.district),
+    sanitize(activeFilters.township),
+    sanitize(locationText),
+  ].filter(Boolean);
+  const prefix = fileParts.length ? fileParts.join('_') : 'TPS_FullExport';
+  const filename = `${prefix}_${today}.xlsx`;
+
+  // Sort by household_no (natural sort order) and household_relationship priority
+  const relationshipOrder = { 'ဦးစီး': 1, 'ဇနီး': 2, 'ခင်ပွန်း': 2, 'သား': 3, 'သမီး': 3 };
+  const sortedData = [...data].sort((a, b) => {
+    const hhA = String(a.household_no || '');
+    const hhB = String(b.household_no || '');
+    if (hhA !== hhB) {
+      return hhA.localeCompare(hhB, undefined, { numeric: true, sensitivity: 'base' });
+    }
+    const orderA = relationshipOrder[a.household_relationship] || 99;
+    const orderB = relationshipOrder[b.household_relationship] || 99;
+    return orderA - orderB;
+  });
+
+  const workbook = new ExcelJS.Workbook();
+  const worksheet = workbook.addWorksheet('Central Database');
+
+  const applyBorder = (cell) => {
+    cell.border = {
+      top: { style: 'thin', color: { argb: 'FF000000' } },
+      left: { style: 'thin', color: { argb: 'FF000000' } },
+      bottom: { style: 'thin', color: { argb: 'FF000000' } },
+      right: { style: 'thin', color: { argb: 'FF000000' } }
+    };
+  };
+
+  // ── Exact English column headers expected by /upload (CsvUploader.jsx) at Row 1 ──
+  const headers = [
+    'Household No.',
+    'Name',
+    'Date of birth',
+    'Gender',
+    "Father's Name",
+    "Mother's Name",
+    'Household Relationship',
+    'Occupation',
+    'Previous ID No.',
+    "Ta'ang Land ID No.",
+    'Nationality',
+    'Resident Status',
+    'Religious',
+    'House NO.',
+    'Ward / Village / Group',
+    'Township',
+    'District',
+    'Submission Date'
+  ];
+
+  const r1 = worksheet.getRow(1);
+  headers.forEach((h, idx) => {
+    const cell = r1.getCell(idx + 1);
+    cell.value = h;
+    cell.font = { name: 'Pyidaungsu', size: 11, bold: true, color: { argb: 'FF000000' } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8E8E8' } };
+    cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+    applyBorder(cell);
+  });
+  r1.height = 26;
+
+  // ── Member rows starting at Row 2 ──
+  let currentHh = '';
+  let hhCount = 0;
+
+  sortedData.forEach((m, i) => {
+    const rowIdx = 2 + i;
+    const row = worksheet.getRow(rowIdx);
+
+    if (m.household_no !== currentHh) {
+      currentHh = m.household_no;
+      hhCount++;
+    }
+    const isEvenHh = hhCount % 2 === 0;
+    const bg = isEvenHh ? 'FFF5F5F5' : 'FFFFFFFF';
+
+    // Must be raw database unformatted values so that they match exactly when imported!
+    const cells = [
+      { val: m.household_no, align: 'center' },
+      { val: m.name, align: 'left', bold: true },
+      { val: m.date_of_birth, align: 'center' },
+      { val: m.gender, align: 'center' },
+      { val: m.fathers_name, align: 'left' },
+      { val: m.mothers_name, align: 'left' },
+      { val: m.household_relationship, align: 'center' },
+      { val: m.occupation, align: 'left' },
+      { val: m.previous_id_no, align: 'center' },
+      { val: m.taang_land_id_no, align: 'center' },
+      { val: m.nationality, align: 'center' },
+      { val: m.resident_status, align: 'center' },
+      { val: m.religious, align: 'center' },
+      { val: m.house_no, align: 'center' },
+      { val: m.ward_village_group, align: 'left' },
+      { val: m.township, align: 'left' },
+      { val: m.district, align: 'left' },
+      { val: m.submission_date || (m.created_at ? m.created_at.split('T')[0] : ''), align: 'center' }
+    ];
+
+    cells.forEach((c, idx) => {
+      const cell = row.getCell(idx + 1);
+      cell.value = c.val;
+      cell.font = { name: 'Pyidaungsu', size: 10, bold: c.bold || false };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } };
+      cell.alignment = { horizontal: c.align, vertical: 'middle', wrapText: true };
+      applyBorder(cell);
+    });
+    row.height = 22;
+  });
+
+  // Column key definitions matching headers for width calculations
+  worksheet.columns = [
+    { key: 'hhNo', width: 18 },
+    { key: 'name', width: 24 },
+    { key: 'dob', width: 14 },
+    { key: 'gender', width: 9 },
+    { key: 'father', width: 20 },
+    { key: 'mother', width: 20 },
+    { key: 'rel', width: 14 },
+    { key: 'occ', width: 20 },
+    { key: 'prevId', width: 18 },
+    { key: 'taangId', width: 20 },
+    { key: 'nat', width: 14 },
+    { key: 'status', width: 14 },
+    { key: 'religion', width: 12 },
+    { key: 'houseNo', width: 12 },
+    { key: 'ward', width: 20 },
+    { key: 'township', width: 18 },
+    { key: 'district', width: 16 },
+    { key: 'subDate', width: 16 }
+  ];
+
+  // Adjust widths dynamically based on content length
+  worksheet.columns.forEach((column) => {
+    let maxLen = column.width || 10;
+    column.eachCell({ includeEmpty: true }, (cell) => {
+      if (cell.row > 1 && cell.value) {
+        let len = String(cell.value).length;
+        if (len > maxLen) maxLen = len;
+      }
+    });
+    column.width = Math.min(Math.max(maxLen + 4, 10), 32);
+  });
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 };

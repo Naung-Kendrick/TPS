@@ -593,8 +593,44 @@ const DemographicDashboard = ({ user }) => {
   const [selectedWard, setSelectedWard]         = useState('');
   const [selectedGroup, setSelectedGroup]       = useState('');
   const [selectedVillage, setSelectedVillage]   = useState('');
-  const [reqSending, setReqSending] = useState(false);
-  const [reqSent,    setReqSent]    = useState(null);
+  const [reqSending,    setReqSending]    = useState(false);
+  const [reqSent,       setReqSent]       = useState(null);
+  const [approvedTypes, setApprovedTypes] = useState(new Set());
+
+  // Load already-approved requests + subscribe to live approval changes
+  useEffect(() => {
+    if (!isViewer || !user?.id) return;
+    supabase
+      .from('print_export_requests')
+      .select('export_type')
+      .eq('requester_id', user.id)
+      .eq('page', 'demographics')
+      .eq('status', 'resolved')
+      .then(({ data }) => {
+        if (data?.length) setApprovedTypes(new Set(data.map(r => r.export_type)));
+      });
+    const ch = supabase
+      .channel(`demo-req-${user.id}`)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'print_export_requests',
+        filter: `requester_id=eq.${user.id}` }, (payload) => {
+        if (payload.new.page === 'demographics' && payload.new.status === 'resolved') {
+          setApprovedTypes(prev => new Set([...prev, payload.new.export_type]));
+        }
+      })
+      .subscribe();
+    return () => supabase.removeChannel(ch);
+  }, [isViewer, user?.id]);
+
+  const markUsed = async (exportType) => {
+    await supabase
+      .from('print_export_requests')
+      .update({ status: 'used' })
+      .eq('requester_id', user.id)
+      .eq('page', 'demographics')
+      .eq('export_type', exportType)
+      .eq('status', 'resolved');
+    setApprovedTypes(prev => { const n = new Set(prev); n.delete(exportType); return n; });
+  };
 
   const submitRequest = async (exportType) => {
     setReqSending(true);
@@ -976,13 +1012,27 @@ const DemographicDashboard = ({ user }) => {
           {/* ── Print / Export toolbar ─────────────────────── */}
           {isViewer ? (
             <div className="tps-stats-toolbar" style={{ display:'flex', gap:'8px', justifyContent:'flex-end', marginTop:'8px', flexWrap:'wrap', alignItems:'center' }}>
-              <button type="button" onClick={() => submitRequest('print')} disabled={reqSending || reqSent === 'print'}
-                style={{ display:'flex', alignItems:'center', gap:'6px', padding:'8px 16px', border:'1px solid #1A1A1A', backgroundColor:'#1A1A1A', color:'#FFFFFF', fontSize:'11px', fontWeight:'500', cursor: reqSending ? 'not-allowed' : 'pointer', textTransform:'uppercase', letterSpacing:'0.05em', flexShrink:0, opacity: reqSent === 'print' ? 0.6 : 1 }}>
-                {reqSent === 'print' ? <><CheckCircle2 size={13} /> Requested</> : <><Send size={13} /> Request Print</>}
-              </button>
-              {reqSent && (
+              {approvedTypes.has('print') ? (
+                <button type="button" onClick={() => { printDemographicDashboard({ totalStats, allReligions, allNationalities, allOccupations, selectedDistrict, selectedTownship, selectedWard, selectedGroup, selectedVillage }); markUsed('print'); }}
+                  onMouseOver={e => { e.currentTarget.style.backgroundColor='#065F46'; }}
+                  onMouseOut={e => { e.currentTarget.style.backgroundColor='#15803D'; }}
+                  style={{ display:'flex', alignItems:'center', gap:'6px', padding:'8px 16px', border:'1px solid #15803D', backgroundColor:'#15803D', color:'#FFFFFF', fontSize:'11px', fontWeight:'600', cursor:'pointer', textTransform:'uppercase', letterSpacing:'0.05em', flexShrink:0, transition:'background-color 120ms' }}>
+                  <Printer size={13} /> Print — Legal (Approved)
+                </button>
+              ) : (
+                <button type="button" onClick={() => submitRequest('print')} disabled={reqSending || reqSent === 'print'}
+                  style={{ display:'flex', alignItems:'center', gap:'6px', padding:'8px 16px', border:'1px solid #1A1A1A', backgroundColor:'#1A1A1A', color:'#FFFFFF', fontSize:'11px', fontWeight:'500', cursor: reqSending ? 'not-allowed' : 'pointer', textTransform:'uppercase', letterSpacing:'0.05em', flexShrink:0, opacity: reqSent === 'print' ? 0.6 : 1 }}>
+                  {reqSent === 'print' ? <><CheckCircle2 size={13} /> Requested</> : <><Send size={13} /> Request Print</>}
+                </button>
+              )}
+              {approvedTypes.size > 0 && (
                 <span style={{ fontSize:'10px', color:'#065F46', fontWeight:'600', display:'flex', alignItems:'center', gap:'4px' }}>
-                  <CheckCircle2 size={12} /> Request sent. District administrator has been notified.
+                  <CheckCircle2 size={12} /> Permission granted by administrator.
+                </span>
+              )}
+              {reqSent && approvedTypes.size === 0 && (
+                <span style={{ fontSize:'10px', color:'#065F46', fontWeight:'600', display:'flex', alignItems:'center', gap:'4px' }}>
+                  <CheckCircle2 size={12} /> Request sent. Administrator has been notified.
                 </span>
               )}
             </div>

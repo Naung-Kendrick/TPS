@@ -118,6 +118,35 @@ const Reports = ({ user }) => {
 
   const [dataList, setDataList] = useState([]); // Stores items for Levels 1 to 5
   const [familyMembers, setFamilyMembers] = useState([]); // Stores items for Level 6
+  const [navigatingId, setNavigatingId] = useState(null); // Step-by-step delay tracker
+  const [goingBack, setGoingBack] = useState(false);
+
+  const handleNavigateStep = (newLevel, payload, itemId) => {
+    if (navigatingId || goingBack) return; // prevent multiple clicks while waiting
+    setNavigatingId(itemId);
+    setTimeout(() => {
+      handleNavigate(newLevel, payload);
+      setNavigatingId(null);
+    }, 1000);
+  };
+
+  const handleGoBackStep = () => {
+    if (goingBack || navigatingId) return;
+    setGoingBack(true);
+    setTimeout(() => {
+      goBack();
+      setGoingBack(false);
+    }, 500);
+  };
+
+  const handleJumpStep = (targetLevel) => {
+    if (goingBack || navigatingId) return;
+    setGoingBack(true);
+    setTimeout(() => {
+      jumpToLevel(targetLevel);
+      setGoingBack(false);
+    }, 500);
+  };
 
   // Export All JSON state
   const [exportingJson, setExportingJson] = useState(false);
@@ -125,12 +154,19 @@ const Reports = ({ user }) => {
   // Export All Excel state
   const [exportingExcel, setExportingExcel] = useState(false);
 
-  // Edit / delete state
+  // Edit / delete state with Audit Reason & PIN Code tracking
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({});
+  const [showEditReasonModal, setShowEditReasonModal] = useState(false);
+  const [editReason, setEditReason] = useState('');
+  const [editPin, setEditPin] = useState('');
+  const [editPinError, setEditPinError] = useState('');
 
   const [saving, setSaving] = useState(false);
-  const [deleteConfirmId, setDeleteConfirmId] = useState(null);
+  const [deleteConfirmMember, setDeleteConfirmMember] = useState(null);
+  const [deleteReason, setDeleteReason] = useState('');
+  const [deletePin, setDeletePin] = useState('');
+  const [deletePinError, setDeletePinError] = useState('');
   const [deleting, setDeleting] = useState(false);
   const tableScrollRef = useRef(null);
   const scroll = (dir) => {
@@ -176,8 +212,8 @@ const Reports = ({ user }) => {
     setError(null);
     setSearch('');
 
-    // Cache key for this navigation state (v3 = normalized Myanmar text)
-    const cacheKey = `reports_v3_l${level}_${path.district||''}_${path.township||''}_${path.locationType||''}_${path.ward||''}_${path.group||''}_${path.village||''}_${path.householdNo||''}`;
+    // Cache key for this navigation state (v5 = group village isolated)
+    const cacheKey = `reports_v5_l${level}_${path.district||''}_${path.township||''}_${path.locationType||''}_${path.ward||''}_${path.group||''}_${path.village||''}_${path.householdNo||''}`;
 
     // Serve cached data immediately (stale-while-revalidate)
     const cached = await cacheGet(cacheKey);
@@ -234,63 +270,92 @@ const Reports = ({ user }) => {
       else if (level === 4) {
         // If user selected a Ward: show household heads directly
         if (path.locationType === 'ward') {
-          const { data, error } = await supabase
+          let query = supabase
             .from('households')
             .select('id, name, household_no, gender, occupation, date_of_birth')
             .ilike('ward_village_group', '%' + path.ward.trim() + '%')
             .ilike('household_relationship', '%ဦးစီး%');
+
+          if (path.district) query = query.eq('district', path.district);
+          if (path.township) query = query.eq('township', path.township);
+
+          const { data, error } = await query;
           if (error) throw error;
           console.log('Ward query:', path.ward, 'Results:', data?.length || 0);
           setDataList(data || []);
           cacheSet(cacheKey, data || []);
         }
-        // If user selected a Group: show villages in this group
+        // If user selected a Group: show villages belonging strictly to this group
         else if (path.locationType === 'group') {
-          console.log('Fetching villages for group:', path.group);
-          const { data, error } = await supabase.rpc('report_village_only', { p_group: path.group.trim() });
+          console.log('Fetching villages for group:', path.group, 'in township:', path.township);
+          
+          let query = supabase
+            .from('households')
+            .select('ward_village_group')
+            .ilike('ward_village_group', '%' + path.group.trim() + '%');
+
+          if (path.district) query = query.eq('district', path.district);
+          if (path.township) query = query.eq('township', path.township);
+
+          const { data, error } = await query;
           if (error) throw error;
-          console.log('Group villages result:', data?.length || 0, 'villages');
-          const list = (data || []).map(d => ({ id: d.village, name: d.village }));
+
+          const villageSet = new Set();
+          const cleanGroup = path.group.trim();
+
+          (data || []).forEach(row => {
+            if (!row.ward_village_group) return;
+            const parts = row.ward_village_group.split(/[,၊]/).map(p => p.trim()).filter(Boolean);
+            parts.forEach(part => {
+              if (part !== cleanGroup && !part.includes('အုပ်စု')) {
+                villageSet.add(part);
+              }
+            });
+          });
+
+          let villageList = Array.from(villageSet);
+          if (villageList.length === 0) {
+            const { data: rpcData } = await supabase.rpc('report_village_only', { p_group: cleanGroup });
+            villageList = (rpcData || []).map(d => d.village).filter(Boolean);
+          }
+
+          const list = villageList.map(v => ({ id: v, name: v }));
+          console.log('Filtered Group villages result:', list.length, 'villages');
           setDataList(list);
           cacheSet(cacheKey, list);
         }
       }
       else if (level === 5 && path.locationType === 'group' && path.village) {
         // Only reachable if locationType is 'group' and village is selected
-        // Household heads under this village
-        console.log('Fetching household heads for village:', path.village);
+        console.log('Fetching household heads for village:', path.village, 'under group:', path.group);
         
-        // First try: search for village name anywhere in ward_village_group
-        let { data, error } = await supabase
+        let query = supabase
           .from('households')
           .select('id, name, household_no, gender, occupation, date_of_birth')
           .ilike('ward_village_group', '%' + path.village.trim() + '%')
           .ilike('household_relationship', '%ဦးစီး%');
+
+        if (path.district) query = query.eq('district', path.district);
+        if (path.township) query = query.eq('township', path.township);
+        if (path.group) query = query.ilike('ward_village_group', '%' + path.group.trim() + '%');
           
+        let { data, error } = await query;
         if (error) throw error;
-        console.log('Village household heads (pattern search):', data?.length || 0);
-        
-        // If no results, try exact match
-        if (!data || data.length === 0) {
-          console.log('Trying exact match for village:', path.village);
-          const result2 = await supabase
-            .from('households')
-            .select('id, name, household_no, gender, occupation, date_of_birth')
-            .eq('ward_village_group', path.village.trim())
-            .ilike('household_relationship', '%ဦးစီး%');
-          data = result2.data;
-          console.log('Village household heads (exact match):', data?.length || 0);
-        }
         
         setDataList(data || []);
         cacheSet(cacheKey, data || []);
       }
       else if (level === 6) {
         // Family members
-        const { data, error } = await supabase
+        let query = supabase
           .from('households')
           .select('*')
           .eq('household_no', path.householdNo);
+
+        if (path.district) query = query.eq('district', path.district);
+        if (path.township) query = query.eq('township', path.township);
+
+        const { data, error } = await query;
         if (error) throw error;
         
         const relationshipOrder = { 'ဦးစီး': 1, 'ဇနီး': 2, 'ခင်ပွန်း': 2, 'သား': 3, 'သမီး': 3 };
@@ -554,24 +619,65 @@ const Reports = ({ user }) => {
   const cancelEdit = () => {
     setEditingId(null);
     setEditForm({});
+    setShowEditReasonModal(false);
+    setEditReason('');
+    setEditPin('');
+    setEditPinError('');
   };
 
-  const saveEdit = async () => {
+  const initiateSaveEdit = () => {
+    const { id, created_at, ...fields } = editForm;
+    if (fields.date_of_birth) {
+      fields.date_of_birth = normalizeDateOfBirth(fields.date_of_birth);
+      const dobError = validateDateOfBirth(fields.date_of_birth);
+      if (dobError) {
+        alert(dobError);
+        return;
+      }
+    }
+    setEditPin('');
+    setEditPinError('');
+    setShowEditReasonModal(true);
+  };
+
+  const executeSaveEdit = async () => {
+    if (!editReason.trim()) {
+      alert('Please enter a reason for editing.');
+      return;
+    }
+    if (editPin.trim() !== '510237') {
+      setEditPinError('Incorrect PIN code. Authorization denied.');
+      return;
+    }
+    setEditPinError('');
     setSaving(true);
     try {
       const { id, created_at, ...fields } = editForm;
-
-      // Normalize and validate Date of Birth
       if (fields.date_of_birth) {
         fields.date_of_birth = normalizeDateOfBirth(fields.date_of_birth);
-        const dobError = validateDateOfBirth(fields.date_of_birth);
-        if (dobError) {
-          alert(dobError);
-          setSaving(false);
-          return;
-        }
       }
 
+      // 1. Log audit trail in Supabase
+      try {
+        await supabase.from('audit_logs').insert([{
+          user_id: user?.id || null,
+          action: 'UPDATE_MEMBER',
+          table_name: 'households',
+          details: {
+            record_id: editingId,
+            member_name: editForm.name,
+            household_no: editForm.household_no,
+            reason: editReason.trim(),
+            updated_fields: fields,
+            performed_by: user?.username || user?.email || 'Officer',
+            timestamp: new Date().toISOString()
+          }
+        }]);
+      } catch (auditErr) {
+        console.warn('Audit logging error:', auditErr);
+      }
+
+      // 2. Perform database update
       const { error } = await supabase
         .from('households')
         .update(fields)
@@ -583,6 +689,10 @@ const Reports = ({ user }) => {
       );
       setEditingId(null);
       setEditForm({});
+      setShowEditReasonModal(false);
+      setEditReason('');
+      setEditPin('');
+      setEditPinError('');
     } catch (err) {
       alert('Save failed: ' + err.message);
     } finally {
@@ -591,19 +701,66 @@ const Reports = ({ user }) => {
   };
 
   // ── DELETE handlers ─────────────────────────────────────────────────────────
-  const confirmDelete = (id) => setDeleteConfirmId(id);
-  const cancelDelete = () => setDeleteConfirmId(null);
+  const confirmDelete = (member) => {
+    setDeleteConfirmMember(member);
+    setDeleteReason('');
+    setDeletePin('');
+    setDeletePinError('');
+  };
+
+  const cancelDelete = () => {
+    setDeleteConfirmMember(null);
+    setDeleteReason('');
+    setDeletePin('');
+    setDeletePinError('');
+  };
 
   const doDelete = async () => {
+    if (!deleteConfirmMember) return;
+    if (!deleteReason.trim()) {
+      alert('Please enter a reason for deletion.');
+      return;
+    }
+    if (deletePin.trim() !== '510237') {
+      setDeletePinError('Incorrect PIN code. Authorization denied.');
+      return;
+    }
+    setDeletePinError('');
     setDeleting(true);
     try {
+      const member = deleteConfirmMember;
+
+      // 1. Log audit trail in Supabase
+      try {
+        await supabase.from('audit_logs').insert([{
+          user_id: user?.id || null,
+          action: 'DELETE_MEMBER',
+          table_name: 'households',
+          details: {
+            record_id: member.id,
+            member_name: member.name,
+            household_no: member.household_no,
+            reason: deleteReason.trim(),
+            performed_by: user?.username || user?.email || 'Officer',
+            timestamp: new Date().toISOString()
+          }
+        }]);
+      } catch (auditErr) {
+        console.warn('Audit logging error:', auditErr);
+      }
+
+      // 2. Perform database deletion
       const { error } = await supabase
         .from('households')
         .delete()
-        .eq('id', deleteConfirmId);
+        .eq('id', member.id);
+
       if (error) throw error;
-      setFamilyMembers(prev => prev.filter(m => m.id !== deleteConfirmId));
-      setDeleteConfirmId(null);
+      setFamilyMembers(prev => prev.filter(m => m.id !== member.id));
+      setDeleteConfirmMember(null);
+      setDeleteReason('');
+      setDeletePin('');
+      setDeletePinError('');
     } catch (err) {
       alert('Delete failed: ' + err.message);
     } finally {
@@ -705,14 +862,14 @@ const Reports = ({ user }) => {
 
         {/* Breadcrumb — scrollable horizontally on mobile */}
         <div className="flex items-center gap-1.5 text-xs font-medium text-gray-500 uppercase overflow-x-auto pb-1 scrollbar-none whitespace-nowrap">        
-          <button onClick={() => jumpToLevel(1)} className={`flex items-center gap-1 hover:text-gray-900 transition-colors ${level === 1 ? 'text-gray-900 font-bold' : ''}`}>
+          <button onClick={() => handleJumpStep(1)} disabled={goingBack || !!navigatingId} className={`flex items-center gap-1 hover:text-gray-900 transition-colors disabled:opacity-50 ${level === 1 ? 'text-gray-900 font-bold' : ''}`}>
             <MapIcon size={14} /> Districts
           </button>
           
           {path.district && (
             <>
               <ChevronRight size={14} />
-              <button onClick={() => jumpToLevel(2)} className={`flex items-center gap-1 hover:text-gray-900 transition-colors ${level === 2 ? 'text-gray-900 font-bold' : ''}`}>
+              <button onClick={() => handleJumpStep(2)} disabled={goingBack || !!navigatingId} className={`flex items-center gap-1 hover:text-gray-900 transition-colors disabled:opacity-50 ${level === 2 ? 'text-gray-900 font-bold' : ''}`}>
                 <MapPin size={14} /> {path.district}
               </button>
             </>
@@ -721,7 +878,7 @@ const Reports = ({ user }) => {
           {path.township && (
             <>
               <ChevronRight size={14} />
-              <button onClick={() => jumpToLevel(2)} className={`flex items-center gap-1 hover:text-gray-900 transition-colors ${level === 2 ? 'text-gray-900 font-bold' : ''}`}>
+              <button onClick={() => handleJumpStep(2)} disabled={goingBack || !!navigatingId} className={`flex items-center gap-1 hover:text-gray-900 transition-colors disabled:opacity-50 ${level === 2 ? 'text-gray-900 font-bold' : ''}`}>
                 <Home size={14} /> {path.township}
               </button>
             </>
@@ -730,7 +887,7 @@ const Reports = ({ user }) => {
           {path.locationType && (
             <>
               <ChevronRight size={14} />
-              <button onClick={() => jumpToLevel(3)} className={`flex items-center gap-1 hover:text-gray-900 transition-colors ${level === 3 ? 'text-gray-900 font-bold' : ''}`}>
+              <button onClick={() => handleJumpStep(3)} disabled={goingBack || !!navigatingId} className={`flex items-center gap-1 hover:text-gray-900 transition-colors disabled:opacity-50 ${level === 3 ? 'text-gray-900 font-bold' : ''}`}>
                 {path.locationType === 'ward' ? <Home size={14} /> : <Users size={14} />}
                 {path.locationType === 'ward' ? path.ward : path.group}
               </button>
@@ -740,7 +897,7 @@ const Reports = ({ user }) => {
           {path.village && path.locationType === 'group' && (
             <>
               <ChevronRight size={14} />
-              <button onClick={() => jumpToLevel(4)} className={`flex items-center gap-1 hover:text-gray-900 transition-colors ${level === 4 ? 'text-gray-900 font-bold' : ''}`}>
+              <button onClick={() => handleJumpStep(4)} disabled={goingBack || !!navigatingId} className={`flex items-center gap-1 hover:text-gray-900 transition-colors disabled:opacity-50 ${level === 4 ? 'text-gray-900 font-bold' : ''}`}>
                 <Home size={14} /> {path.village}
               </button>
             </>
@@ -771,7 +928,7 @@ const Reports = ({ user }) => {
       {/* CONTROLS */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 mb-4">
         {level > 1 ? (
-          <button onClick={goBack} className="flex items-center justify-center gap-2 px-4 py-2 bg-white border border-gray-900 text-gray-900 font-medium text-xs uppercase w-full sm:w-auto">
+          <button onClick={handleGoBackStep} disabled={goingBack || !!navigatingId} className="flex items-center justify-center gap-2 px-4 py-2 bg-white border border-gray-900 text-gray-900 font-medium text-xs uppercase w-full sm:w-auto disabled:opacity-50">
             <ArrowLeft size={13} /> Back
           </button>
         ) : <div className="hidden sm:block" />}
@@ -808,35 +965,44 @@ const Reports = ({ user }) => {
                     <EmptyState type="no-results" message={search ? `No results for "${search}".` : 'No records available at this level.'} compact />
                   </div>
                 ) : (
-                  filteredData.map((item, idx) => (
-                    <div 
-                      key={idx} 
-                      onClick={() => {
-                        if (level === 1) handleNavigate(2, { district: item.name });
-                        if (level === 2) handleNavigate(3, { township: item.name });
-                        if (level === 3) {
-                          // Level 3: handle selection of ward or group
-                          if (item.locationType === 'ward') {
-                            handleNavigate(4, { locationType: 'ward', ward: item.name });
-                          } else if (item.locationType === 'group') {
-                            handleNavigate(4, { locationType: 'group', group: item.name });
+                  filteredData.map((item, idx) => {
+                    const itemId = `${level}-${item.name}`;
+                    const isNavigating = navigatingId === itemId;
+                    return (
+                      <div 
+                        key={idx} 
+                        onClick={() => {
+                          if (navigatingId) return;
+                          if (level === 1) handleNavigateStep(2, { district: item.name }, itemId);
+                          if (level === 2) handleNavigateStep(3, { township: item.name }, itemId);
+                          if (level === 3) {
+                            if (item.locationType === 'ward') {
+                              handleNavigateStep(4, { locationType: 'ward', ward: item.name }, itemId);
+                            } else if (item.locationType === 'group') {
+                              handleNavigateStep(4, { locationType: 'group', group: item.name }, itemId);
+                            }
                           }
-                        }
-                      }}
-                      className="bg-white p-4 border border-gray-200 hover:border-gray-900 active:bg-gray-50 cursor-pointer transition-[border-color] duration-100 flex items-center justify-between group"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="text-gray-500 group-hover:text-gray-900 transition-colors">
-                          {level === 1 && <MapIcon size={15} />}
-                          {level === 2 && <MapPin size={15} />}
-                          {level === 3 && item.locationType === 'ward' && <Home size={15} />}
-                          {level === 3 && item.locationType === 'group' && <Users size={15} />}
+                        }}
+                        className={`p-4 transition-all duration-150 flex items-center justify-between group relative overflow-hidden ${isNavigating ? 'bg-white border border-gray-900 shadow-sm' : 'bg-white border border-gray-200 hover:border-gray-900 active:bg-gray-50 cursor-pointer text-gray-900'}`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="text-gray-500 group-hover:text-gray-900 transition-colors">
+                            {level === 1 && <MapIcon size={15} />}
+                            {level === 2 && <MapPin size={15} />}
+                            {level === 3 && item.locationType === 'ward' && <Home size={15} />}
+                            {level === 3 && item.locationType === 'group' && <Users size={15} />}
+                          </div>
+                          <span className="font-semibold text-gray-900 text-xs leading-snug">{item.name}</span>
                         </div>
-                        <span className="font-medium text-gray-900 text-xs leading-snug">{item.name}</span>
+                        <ChevronRight size={13} className="text-gray-300 group-hover:text-gray-900 transition-colors flex-shrink-0" />
+                        {isNavigating && (
+                          <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-gray-100 overflow-hidden">
+                            <div className="h-full bg-gray-900 w-full animate-tps-line" />
+                          </div>
+                        )}
                       </div>
-                      <ChevronRight size={13} className="text-gray-300 group-hover:text-gray-900 transition-colors flex-shrink-0" />
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             )}
@@ -868,8 +1034,12 @@ const Reports = ({ user }) => {
                             <td style={tdStyle}>{head.occupation || '-'}</td>
                             <td style={{ ...tdStyle, textAlign: 'right' }}>
                               <button
-                                onClick={() => handleNavigate(6, { headName: head.name, householdNo: head.household_no })}
-                                className="inline-flex items-center gap-1 bg-white border border-gray-900 text-gray-900 px-3 py-1 text-xs font-medium uppercase"
+                                onClick={() => {
+                                  if (navigatingId) return;
+                                  handleNavigateStep(6, { headName: head.name, householdNo: head.household_no }, `h-${head.household_no}`);
+                                }}
+                                disabled={navigatingId === `h-${head.household_no}`}
+                                className="inline-flex items-center gap-1 bg-white border border-gray-900 text-gray-900 px-3 py-1 text-xs font-medium uppercase disabled:opacity-50"
                               >
                                 View Family <ChevronRight size={13} />
                               </button>
@@ -888,19 +1058,33 @@ const Reports = ({ user }) => {
                       <EmptyState type="no-results" message={search ? `No results for "${search}".` : 'No villages found in this group.'} compact />
                     </div>
                   ) : (
-                    filteredData.map((item, idx) => (
-                      <div 
-                        key={idx} 
-                        onClick={() => handleNavigate(5, { village: item.name })}
-                        className="bg-white p-4 border border-gray-200 hover:border-gray-900 active:bg-gray-50 cursor-pointer transition-[border-color] duration-100 flex items-center justify-between group"
-                      >
-                        <div className="flex items-center gap-3">
-                          <Home size={15} className="text-gray-500 group-hover:text-gray-900 transition-colors" />
-                          <span className="font-medium text-gray-900 text-xs leading-snug">{item.name}</span>
+                    filteredData.map((item, idx) => {
+                      const itemId = `v-${item.name}`;
+                      const isNavigating = navigatingId === itemId;
+                      return (
+                        <div 
+                          key={idx} 
+                          onClick={() => {
+                            if (navigatingId) return;
+                            handleNavigateStep(5, { village: item.name }, itemId);
+                          }}
+                          className={`p-4 transition-all duration-150 flex items-center justify-between group relative overflow-hidden ${isNavigating ? 'bg-white border border-gray-900 shadow-sm' : 'bg-white border border-gray-200 hover:border-gray-900 active:bg-gray-50 cursor-pointer text-gray-900'}`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="text-gray-500 group-hover:text-gray-900 transition-colors">
+                              <Home size={15} className="text-gray-500 group-hover:text-gray-900 transition-colors" />
+                            </div>
+                            <span className="font-semibold text-gray-900 text-xs leading-snug">{item.name}</span>
+                          </div>
+                          <ChevronRight size={13} className="text-gray-300 group-hover:text-gray-900 transition-colors flex-shrink-0" />
+                          {isNavigating && (
+                            <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-gray-100 overflow-hidden">
+                              <div className="h-full bg-gray-900 w-full animate-tps-line" />
+                            </div>
+                          )}
                         </div>
-                        <ChevronRight size={13} className="text-gray-300 group-hover:text-gray-900 transition-colors flex-shrink-0" />
-                      </div>
-                    ))
+                      );
+                    })
                   )}
                 </div>
               )
@@ -931,8 +1115,12 @@ const Reports = ({ user }) => {
                           <td style={tdStyle}>{head.occupation || '-'}</td>
                           <td style={{ ...tdStyle, textAlign: 'right' }}>
                             <button
-                              onClick={() => handleNavigate(6, { headName: head.name, householdNo: head.household_no })}
-                              className="inline-flex items-center gap-1 bg-white border border-gray-900 text-gray-900 px-3 py-1 text-xs font-medium uppercase"
+                              onClick={() => {
+                                if (navigatingId) return;
+                                handleNavigateStep(6, { headName: head.name, householdNo: head.household_no }, `h5-${head.household_no}`);
+                              }}
+                              disabled={navigatingId === `h5-${head.household_no}`}
+                              className="inline-flex items-center gap-1 bg-white border border-gray-900 text-gray-900 px-3 py-1 text-xs font-medium uppercase disabled:opacity-50"
                             >
                               View Family <ChevronRight size={13} />
                             </button>
@@ -948,19 +1136,116 @@ const Reports = ({ user }) => {
             {/* LEVEL 6: FAMILY MEMBERS TABLE (for both ward and group/village paths) */}
             {level === 6 && (
               <div>
-                {/* Delete confirmation modal */}
-                {deleteConfirmId && (
-                  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-                    <div className="bg-white border border-gray-200 p-6 w-80 shadow-lg">
-                      <p className="text-sm font-semibold text-gray-900 mb-2">Delete Member?</p>
-                      <p className="text-xs text-gray-500 mb-6">This will permanently remove this record from the database. This action cannot be undone.</p>
+                {/* ── EDIT REASON MODAL ── */}
+                {showEditReasonModal && (
+                  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+                    <div className="bg-white border border-gray-200 p-6 w-full max-w-md shadow-xl">
+                      <h4 className="text-sm font-bold text-gray-900 uppercase tracking-wide mb-1">Reason for Edit & PIN Verification</h4>
+                      <p className="text-xs text-gray-600 mb-4">
+                        You are modifying record details for <strong>{editForm.name}</strong> ({editForm.household_no}). Please state the reason and enter your authorization PIN.
+                      </p>
+                      <div className="mb-3">
+                        <label className="block text-[11px] font-semibold text-gray-700 uppercase tracking-wider mb-1">
+                          REASON FOR EDIT <span className="text-red-500">*</span>
+                        </label>
+                        <textarea
+                          rows={3}
+                          value={editReason}
+                          onChange={(e) => setEditReason(e.target.value)}
+                          placeholder="Enter detailed reason for modifying data (e.g. Name spelling correction, NRC update, etc.)"
+                          className="w-full p-2 text-xs border border-gray-300 outline-none focus:border-gray-900 font-sans"
+                          autoFocus
+                        />
+                      </div>
+                      <div className="mb-4">
+                        <label className="block text-[11px] font-semibold text-gray-700 uppercase tracking-wider mb-1">
+                          SECURITY AUTHORIZATION PIN <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="password"
+                          maxLength={6}
+                          value={editPin}
+                          onChange={(e) => { setEditPin(e.target.value); setEditPinError(''); }}
+                          placeholder="Enter 6-digit PIN code"
+                          className="w-full p-2 text-xs border border-gray-300 outline-none focus:border-gray-900 font-mono tracking-widest"
+                        />
+                        {editPinError && <p className="text-[11px] text-red-600 font-medium mt-1">{editPinError}</p>}
+                      </div>
                       <div className="flex gap-3 justify-end">
-                        <button onClick={cancelDelete} disabled={deleting} className="px-4 py-2 text-xs border border-gray-900 text-gray-900">
+                        <button
+                          type="button"
+                          onClick={cancelEdit}
+                          disabled={saving}
+                          className="px-4 py-2 text-xs border border-gray-300 text-gray-700 font-medium uppercase hover:bg-gray-50"
+                        >
                           Cancel
                         </button>
-                        <button onClick={doDelete} disabled={deleting} className="px-4 py-2 text-xs bg-red-600 text-white hover:bg-red-700 transition-colors flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={executeSaveEdit}
+                          disabled={saving || !editReason.trim() || !editPin.trim()}
+                          className="px-4 py-2 text-xs bg-gray-900 text-white font-medium uppercase hover:bg-gray-800 transition-colors flex items-center gap-1.5 disabled:opacity-50"
+                        >
+                          {saving ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
+                          {saving ? 'Saving...' : 'Confirm & Save'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* ── DELETE REASON MODAL ── */}
+                {deleteConfirmMember && (
+                  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+                    <div className="bg-white border border-gray-200 p-6 w-full max-w-md shadow-xl">
+                      <h4 className="text-sm font-bold text-red-600 uppercase tracking-wide mb-1">Reason for Deletion & PIN Verification</h4>
+                      <p className="text-xs text-gray-600 mb-4">
+                        You are about to delete record for <strong>{deleteConfirmMember.name}</strong> ({deleteConfirmMember.household_no}). Please state the reason and enter your authorization PIN.
+                      </p>
+                      <div className="mb-3">
+                        <label className="block text-[11px] font-semibold text-gray-700 uppercase tracking-wider mb-1">
+                          REASON FOR DELETION <span className="text-red-500">*</span>
+                        </label>
+                        <textarea
+                          rows={3}
+                          value={deleteReason}
+                          onChange={(e) => setDeleteReason(e.target.value)}
+                          placeholder="Enter reason for deletion (e.g. Duplicate record, Incorrect entry, Transferred out, etc.)"
+                          className="w-full p-2 text-xs border border-gray-300 outline-none focus:border-red-600 font-sans"
+                          autoFocus
+                        />
+                      </div>
+                      <div className="mb-4">
+                        <label className="block text-[11px] font-semibold text-gray-700 uppercase tracking-wider mb-1">
+                          SECURITY AUTHORIZATION PIN <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="password"
+                          maxLength={6}
+                          value={deletePin}
+                          onChange={(e) => { setDeletePin(e.target.value); setDeletePinError(''); }}
+                          placeholder="Enter 6-digit PIN code"
+                          className="w-full p-2 text-xs border border-gray-300 outline-none focus:border-red-600 font-mono tracking-widest"
+                        />
+                        {deletePinError && <p className="text-[11px] text-red-600 font-medium mt-1">{deletePinError}</p>}
+                      </div>
+                      <div className="flex gap-3 justify-end">
+                        <button
+                          type="button"
+                          onClick={cancelDelete}
+                          disabled={deleting}
+                          className="px-4 py-2 text-xs border border-gray-300 text-gray-700 font-medium uppercase hover:bg-gray-50"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          onClick={doDelete}
+                          disabled={deleting || !deleteReason.trim() || !deletePin.trim()}
+                          className="px-4 py-2 text-xs bg-red-600 text-white font-medium uppercase hover:bg-red-700 transition-colors flex items-center gap-1.5 disabled:opacity-50"
+                        >
                           {deleting ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
-                          {deleting ? 'Deleting...' : 'Delete'}
+                          {deleting ? 'Deleting...' : 'Confirm & Delete'}
                         </button>
                       </div>
                     </div>
@@ -1025,7 +1310,7 @@ const Reports = ({ user }) => {
                               <td style={{ padding: '7px 6px', whiteSpace: 'nowrap', textAlign: 'center' }}>
                                 {isEditing ? (
                                   <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
-                                    <button onClick={saveEdit} disabled={saving} style={{ padding: '3px 8px', border: '1px solid #1A1A1A', background: '#1A1A1A', color: '#fff', cursor: 'pointer', fontSize: '10px', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                    <button onClick={initiateSaveEdit} disabled={saving} style={{ padding: '3px 8px', border: '1px solid #1A1A1A', background: '#1A1A1A', color: '#fff', cursor: 'pointer', fontSize: '10px', display: 'flex', alignItems: 'center', gap: '3px' }}>
                                       {saving ? <Loader2 size={9} className="animate-spin" /> : <Check size={9} />} Save
                                     </button>
                                     <button onClick={cancelEdit} style={{ padding: '3px 8px', border: '1px solid #D1D5DB', background: '#fff', cursor: 'pointer', fontSize: '10px', display: 'flex', alignItems: 'center', gap: '3px' }}>
@@ -1039,7 +1324,7 @@ const Reports = ({ user }) => {
                                       onMouseLeave={e => { e.currentTarget.style.borderColor = '#D1D5DB'; e.currentTarget.style.color = '#6B7280'; }}>
                                       <Pencil size={10} />
                                     </button>
-                                    <button onClick={() => confirmDelete(member.id)} title="Delete" style={{ padding: '3px 6px', border: '1px solid #D1D5DB', background: '#fff', cursor: 'pointer', color: '#9CA3AF', fontSize: '10px' }}
+                                    <button onClick={() => confirmDelete(member)} title="Delete" style={{ padding: '3px 6px', border: '1px solid #D1D5DB', background: '#fff', cursor: 'pointer', color: '#9CA3AF', fontSize: '10px' }}
                                       onMouseEnter={e => { e.currentTarget.style.borderColor = '#EF4444'; e.currentTarget.style.color = '#EF4444'; }}
                                       onMouseLeave={e => { e.currentTarget.style.borderColor = '#D1D5DB'; e.currentTarget.style.color = '#9CA3AF'; }}>
                                       <Trash2 size={10} />

@@ -8,15 +8,15 @@ const SKIP_OTP = false;  // ← set false to re-enable OTP
 
 const Login = ({ onLogin }) => {
   // Step 1: username+PIN  →  Step 2: email OTP
-  const [step, setStep]           = useState(1);
-  const [formData, setFormData]   = useState({ username: '', pinCode: '' });
-  const [showPin, setShowPin]     = useState(false);
-  const [otp, setOtp]             = useState(['', '', '', '', '', '']);
-  const [error, setError]         = useState('');
-  const [loading, setLoading]     = useState(false);
+  const [step, setStep] = useState(1);
+  const [formData, setFormData] = useState({ username: '', pinCode: '' });
+  const [showPin, setShowPin] = useState(false);
+  const [otp, setOtp] = useState(['', '', '', '', '', '']);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const [maskedEmail, setMaskedEmail] = useState('');
   const [pendingUser, setPendingUser] = useState(null); // holds authData after PIN success
-  const [cooldown, setCooldown]   = useState(0);
+  const [cooldown, setCooldown] = useState(0);
   const otpRefs = useRef([]);
   const cooldownRef = useRef(null);
 
@@ -97,7 +97,7 @@ const Login = ({ onLogin }) => {
         try {
           const body = await otpFnError.context?.json?.();
           if (body?.error) msg = body.error;
-        } catch {}
+        } catch { }
         throw new Error(msg);
       }
       if (otpResult?.error) throw new Error(otpResult.error);
@@ -161,7 +161,14 @@ const Login = ({ onLogin }) => {
       const { data: verifyResult, error: verifyFnError } = await supabase.functions.invoke('verify-otp', {
         body: { user_id: pendingUser.authData.user.id, code: token },
       });
-      if (verifyFnError) throw new Error(verifyFnError.message || 'Verification failed.');
+      if (verifyFnError) {
+        let msg = 'Verification failed.';
+        try {
+          const body = await verifyFnError.context?.json?.();
+          if (body?.error) msg = body.error;
+        } catch { }
+        throw new Error(msg);
+      }
       if (verifyResult?.error) throw new Error(verifyResult.error);
 
       // Stamp last_seen_at
@@ -233,7 +240,7 @@ const Login = ({ onLogin }) => {
   return (
     <div className="login-wrapper" style={{
       minHeight: '100vh', width: '100%', flex: 1,
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
       backgroundColor: 'transparent', padding: '1rem',
       fontFamily: "Inter, 'Pyidaungsu', system-ui, sans-serif",
     }}>
@@ -402,7 +409,7 @@ const Login = ({ onLogin }) => {
             </div>
 
             <div style={{ display: 'flex', gap: '8px' }}>
-              <button type="button" onClick={() => { setStep(1); setOtp(['','','','','','']); setError(''); }}
+              <button type="button" onClick={() => { setStep(1); setOtp(['', '', '', '', '', '']); setError(''); }}
                 style={{ ...submitBtn(false), width: 'auto', padding: '1rem 1.25rem', backgroundColor: 'white', color: '#1A1A1A', border: '1px solid #E5E7EB' }}>
                 <ArrowLeft size={16} />
               </button>
@@ -420,9 +427,13 @@ const Login = ({ onLogin }) => {
         <div style={{
           padding: '1.25rem 2rem', borderTop: '1px solid #F3F4F6',
           textAlign: 'center', backgroundColor: '#FAFAFA',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px'
         }}>
           <p style={{ fontSize: '0.75rem', color: '#6B7280', margin: 0, lineHeight: 1.5 }}>
             Ta'ang Population System
+          </p>
+          <p style={{ fontSize: '0.68rem', color: '#737373', margin: 0, letterSpacing: '0.03em', fontWeight: '500' }}>
+            Powered by <span style={{ color: '#1A1A1A', fontWeight: '700' }}>Mai Naung Naung &amp; Mai Nay Lin</span>
           </p>
         </div>
       </div>
@@ -432,8 +443,8 @@ const Login = ({ onLogin }) => {
         input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
         input[type=number] { -moz-appearance: textfield; }
         @media (max-width: 480px) {
-          .login-wrapper { padding: 0 !important; background-color: white !important; align-items: flex-start !important; }
-          .login-card { max-width: 100% !important; min-height: 100vh !important; border: none !important; box-shadow: none !important; }
+          .login-wrapper { padding: 12px !important; background-color: #FAFAFA !important; align-items: center !important; justify-content: center !important; }
+          .login-card { max-width: 100% !important; min-height: auto !important; border: 1px solid #E5E7EB !important; box-shadow: 0 4px 12px rgba(0,0,0,0.05) !important; }
         }
       `}</style>
     </div>

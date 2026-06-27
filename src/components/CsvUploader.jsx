@@ -792,6 +792,55 @@ const validateHouseholdIDRequirements = (data) => {
   return [];
 };
 
+// Audio chime notifications for upload success and validation errors using Web Audio API
+export const playUploadSuccessSound = () => {
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    
+    const notes = [523.25, 659.25, 783.99];
+    notes.forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, ctx.currentTime + i * 0.09);
+      gain.gain.setValueAtTime(0.18, ctx.currentTime + i * 0.09);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.09 + 0.2);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(ctx.currentTime + i * 0.09);
+      osc.stop(ctx.currentTime + i * 0.09 + 0.2);
+    });
+  } catch (e) {
+    console.warn('Audio playback error:', e);
+  }
+};
+
+export const playUploadFailureSound = () => {
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+
+    const notes = [174.61, 138.59];
+    notes.forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(freq, ctx.currentTime + i * 0.12);
+      gain.gain.setValueAtTime(0.2, ctx.currentTime + i * 0.12);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.12 + 0.25);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(ctx.currentTime + i * 0.12);
+      osc.stop(ctx.currentTime + i * 0.12 + 0.25);
+    });
+  } catch (e) {
+    console.warn('Audio playback error:', e);
+  }
+};
+
 // Shared: run validation + Supabase upsert for a flat array of parsed rows
 const processAndUpload = async (formattedData, setValidationErrors, setShowModal, setLoading, setSuccessMsg, onUploadSuccess, fileInputRef, setProgress) => {
   const errorsFound = [];
@@ -903,6 +952,7 @@ const processAndUpload = async (formattedData, setValidationErrors, setShowModal
     setValidationErrors(errorsFound);
     setShowModal(true);
     setLoading(false);
+    playUploadFailureSound();
     if (fileInputRef.current) fileInputRef.current.value = '';
     return;
   }
@@ -1024,11 +1074,14 @@ const processAndUpload = async (formattedData, setValidationErrors, setShowModal
   const msg = parts.join(' | ') || 'No changes made.';
   setSuccessMsg(msg);
   if (successCount > 0) {
+    playUploadSuccessSound();
     pushNotification({
       type: NOTIF_TYPES.UPLOAD,
       title: 'Upload Complete',
       message: msg,
     });
+  } else if (dbErrors.length > 0) {
+    playUploadFailureSound();
   }
   if (onUploadSuccess && successCount > 0) onUploadSuccess();
   setLoading(false);
@@ -1054,7 +1107,19 @@ const CsvUploader = ({ onUploadSuccess }) => {
         const rawParsed = JSON.parse(e.target.result);
         // Recursively convert every Myanmar string to Unicode before processing
         const parsed = deepEnsureUnicode(rawParsed);
-        const households = Array.isArray(parsed) ? parsed : [parsed];
+        
+        let households = [];
+        if (Array.isArray(parsed)) {
+          households = parsed;
+        } else if (parsed && Array.isArray(parsed.households)) {
+          households = parsed.households;
+        } else if (parsed && Array.isArray(parsed.data)) {
+          households = parsed.data;
+        } else if (parsed && Array.isArray(parsed.records)) {
+          households = parsed.records;
+        } else if (parsed) {
+          households = [parsed];
+        }
 
         // Helper: normalize whitespace + ensure Unicode in one step.
         const norm = (v) => normalizeWhitespace(ensureUnicode(v || ''));
@@ -1062,29 +1127,60 @@ const CsvUploader = ({ onUploadSuccess }) => {
         const formattedData = [];
         for (const hh of households) {
           const hhId = hh.household_id || hh.household_no || 'UNKNOWN';
-          const loc = hh.location || {};
-          const members = Array.isArray(hh.members) ? hh.members : [];
-          for (const m of members) {
+          const loc = hh.location || {
+            house_no: hh.house_no,
+            ward_village: hh.ward_village_group || hh.ward_village,
+            township: hh.township,
+            district: hh.district
+          };
+          const members = Array.isArray(hh.members) ? hh.members : (Array.isArray(hh.family_members) ? hh.family_members : []);
+          
+          if (members.length > 0) {
+            for (const m of members) {
+              formattedData.push({
+                household_no: formatHouseholdNo(norm(hhId)),
+                name: norm(m.name),
+                date_of_birth: normalizeDateOfBirth(m.dob || m.date_of_birth),
+                gender: norm(m.gender),
+                fathers_name: norm(m.fathers_name || m.father_name),
+                mothers_name: norm(m.mothers_name || m.mother_name),
+                household_relationship: norm(m.relationship || m.household_relationship),
+                occupation: norm(m.occupation),
+                previous_id_no: normalizePreviousId(ensureUnicode(m.previous_id_no || m.nrc || '')),
+                taang_land_id_no: normalizeTaangLandId(m.taang_land_id_no || ''),
+                nationality: norm(m.nationality),
+                resident_status: norm(m.resident_status),
+                religious: norm(m.religious),
+                house_no: norm(loc.house_no || m.house_no),
+                ward_village_group: normalizeCommaList(norm(loc.ward_village || loc.ward_village_group || m.ward_village_group)),
+                township: autoCorrectTownship(norm(loc.township || m.township)),
+                district: autoCorrectDistrict(norm(loc.district || m.district)),
+                submission_date: normalizeWhitespace(m.submission_date),
+                address: norm(`${loc.house_no || m.house_no || ''}, ${loc.ward_village || m.ward_village_group || ''}, ${loc.township || m.township || ''}, ${loc.district || m.district || ''}`),
+              });
+            }
+          } else if (hh.name && (hh.household_no || hh.household_id)) {
+            // Flat member record
             formattedData.push({
-              household_no: formatHouseholdNo(norm(hhId)),
-              name: norm(m.name),
-              date_of_birth: normalizeDateOfBirth(m.dob || m.date_of_birth),
-              gender: norm(m.gender),
-              fathers_name: norm(m.fathers_name),
-              mothers_name: norm(m.mothers_name),
-              household_relationship: norm(m.relationship || m.household_relationship),
-              occupation: norm(m.occupation),
-              previous_id_no: normalizePreviousId(ensureUnicode(m.previous_id_no || '')),
-              taang_land_id_no: normalizeTaangLandId(m.taang_land_id_no || ''),
-              nationality: norm(m.nationality),
-              resident_status: norm(m.resident_status),
-              religious: norm(m.religious),
-              house_no: norm(loc.house_no || m.house_no),
-              ward_village_group: normalizeCommaList(norm(loc.ward_village || loc.ward_village_group || m.ward_village_group)),
-              township: autoCorrectTownship(norm(loc.township || m.township)),
-              district: autoCorrectDistrict(norm(loc.district || m.district)),
-              submission_date: normalizeWhitespace(m.submission_date),
-              address: norm(`${loc.house_no || ''}, ${loc.ward_village || ''}, ${loc.township || ''}, ${loc.district || ''}`),
+              household_no: formatHouseholdNo(norm(hh.household_no || hh.household_id)),
+              name: norm(hh.name),
+              date_of_birth: normalizeDateOfBirth(hh.dob || hh.date_of_birth),
+              gender: norm(hh.gender),
+              fathers_name: norm(hh.fathers_name || hh.father_name),
+              mothers_name: norm(hh.mothers_name || hh.mother_name),
+              household_relationship: norm(hh.relationship || hh.household_relationship),
+              occupation: norm(hh.occupation),
+              previous_id_no: normalizePreviousId(ensureUnicode(hh.previous_id_no || hh.nrc || '')),
+              taang_land_id_no: normalizeTaangLandId(hh.taang_land_id_no || ''),
+              nationality: norm(hh.nationality),
+              resident_status: norm(hh.resident_status),
+              religious: norm(hh.religious),
+              house_no: norm(loc.house_no || hh.house_no),
+              ward_village_group: normalizeCommaList(norm(loc.ward_village || loc.ward_village_group || hh.ward_village_group)),
+              township: autoCorrectTownship(norm(loc.township || hh.township)),
+              district: autoCorrectDistrict(norm(loc.district || hh.district)),
+              submission_date: normalizeWhitespace(hh.submission_date),
+              address: norm(`${loc.house_no || hh.house_no || ''}, ${loc.ward_village || hh.ward_village_group || ''}, ${loc.township || hh.township || ''}, ${loc.district || hh.district || ''}`),
             });
           }
         }
@@ -1113,6 +1209,7 @@ const CsvUploader = ({ onUploadSuccess }) => {
         );
       } catch (err) {
         console.error('JSON upload error:', err);
+        playUploadFailureSound();
         alert(err.message || 'Failed to parse JSON file.');
         setLoading(false);
         if (fileInputRef.current) fileInputRef.current.value = '';
@@ -1484,8 +1581,14 @@ const CsvUploader = ({ onUploadSuccess }) => {
           <Upload size={24} />
         </div>
         <div>
-          <h2 className="text-xl font-bold text-[#1A1A1A]">Bulk Upload Households (Excel / CSV / JSON)</h2>
-          <p className="text-sm text-[#737373]">Upload an Excel workbook, CSV file, or a previously exported JSON backup.</p>
+          <h2 className="text-[#1A1A1A]">
+            <span className="hidden sm:inline text-xl font-bold">Bulk Upload Households (Excel / CSV / JSON)</span>
+            <span className="inline sm:hidden text-base font-bold">Bulk Upload Households</span>
+          </h2>
+          <p className="text-sm text-[#737373]">
+            <span className="hidden sm:inline">Upload an Excel workbook, CSV file, or a previously exported JSON backup.</span>
+            <span className="inline sm:hidden">Upload Excel, CSV, or JSON backup file.</span>
+          </p>
         </div>
       </div>
 
@@ -1498,7 +1601,10 @@ const CsvUploader = ({ onUploadSuccess }) => {
               <FileSpreadsheet size={28} className="text-[#737373]" />
               <FileJson size={28} className="text-[#737373]" />
             </div>
-            <p className="text-sm text-[#737373] font-medium">Click to upload or drag and drop</p>
+            <p className="text-sm text-[#737373] font-medium">
+              <span className="hidden sm:inline">Click to upload or drag and drop</span>
+              <span className="inline sm:hidden">Tap to upload file</span>
+            </p>
             <p className="text-xs text-[#737373]">.XLSX, .XLS, .CSV, or .JSON files</p>
           </div>
           <input

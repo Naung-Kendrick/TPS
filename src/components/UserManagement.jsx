@@ -311,9 +311,9 @@ const UserManagement = ({ user }) => {
                   onChange={e => setFilterRole(e.target.value)}
                   className="pl-2 pr-6 py-1.5 border border-gray-200 text-[11px] text-gray-700 bg-white focus:outline-none focus:border-gray-900 appearance-none cursor-pointer"
                 >
-                  <option value="all">All Roles</option>
+                  <option value="all" style={{ backgroundColor: '#FFFFFF', color: '#1A1A1A' }}>All Roles</option>
                   {Object.entries(ROLE_LABELS).map(([k, v]) => (
-                    <option key={k} value={k}>{v.label}</option>
+                    <option key={k} value={k} style={{ backgroundColor: '#FFFFFF', color: '#1A1A1A' }}>{v.label}</option>
                   ))}
                 </select>
                 <ChevronDown size={10} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
@@ -852,10 +852,10 @@ const UserManagement = ({ user }) => {
                       name="role" value={formData.role} onChange={handleChange}
                       className="w-full px-3 py-2.5 bg-white border border-gray-200 focus:outline-none focus:border-gray-900 transition-colors text-sm appearance-none cursor-pointer"
                     >
-                      <option value="field">Field Staff</option>
-                      <option value="ops">Operations</option>
-                      <option value="regional">Regional Admin</option>
-                      <option value="system">System Admin</option>
+                      <option value="field" style={{ backgroundColor: '#FFFFFF', color: '#1A1A1A' }}>Field Staff</option>
+                      <option value="ops" style={{ backgroundColor: '#FFFFFF', color: '#1A1A1A' }}>Operations</option>
+                      <option value="regional" style={{ backgroundColor: '#FFFFFF', color: '#1A1A1A' }}>Regional Admin</option>
+                      <option value="system" style={{ backgroundColor: '#FFFFFF', color: '#1A1A1A' }}>System Admin</option>
                     </select>
                   </div>
 

@@ -836,7 +836,7 @@ export const printStatistics = ({
     .header .center { flex: 1; text-align: center; }
     .header .center .org { font-size: 11px; font-weight: 700; letter-spacing: 0.4px; }
     .header .center .dept { font-size: 9px; margin-top: 1px; }
-    .header .center .doc-title { font-size: 9px; margin-top: 2px; font-style: italic; color: #333; }
+    .header .center .doc-title { font-size: 9px; margin-top: 2px; color: #333; }
     .header .flag { width: 44px; flex: 0 0 44px; text-align: right; }
     .header .flag img { width: 38px; height: auto; border: 1px solid #000; }
     .rule { border-top: 1px solid #000; border-bottom: 1px solid #000; height: 2px; margin: 0 0 4px; }
@@ -1157,7 +1157,7 @@ export const printDemographicDashboard = ({
     .header .center { flex: 1; text-align: center; }
     .header .center .org  { font-size: 11px; font-weight: 700; letter-spacing: 0.4px; }
     .header .center .dept { font-size: 9px; margin-top: 1px; }
-    .header .center .doc-title { font-size: 9px; margin-top: 2px; font-style: italic; color: #333; }
+    .header .center .doc-title { font-size: 9px; margin-top: 2px; color: #333; }
     .header .flag { width: 44px; flex: 0 0 44px; text-align: right; }
     .header .flag img { width: 38px; height: auto; border: 1px solid #000; }
     .rule { border-top: 1px solid #000; border-bottom: 1px solid #000; height: 2px; margin: 0 0 4px; }

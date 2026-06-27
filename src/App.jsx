@@ -2,6 +2,7 @@ import { Suspense, lazy, useState, useEffect } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import Layout from './components/layout/Layout'
 import { supabase } from './lib/supabase'
+import IntroAnimation from './components/IntroAnimation'
 import './App.css'
 
 // Route-level code splitting — each page is a separate JS chunk
@@ -15,6 +16,7 @@ const IDCardScanner      = lazy(() => import('./components/IDCardScanner'))
 const Login              = lazy(() => import('./components/Login'))
 const UserManagement     = lazy(() => import('./components/UserManagement'))
 const NotificationsRequests = lazy(() => import('./components/NotificationsRequests'))
+const DatabaseBackup        = lazy(() => import('./components/DatabaseBackup'))
 
 const PageFallback = () => (
   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
@@ -49,6 +51,11 @@ const Placeholder = ({ title }) => (
 
 function App() {
   const [user, setUser] = useState(null);
+  const [introShown, setIntroShown] = useState(false);
+
+  const handleIntroDone = () => {
+    setIntroShown(true);
+  };
 
   const handleLogin = (data) => {
     setUser(data);
@@ -95,12 +102,15 @@ function App() {
   // Gate: Username + PIN + Email OTP login
   if (!user) {
     return (
-      <Suspense fallback={<PageFallback />}>
-        <Routes>
-          <Route path="/login" element={<Login onLogin={handleLogin} />} />
-          <Route path="*" element={<Navigate to="/login" replace />} />
-        </Routes>
-      </Suspense>
+      <>
+        {!introShown && <IntroAnimation onDone={handleIntroDone} />}
+        <Suspense fallback={<PageFallback />}>
+          <Routes>
+            <Route path="/login" element={<Login onLogin={handleLogin} />} />
+            <Route path="*" element={<Navigate to="/login" replace />} />
+          </Routes>
+        </Suspense>
+      </>
     );
   }
 
@@ -125,6 +135,11 @@ function App() {
             : <Navigate to="/verification" replace />
         } />
         <Route path="notifications-requests" element={<Suspense fallback={<PageFallback />}><NotificationsRequests user={user} /></Suspense>} />
+        <Route path="backup" element={
+          ((user?.role === 'system' || user?.role === 'master') && (user?.access_level || user?.profile?.access_level) === 'central')
+            ? <Suspense fallback={<PageFallback />}><DatabaseBackup user={user} /></Suspense>
+            : <Navigate to="/verification" replace />
+        } />
         <Route path="*" element={<Navigate to="/verification" replace />} />
       </Route>
       <Route path="/login" element={<Navigate to="/verification" replace />} />

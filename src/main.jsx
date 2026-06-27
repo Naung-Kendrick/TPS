@@ -33,7 +33,7 @@ window.addEventListener('online', () => {
 });
 
 window.addEventListener('offline', () => {
-  pushNotification({ type: NOTIF_TYPES.OFFLINE, title: 'Gone Offline', message: 'No internet connection. Data will be saved locally and synced when online.' });
+  // Offline notification disabled per user request
 });
 
 ReactDOM.createRoot(document.getElementById('root')).render(

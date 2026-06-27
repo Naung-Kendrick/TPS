@@ -1,6 +1,117 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { Pencil, Trash2, ChevronDown } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { enqueue } from '../lib/retryQueue';
+import EditHouseholdModal from './EditHouseholdModal';
+
+// ─── Custom Responsive Form Dropdown Selector ─────────────────────
+const FormCustomSelect = ({ name, value, onChange, options, placeholder, style }) => {
+  const [open, setOpen] = useState(false);
+  const ref = React.useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    document.addEventListener('touchstart', handler);
+    return () => {
+      document.removeEventListener('mousedown', handler);
+      document.removeEventListener('touchstart', handler);
+    };
+  }, [open]);
+
+  const selectedItem = options.find(o => (typeof o === 'object' ? o.value === value : o === value));
+  const selectedLabel = selectedItem ? (typeof selectedItem === 'object' ? selectedItem.label : selectedItem) : placeholder;
+
+  return (
+    <div ref={ref} style={{ position: 'relative', width: '100%', ...style }}>
+      <button
+        type="button"
+        onClick={() => setOpen(v => !v)}
+        style={{
+          width: '100%',
+          height: '30px',
+          padding: '0 10px',
+          marginTop: '3px',
+          borderRadius: '0px',
+          border: '1px solid #E5E7EB',
+          fontSize: '11px',
+          fontFamily: "Inter, 'Pyidaungsu', sans-serif",
+          backgroundColor: '#FFFFFF',
+          boxSizing: 'border-box',
+          color: value ? '#1A1A1A' : '#737373',
+          lineHeight: '1.2',
+          textAlign: 'left',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          cursor: 'pointer',
+        }}
+      >
+        <span style={{ fontSize: '11px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {selectedLabel}
+        </span>
+        <ChevronDown size={12} color="#737373" style={{ flexShrink: 0, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 150ms' }} />
+      </button>
+
+      {open && (
+        <div style={{
+          position: 'absolute',
+          top: 'calc(100% + 2px)',
+          left: 0, right: 0,
+          backgroundColor: '#FFFFFF',
+          border: '1px solid #1A1A1A',
+          boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+          maxHeight: '220px',
+          overflowY: 'auto',
+          zIndex: 999,
+          borderRadius: '0px',
+        }}>
+          {placeholder && (
+            <div
+              onClick={() => { onChange({ target: { name, value: '' } }); setOpen(false); }}
+              style={{
+                padding: '10px 12px',
+                fontSize: '12px',
+                color: !value ? '#FFFFFF' : '#1A1A1A',
+                backgroundColor: !value ? '#1A1A1A' : '#FFFFFF',
+                fontWeight: !value ? '600' : '400',
+                cursor: 'pointer',
+                borderBottom: '1px solid #F3F4F6',
+              }}
+            >
+              {placeholder}
+            </div>
+          )}
+          {options.map(opt => {
+            const optVal = typeof opt === 'object' ? opt.value : opt;
+            const optLbl = typeof opt === 'object' ? opt.label : opt;
+            const isSelected = value === optVal;
+            return (
+              <div
+                key={optVal}
+                onClick={() => { onChange({ target: { name, value: optVal } }); setOpen(false); }}
+                style={{
+                  padding: '10px 12px',
+                  fontSize: '12px',
+                  color: isSelected ? '#FFFFFF' : '#1A1A1A',
+                  backgroundColor: isSelected ? '#1A1A1A' : '#FFFFFF',
+                  fontWeight: isSelected ? '600' : '400',
+                  cursor: 'pointer',
+                  borderBottom: '1px solid #F9FAFB',
+                }}
+              >
+                {optLbl}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
 
 const MyanmarCalendar = ({ value, onChange }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -82,13 +193,13 @@ const MyanmarCalendar = ({ value, onChange }) => {
       <div 
         onClick={() => setIsOpen(!isOpen)}
         style={{
-          width: '100%', height: '28px', padding: '0 10px', borderRadius: '0px', border: '1px solid #E5E7EB',
+          width: '100%', height: '30px', padding: '0 10px', borderRadius: '0px', border: '1px solid #E5E7EB',
           fontSize: '11px', marginTop: '3px', boxSizing: 'border-box',
           fontFamily: "Inter, 'Pyidaungsu', sans-serif", backgroundColor: '#FFFFFF', cursor: 'pointer',
           display: 'flex', justifyContent: 'space-between', alignItems: 'center'
         }}
       >
-        <span style={{ color: value ? '#1A1A1A' : '#737373' }}>
+        <span style={{ fontSize: '11px', color: value ? '#1A1A1A' : '#737373' }}>
           {value || 'Select Date'}
         </span>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: '#737373' }}>
@@ -272,6 +383,9 @@ const HouseholdForm = ({ user }) => {
   const [isCustomReligion, setIsCustomReligion] = useState(false);
   
   const [totalFamilyMembers, setTotalFamilyMembers] = useState(0);
+  const [familyRoster, setFamilyRoster] = useState([]);
+  const [editingMember, setEditingMember] = useState(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [viewFamilyModalOpen, setViewFamilyModalOpen] = useState(false);
   const [viewFamilyData, setViewFamilyData] = useState([]);
   const [viewFamilyLoading, setViewFamilyLoading] = useState(false);
@@ -324,31 +438,40 @@ const HouseholdForm = ({ user }) => {
     setDob(prev => ({ ...prev, [name]: value }));
   }, []);
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (formData.household_no) {
-        fetchFamilyCount(formData.household_no);
-      } else {
-        setTotalFamilyMembers(0);
-      }
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [formData.household_no]);
-
-  const fetchFamilyCount = async (householdNo) => {
+  const fetchFamilyRoster = useCallback(async (householdNo) => {
+    if (!householdNo) {
+      setFamilyRoster([]);
+      setTotalFamilyMembers(0);
+      return;
+    }
     try {
-      const { count, error } = await supabase
+      const normalizedHn = normalizeHouseholdNo(householdNo);
+      const { data, error } = await supabase
         .from('households')
-        .select('*', { count: 'exact', head: true })
-        .eq('household_no', householdNo);
+        .select('*')
+        .ilike('household_no', `%${normalizedHn}%`)
+        .order('created_at', { ascending: true });
         
-      if (!error && count !== null) {
-        setTotalFamilyMembers(count);
+      if (!error && data) {
+        setFamilyRoster(data);
+        setTotalFamilyMembers(data.length);
       }
     } catch (err) {
       console.error(err);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (formData.household_no) {
+        fetchFamilyRoster(formData.household_no);
+      } else {
+        setFamilyRoster([]);
+        setTotalFamilyMembers(0);
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [formData.household_no, fetchFamilyRoster]);
 
   const handleViewFamily = async (householdNo) => {
     setViewFamilyModalOpen(true);
@@ -679,8 +802,8 @@ const HouseholdForm = ({ user }) => {
       setIsCustomRelationship(false);
       setIsCustomReligion(false);
       setDob({ day: '', month: '', year: '' });
-      setSubmittedMembers(prev => [...prev, formData]);
-      fetchFamilyCount(formData.household_no);
+      setSubmittedMembers(prev => [...prev, payload]);
+      fetchFamilyRoster(payload.household_no);
       localStorage.removeItem(DRAFT_KEY);
       
       if (mode === 'SAME_HOUSEHOLD') {
@@ -717,7 +840,7 @@ const HouseholdForm = ({ user }) => {
 
   const inputStyle = useMemo(() => ({
     width: '100%',
-    height: '28px',
+    height: '30px',
     padding: '0 10px',
     borderRadius: '0px',
     border: '1px solid #E5E7EB',
@@ -768,6 +891,40 @@ const HouseholdForm = ({ user }) => {
   };
 
   const tdMonoS = { ...tdStyle, fontFamily: 'var(--font-mono)' };
+
+  const rosterThStyle = {
+    padding: '10px 12px',
+    textAlign: 'left',
+    fontSize: '10px',
+    fontWeight: '700',
+    color: '#6B7280',
+    textTransform: 'uppercase',
+    letterSpacing: '0.04em',
+    whiteSpace: 'nowrap',
+    borderBottom: '1px solid #E5E7EB',
+  };
+
+  const rosterTdStyle = {
+    padding: '10px 12px',
+    fontSize: '12px',
+    color: '#111827',
+    whiteSpace: 'nowrap',
+    verticalAlign: 'middle',
+  };
+
+  const handleDeleteMember = async (id, name) => {
+    if (!window.confirm(`Are you sure you want to delete ${name || 'this member'}?`)) return;
+    try {
+      const { error } = await supabase.from('households').delete().eq('id', id);
+      if (!error) {
+        fetchFamilyRoster(formData.household_no);
+      } else {
+        alert('Failed to delete: ' + error.message);
+      }
+    } catch (err) {
+      alert('Error deleting: ' + err.message);
+    }
+  };
 
   const [formOpen, setFormOpen] = useState(false);
 
@@ -828,28 +985,42 @@ const HouseholdForm = ({ user }) => {
       <div style={{ ...groupStyle, gridColumn: 'span 1' }}>
         <label style={labelStyle}>DATE OF BIRTH</label>
         <div style={{ display: 'flex', gap: '6px' }}>
-          <select name="day" value={dob.day} onChange={handleDobChange} style={{ ...inputStyle, flex: '0 0 28%', fontFamily: 'var(--font-mono)' }}>
-            <option value="">Day</option>
-            {days.map(d => <option key={d} value={d}>{d}</option>)}
-          </select>
-          <select name="month" value={dob.month} onChange={handleDobChange} style={{ ...inputStyle, flex: '0 0 40%' }}>
-            <option value="">Month</option>
-            {months.map((m, i) => <option key={m} value={toMyanmarNum(i + 1)}>{toMyanmarNum(i + 1)}</option>)}
-          </select>
-          <select name="year" value={dob.year} onChange={handleDobChange} style={{ ...inputStyle, flex: '1 1 0', fontFamily: 'var(--font-mono)' }}>
-            <option value="">Year</option>
-            {years.map(y => <option key={y} value={y}>{y}</option>)}
-          </select>
+          <FormCustomSelect
+            name="day"
+            value={dob.day}
+            onChange={handleDobChange}
+            options={days}
+            placeholder="Day"
+            style={{ flex: '0 0 28%' }}
+          />
+          <FormCustomSelect
+            name="month"
+            value={dob.month}
+            onChange={handleDobChange}
+            options={months.map((m, i) => ({ value: toMyanmarNum(i + 1), label: toMyanmarNum(i + 1) }))}
+            placeholder="Month"
+            style={{ flex: '0 0 38%' }}
+          />
+          <FormCustomSelect
+            name="year"
+            value={dob.year}
+            onChange={handleDobChange}
+            options={years}
+            placeholder="Year"
+            style={{ flex: '1 1 0' }}
+          />
         </div>
       </div>
 
       <div style={{ ...groupStyle, gridColumn: 'span 1' }}>
         <label style={labelStyle}>GENDER</label>
-        <select name="gender" value={formData.gender} onChange={handleChange} style={inputStyle}>
-          <option value="">Select Gender</option>
-          <option value="ကျား">Male</option>
-          <option value="မ">Female</option>
-        </select>
+        <FormCustomSelect
+          name="gender"
+          value={formData.gender}
+          onChange={handleChange}
+          options={['ကျား', 'မ']}
+          placeholder="Select Gender"
+        />
       </div>
 
       <div style={{ ...groupStyle, gridColumn: 'span 1' }}>
@@ -864,7 +1035,7 @@ const HouseholdForm = ({ user }) => {
 
       <div style={{ ...groupStyle, gridColumn: 'span 1' }}>
         <label style={labelStyle}>RELATIONSHIP TO HEAD</label>
-        <select
+        <FormCustomSelect
           name="household_relationship"
           value={isCustomRelationship ? "other" : formData.household_relationship}
           onChange={(e) => {
@@ -876,17 +1047,17 @@ const HouseholdForm = ({ user }) => {
               handleChange(e);
             }
           }}
-          style={inputStyle}
-        >
-          <option value="">Select Relationship</option>
-          <option value="ဦးစီး">Head</option>
-          <option value="ဇနီး">Wife</option>
-          <option value="သား">Son</option>
-          <option value="သမီး">Daughter</option>
-          <option value="ချွေးမ">Daughter-in-law</option>
-          <option value="မြေး">Grandchild</option>
-          <option value="other">Other...</option>
-        </select>
+          options={[
+            { value: 'ဦးစီး', label: 'ဦးစီး' },
+            { value: 'ဇနီး', label: 'ဇနီး' },
+            { value: 'သား', label: 'သား' },
+            { value: 'သမီး', label: 'သမီး' },
+            { value: 'ချွေးမ', label: 'ချွေးမ' },
+            { value: 'မြေး', label: 'မြေး' },
+            { value: 'other', label: 'အခြား...' }
+          ]}
+          placeholder="Select Relationship"
+        />
         {isCustomRelationship && (
           <input type="text" name="household_relationship" value={formData.household_relationship} onChange={handleChange} placeholder="Enter relationship" style={{ ...inputStyle, marginTop: '8px' }} autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} autoFocus />
         )}
@@ -930,16 +1101,18 @@ const HouseholdForm = ({ user }) => {
 
       <div style={{ ...groupStyle, gridColumn: 'span 1' }}>
         <label style={labelStyle}>RESIDENT STATUS</label>
-        <select name="resident_status" value={formData.resident_status} onChange={handleChange} style={inputStyle}>
-          <option value="">Select status</option>
-          <option value="တအာင်း">တအာင်း</option>
-          <option value="ပြည်နယ်ခြားသား">ပြည်နယ်ခြားသား</option>
-        </select>
+        <FormCustomSelect
+          name="resident_status"
+          value={formData.resident_status}
+          onChange={handleChange}
+          options={['တအာင်း', 'ပြည်နယ်ခြားသား']}
+          placeholder="Select Resident Status"
+        />
       </div>
 
       <div style={{ ...groupStyle, gridColumn: 'span 1' }}>
         <label style={labelStyle}>RELIGION</label>
-        <select
+        <FormCustomSelect
           name="religious"
           value={isCustomReligion ? "other" : formData.religious}
           onChange={(e) => {
@@ -951,16 +1124,16 @@ const HouseholdForm = ({ user }) => {
               handleChange(e);
             }
           }}
-          style={inputStyle}
-        >
-          <option value="">Select religion</option>
-          <option value="ဗုဒ္ဓ">ဗုဒ္ဓ</option>
-          <option value="ခရစ်ယာန်">ခရစ်ယာန်</option>
-          <option value="အစ္စလာမ်">အစ္စလာမ်</option>
-          <option value="ဟိန္ဒူ">ဟိန္ဒူ</option>
-          <option value="နတ်">နတ်</option>
-          <option value="other">Other...</option>
-        </select>
+          options={[
+            { value: 'ဗုဒ္ဓ', label: 'ဗုဒ္ဓ' },
+            { value: 'ခရစ်ယာန်', label: 'ခရစ်ယာန်' },
+            { value: 'အစ္စလာမ်', label: 'အစ္စလာမ်' },
+            { value: 'ဟိန္ဒူ', label: 'ဟိန္ဒူ' },
+            { value: 'နတ်', label: 'နတ်' },
+            { value: 'other', label: 'အခြား...' }
+          ]}
+          placeholder="Select Religion"
+        />
         {isCustomReligion && (
           <input type="text" name="religious" value={formData.religious} onChange={handleChange} placeholder="Enter religion name" style={{ ...inputStyle, marginTop: '8px' }} autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} autoFocus />
         )}
@@ -980,11 +1153,13 @@ const HouseholdForm = ({ user }) => {
       <div style={{ ...groupStyle, gridColumn: 'span 1' }}>
         <label style={labelStyle}>TOWNSHIP</label>
         {townshipFilter ? (
-          <select name="township" value={formData.township} onChange={handleChange}
-            style={{ ...inputStyle, cursor: 'pointer' }}>
-            <option value="">-- Select Township --</option>
-            {townshipFilter.map(t => <option key={t} value={t}>{t}</option>)}
-          </select>
+          <FormCustomSelect
+            name="township"
+            value={formData.township}
+            onChange={handleChange}
+            options={townshipFilter}
+            placeholder="-- Select Township --"
+          />
         ) : (
           <input type="text" name="township" value={formData.township} onChange={handleChange} placeholder="Enter township name" style={inputStyle} autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} />
         )}
@@ -993,11 +1168,13 @@ const HouseholdForm = ({ user }) => {
       <div style={{ ...groupStyle, gridColumn: 'span 1' }}>
         <label style={labelStyle}>DISTRICT</label>
         {districtFilter ? (
-          <select name="district" value={formData.district} onChange={handleChange}
-            style={{ ...inputStyle, cursor: 'pointer' }}>
-            <option value="">-- Select District --</option>
-            {districtFilter.map(d => <option key={d} value={d}>{d}</option>)}
-          </select>
+          <FormCustomSelect
+            name="district"
+            value={formData.district}
+            onChange={handleChange}
+            options={districtFilter}
+            placeholder="-- Select District --"
+          />
         ) : (
           <input type="text" name="district" value={formData.district} onChange={handleChange} placeholder="Enter district name" style={inputStyle} autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} />
         )}
@@ -1021,180 +1198,220 @@ const HouseholdForm = ({ user }) => {
           <h2 style={{ fontSize: '20px', margin: '0 0 8px 0', color: '#1A1A1A', fontWeight: '500', letterSpacing: '0.02em' }}>HOUSEHOLD REGISTRATION</h2>
           <p style={{ margin: 0, color: '#737373', fontSize: '12px' }}>Please fill out the form to register household members.</p>
         </div>
-        <button
-          type="button"
-          onClick={openForm}
-          onMouseOver={e => { e.currentTarget.style.backgroundColor = '#FFFFFF'; e.currentTarget.style.color = '#1A1A1A'; }}
-          onMouseOut={e => { e.currentTarget.style.backgroundColor = '#1A1A1A'; e.currentTarget.style.color = '#FFFFFF'; }}
-          style={{
-            padding: '8px 20px', border: '1px solid #1A1A1A', backgroundColor: '#1A1A1A',
-            color: '#FFFFFF', fontWeight: '500', fontSize: '12px', cursor: 'pointer',
-            textTransform: 'uppercase', letterSpacing: '0.05em', flexShrink: 0,
-            transition: 'background-color 120ms cubic-bezier(0.23,1,0.32,1), color 120ms cubic-bezier(0.23,1,0.32,1)',
-          }}
-        >
-          + ADD MEMBER
-        </button>
       </div>
 
-      {/* ── REGISTRATION MODAL ── */}
-      {formOpen && (
+      {/* ── INLINE INPUT DATA LAYOUT BOX ── */}
+      <div style={{ backgroundColor: '#FFFFFF', border: '1px solid #E5E7EB', borderRadius: '0px', overflow: 'hidden' }}>
+        {/* Panel Header */}
+        <div style={{ padding: '12px 20px', borderBottom: '1px solid #E5E7EB', backgroundColor: '#F9FAFB', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <h3 style={{ margin: 0, fontSize: '12px', fontWeight: '700', color: '#374151', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              INPUT DATA FORM — MEMBER REGISTRATION
+            </h3>
+            <p style={{ margin: '2px 0 0', fontSize: '11px', color: '#6B7280' }}>
+              Fill in member credentials to record civil registry details.
+            </p>
+          </div>
+        </div>
+
+        {/* Alerts inside input box */}
+        {draftRestored && (
+          <div style={{ margin: '12px 20px 0', padding: '8px 12px', border: '1px solid #E5E7EB', backgroundColor: '#F3F4F6', color: '#1A1A1A', fontSize: '11px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span>📋 Draft restored — your previous unsaved data has been reloaded.</span>
+            <button type="button" onClick={() => { localStorage.removeItem(DRAFT_KEY); setDraftRestored(false); }} style={{ background: 'none', border: '1px solid #E5E7EB', fontSize: '10px', cursor: 'pointer', padding: '2px 8px', color: '#737373', textTransform: 'uppercase' }}>Clear</button>
+          </div>
+        )}
+        {savedOffline && (
+          <div style={{ margin: '12px 20px 0', padding: '8px 12px', border: '1px solid #E5E7EB', backgroundColor: '#F3F4F6', color: '#1A1A1A', fontSize: '11px' }}>
+            📶 Saved locally — will sync automatically when internet is restored.
+          </div>
+        )}
+        {success && (
+          <div style={{ margin: '12px 20px 0', padding: '10px 12px', border: '1px solid #A5D6A7', backgroundColor: '#F0F7F0', color: '#1B5E20', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ color: '#2E7D32', fontSize: '16px' }}>✓</span>
+            Member record saved successfully.
+          </div>
+        )}
+        {error && (
+          <div style={{ margin: '12px 20px 0', padding: '10px 12px', border: '1px solid #FEE2E2', backgroundColor: '#FEF2F2', color: '#B91C1C', fontSize: '12px' }}>
+            {error}
+          </div>
+        )}
+
+        {/* Form Body */}
+        <div style={{ padding: '20px' }}>
+          <form id="registration-form" onSubmit={(e) => { e.preventDefault(); submitForm('SAME_HOUSEHOLD'); }}>
+            {formFieldsJSX}
+          </form>
+        </div>
+
+        {/* Action Buttons Footer */}
         <div style={{
-          position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.4)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          zIndex: 1000, padding: window.innerWidth < 768 ? '0' : '16px'
+          padding: '12px 20px', borderTop: '1px solid #E5E7EB',
+          display: 'flex', justifyContent: 'flex-end', gap: '12px',
+          backgroundColor: '#FAFAFA'
         }}>
-          <div style={{
-            backgroundColor: '#FFFFFF', border: '1px solid #E5E7EB',
-            width: '100%', maxWidth: '1080px',
-            height: window.innerWidth < 768 ? '100%' : 'auto',
-            maxHeight: window.innerWidth < 768 ? '100dvh' : '96vh',
-            display: 'flex', flexDirection: 'column',
-            borderRadius: '0px'
+          <button type="button" onClick={clearForNewHousehold} style={{
+            padding: '8px 16px', border: '1px solid #E5E7EB', backgroundColor: '#FFFFFF',
+            color: '#1A1A1A', fontWeight: '500', fontSize: '12px', cursor: 'pointer', textTransform: 'uppercase'
           }}>
-            {/* Modal header */}
-            <div style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              padding: '10px 20px', borderBottom: '1px solid #E5E7EB', flexShrink: 0
-            }}>
-              <div>
-                <h3 style={{ margin: 0, fontSize: '12px', fontWeight: '600', color: '#1A1A1A', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  HOUSEHOLD REGISTRATION
-                </h3>
-                <p style={{ margin: '1px 0 0', fontSize: '10px', color: '#737373' }}>
-                  Please fill out the form to register household members.
-                </p>
-              </div>
-              <button onClick={closeForm} type="button" style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#737373', lineHeight: 1 }}>&times;</button>
-            </div>
-
-            {/* Alerts inside modal */}
-            {draftRestored && (
-              <div style={{ margin: '12px 24px 0', padding: '8px 12px', border: '1px solid #E5E7EB', backgroundColor: '#F3F4F6', color: '#1A1A1A', fontSize: '11px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span>📋 Draft restored — your previous unsaved data has been reloaded.</span>
-                <button type="button" onClick={() => { localStorage.removeItem(DRAFT_KEY); setDraftRestored(false); }} style={{ background: 'none', border: '1px solid #E5E7EB', fontSize: '10px', cursor: 'pointer', padding: '2px 8px', color: '#737373', textTransform: 'uppercase' }}>Clear</button>
-              </div>
-            )}
-            {savedOffline && (
-              <div style={{ margin: '12px 24px 0', padding: '8px 12px', border: '1px solid #E5E7EB', backgroundColor: '#F3F4F6', color: '#1A1A1A', fontSize: '11px', flexShrink: 0 }}>
-                📶 Saved locally — will sync automatically when internet is restored.
-              </div>
-            )}
-            {success && (
-              <div style={{ margin: '12px 24px 0', padding: '10px 12px', border: '1px solid #A5D6A7', backgroundColor: '#F0F7F0', color: '#1B5E20', fontSize: '12px', flexShrink: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ color: '#2E7D32', fontSize: '16px' }}>✓</span>
-                Member record saved successfully.
-              </div>
-            )}
-            {error && (
-              <div style={{ margin: '12px 24px 0', padding: '10px 12px', border: '1px solid #E5E7EB', color: '#1A1A1A', fontSize: '12px', flexShrink: 0 }}>
-                {error}
-              </div>
-            )}
-
-            {/* Scrollable form body */}
-            <div style={{ overflowY: 'auto', flex: 1, padding: '14px 20px', paddingBottom: window.innerWidth < 768 ? '80px' : '14px' }}>
-              <form id="registration-form" onSubmit={(e) => { e.preventDefault(); submitForm('SAME_HOUSEHOLD'); }}>
-                {formFieldsJSX}
-              </form>
-            </div>
-
-            {/* Sticky footer buttons */}
-            <div style={{
-              padding: '10px 20px', borderTop: '1px solid #E5E7EB',
-              display: 'flex', justifyContent: 'flex-end', gap: '12px', flexShrink: 0,
-              backgroundColor: '#FAFAFA'
-            }}>
-              <button type="button" onClick={closeForm} style={{
-                padding: '8px 16px', border: '1px solid #E5E7EB', backgroundColor: '#FFFFFF',
-                color: '#1A1A1A', fontWeight: '500', fontSize: '12px', cursor: 'pointer', textTransform: 'uppercase'
-              }}>
-                CANCEL
-              </button>
-              <button type="button" onClick={() => submitForm('SAME_HOUSEHOLD')} disabled={loading} style={{
-                padding: '8px 16px', border: '1px solid #1A1A1A', backgroundColor: '#FFFFFF',
-                color: '#1A1A1A', fontWeight: '500', fontSize: '12px',
-                cursor: loading ? 'not-allowed' : 'pointer', textTransform: 'uppercase'
-              }}>
-                {loading ? 'SAVING...' : 'ADD MEMBER'}
-              </button>
-              <button type="button" onClick={clearForNewHousehold}
-                onMouseOver={e => { e.currentTarget.style.backgroundColor = '#FFFFFF'; e.currentTarget.style.color = '#1A1A1A'; }}
-                onMouseOut={e => { e.currentTarget.style.backgroundColor = '#1A1A1A'; e.currentTarget.style.color = '#FFFFFF'; }}
-                style={{
-                  padding: '8px 16px', border: '1px solid #1A1A1A', backgroundColor: '#1A1A1A',
-                  color: '#FFFFFF', fontWeight: '500', fontSize: '12px',
-                  cursor: 'pointer', textTransform: 'uppercase',
-                  transition: 'background-color 120ms cubic-bezier(0.23,1,0.32,1), color 120ms cubic-bezier(0.23,1,0.32,1)',
-              }}>
-                NEW HOUSEHOLD
-              </button>
-            </div>
-          </div>
+            CLEAR FORM
+          </button>
+          <button type="button" onClick={() => submitForm('SAME_HOUSEHOLD')} disabled={loading} style={{
+            padding: '8px 20px', border: '1px solid #1A1A1A', backgroundColor: '#1A1A1A',
+            color: '#FFFFFF', fontWeight: '600', fontSize: '12px',
+            cursor: loading ? 'not-allowed' : 'pointer', textTransform: 'uppercase', letterSpacing: '0.04em'
+          }}>
+            {loading ? 'SAVING...' : '+ ADD MEMBER'}
+          </button>
+          <button type="button" onClick={() => submitForm('NEW_HOUSEHOLD')} disabled={loading}
+            onMouseOver={e => { e.currentTarget.style.backgroundColor = '#FFFFFF'; e.currentTarget.style.color = '#1A1A1A'; }}
+            onMouseOut={e => { e.currentTarget.style.backgroundColor = '#1A1A1A'; e.currentTarget.style.color = '#FFFFFF'; }}
+            style={{
+              padding: '8px 16px', border: '1px solid #1A1A1A', backgroundColor: '#1A1A1A',
+              color: '#FFFFFF', fontWeight: '500', fontSize: '12px',
+              cursor: loading ? 'not-allowed' : 'pointer', textTransform: 'uppercase',
+              transition: 'background-color 120ms cubic-bezier(0.23,1,0.32,1), color 120ms cubic-bezier(0.23,1,0.32,1)',
+          }}>
+            NEW HOUSEHOLD
+          </button>
         </div>
-      )}
+      </div>
 
 
-      {/* Table for submitted members */}
-      {submittedMembers.length > 0 && (
-        <div style={{ backgroundColor: '#FFFFFF', border: '1px solid #E5E7EB', borderRadius: '0px', overflow: 'hidden' }}>
-          <div style={{ padding: '16px 24px', borderBottom: '1px solid #E5E7EB', display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <h3 style={{ fontSize: '12px', margin: 0, color: '#1A1A1A', fontWeight: '600', textTransform: 'uppercase' }}>RECENTLY ADDED</h3>
-            {totalFamilyMembers > 0 && (
-              <span style={{ fontSize: '11px', border: '1px solid #E5E7EB', color: '#737373', padding: '2px 8px', fontFamily: 'var(--font-mono)' }}>
-                {totalFamilyMembers} MEMBERS
-              </span>
-            )}
-          </div>
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr>
-                  <th style={thStyle}>No.</th>
-                  <th style={thStyle}>Household No.</th>
-                  <th style={thStyle}>Name</th>
-                  <th style={thStyle}>Date of Birth</th>
-                  <th style={thStyle}>Gender</th>
-                  <th style={thStyle}>Father's Name</th>
-                  <th style={thStyle}>Mother's Name</th>
-                  <th style={thStyle}>Relationship</th>
-                  <th style={thStyle}>Occupation</th>
-                  <th style={thStyle}>Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {submittedMembers.map((member, index) => (
-                  <tr key={index} style={{ backgroundColor: '#FFFFFF' }}>
-                    <td style={tdMonoS}>{index + 1}</td>
-                    <td style={{ ...tdMonoS, fontWeight: '600' }}>{member.household_no}</td>
-                    <td style={{ ...tdStyle, fontWeight: '500' }}>{member.name}</td>
-                    <td style={tdMonoS}>{member.date_of_birth}</td>
-                    <td style={tdStyle}>{member.gender}</td>
-                    <td style={tdStyle}>{member.fathers_name}</td>
-                    <td style={tdStyle}>{member.mothers_name}</td>
-                    <td style={tdStyle}>{member.household_relationship}</td>
-                    <td style={tdStyle}>{member.occupation}</td>
-                    <td style={tdStyle}>
-                      <button onClick={() => handleViewFamily(member.household_no)} type="button" style={{
-                        padding: '4px 10px',
-                        border: '1px solid #1A1A1A',
-                        backgroundColor: '#FFFFFF',
-                        color: '#1A1A1A',
-                        fontSize: '11px',
-                        fontWeight: '500',
-                        cursor: 'pointer',
-                        textTransform: 'uppercase'
-                      }}
-                      >
-                        VIEW FAMILY
-                      </button>
-                    </td>
+      {/* Family Roster Table matching user design */}
+      {(() => {
+        const activeHhNo = formData.household_no || (familyRoster[0]?.household_no) || (submittedMembers[submittedMembers.length - 1]?.household_no) || '';
+        const targetNormalized = normalizeHouseholdNo(activeHhNo);
+
+        if (!targetNormalized) return null;
+
+        const matchingDb = familyRoster.filter(m => normalizeHouseholdNo(m.household_no) === targetNormalized);
+        const matchingSubmitted = submittedMembers.filter(m => normalizeHouseholdNo(m.household_no) === targetNormalized);
+
+        const combined = [...matchingDb];
+        matchingSubmitted.forEach(sm => {
+          if (!combined.some(fm => fm.name === sm.name && (fm.id ? fm.id === sm.id : fm.date_of_birth === sm.date_of_birth))) {
+            combined.push(sm);
+          }
+        });
+        const displayMembers = combined;
+        const hhNoDisplay = activeHhNo || displayMembers[0]?.household_no || '—';
+        
+        if (displayMembers.length === 0 && !formData.household_no) return null;
+
+        return (
+          <div style={{ backgroundColor: '#FFFFFF', border: '1px solid #E5E7EB', borderRadius: '0px', overflow: 'hidden', marginTop: '12px' }}>
+            {/* Header Bar matching image */}
+            <div style={{ padding: '12px 20px', borderBottom: '1px solid #E5E7EB', backgroundColor: '#F9FAFB', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ fontSize: '12px', fontWeight: '700', color: '#374151', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                FAMILY ROSTER: {hhNoDisplay || '—'}
+              </div>
+              <div style={{ fontSize: '11px', fontWeight: '600', color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                {displayMembers.length} MEMBERS
+              </div>
+            </div>
+
+            {/* Table */}
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                <thead>
+                  <tr style={{ backgroundColor: '#FAFAFA', borderBottom: '1px solid #E5E7EB' }}>
+                    <th style={rosterThStyle}>NO.</th>
+                    <th style={rosterThStyle}>NAME</th>
+                    <th style={rosterThStyle}>DATE OF BIRTH</th>
+                    <th style={rosterThStyle}>GENDER</th>
+                    <th style={rosterThStyle}>FATHER'S NAME</th>
+                    <th style={rosterThStyle}>MOTHER'S NAME</th>
+                    <th style={rosterThStyle}>RELATIONSHIP</th>
+                    <th style={rosterThStyle}>OCCUPATION</th>
+                    <th style={rosterThStyle}>PREVIOUS ID NO.</th>
+                    <th style={rosterThStyle}>TA'ANG LAND ID NO.</th>
+                    <th style={rosterThStyle}>NATIONALITY</th>
+                    <th style={rosterThStyle}>RESIDENT STATUS</th>
+                    <th style={rosterThStyle}>RELIGIOUS</th>
+                    <th style={rosterThStyle}>SUBMISSION DATE</th>
+                    <th style={{ ...rosterThStyle, textAlign: 'center' }}>ACTION</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {displayMembers.length === 0 ? (
+                    <tr>
+                      <td colSpan={15} style={{ padding: '24px', textAlign: 'center', color: '#9CA3AF', fontSize: '12px' }}>
+                        No members registered yet for this household.
+                      </td>
+                    </tr>
+                  ) : (
+                    displayMembers.map((member, index) => {
+                      const rel = member.household_relationship || '';
+                      const isHead = rel === 'ဦးစီး' || rel.toLowerCase() === 'head';
+                      const rawSub = member.submission_date || (member.created_at ? new Date(member.created_at).toLocaleDateString('en-GB').replace(/\//g, '.') : '—');
+                      const subDate = rawSub;
+
+                      return (
+                        <tr key={member.id || index} style={{ borderBottom: '1px solid #F3F4F6', backgroundColor: index % 2 === 1 ? '#FAFAFA' : '#FFFFFF' }}>
+                          <td style={{ ...rosterTdStyle, textAlign: 'center', fontFamily: 'var(--font-mono)' }}>{index + 1}</td>
+                          <td style={{ ...rosterTdStyle, fontWeight: '600' }}>
+                            {member.name}
+                            {isHead && (
+                              <span style={{ marginLeft: '6px', padding: '1px 4px', fontSize: '9px', fontWeight: '700', border: '1px solid #4B5563', borderRadius: '2px', color: '#374151', textTransform: 'uppercase', display: 'inline-block', verticalAlign: 'middle', lineHeight: '1.2' }}>
+                                HEAD
+                              </span>
+                            )}
+                          </td>
+                          <td style={{ ...rosterTdStyle, fontFamily: 'var(--font-mono)' }}>{member.date_of_birth || '—'}</td>
+                          <td style={rosterTdStyle}>{member.gender || '—'}</td>
+                          <td style={rosterTdStyle}>{member.fathers_name || member.father_name || '—'}</td>
+                          <td style={rosterTdStyle}>{member.mothers_name || member.mother_name || '—'}</td>
+                          <td style={rosterTdStyle}>{member.household_relationship || '—'}</td>
+                          <td style={rosterTdStyle}>{member.occupation || '—'}</td>
+                          <td style={{ ...rosterTdStyle, fontFamily: 'var(--font-mono)' }}>{member.previous_id_no || member.nrc || '—'}</td>
+                          <td style={{ ...rosterTdStyle, fontFamily: 'var(--font-mono)' }}>{member.taang_land_id_no || '—'}</td>
+                          <td style={rosterTdStyle}>{member.nationality || '—'}</td>
+                          <td style={rosterTdStyle}>{member.resident_status || '—'}</td>
+                          <td style={rosterTdStyle}>{member.religious || member.religion || '—'}</td>
+                          <td style={{ ...rosterTdStyle, fontFamily: 'var(--font-mono)' }}>{subDate}</td>
+                          <td style={{ ...rosterTdStyle, textAlign: 'center' }}>
+                            <div style={{ display: 'inline-flex', gap: '4px' }}>
+                              <button
+                                type="button"
+                                onClick={() => { setEditingMember(member); setIsEditModalOpen(true); }}
+                                style={{ padding: '4px 6px', border: '1px solid #E5E7EB', backgroundColor: '#FFFFFF', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                title="Edit Member"
+                              >
+                                <Pencil size={13} color="#6B7280" />
+                              </button>
+                              {member.id && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteMember(member.id, member.name)}
+                                  style={{ padding: '4px 6px', border: '1px solid #E5E7EB', backgroundColor: '#FFFFFF', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                  title="Delete Member"
+                                >
+                                  <Trash2 size={13} color="#9CA3AF" />
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+        );
+      })()}
+
+      {/* Edit Household Modal */}
+      {isEditModalOpen && (
+        <EditHouseholdModal
+          household={editingMember}
+          isOpen={isEditModalOpen}
+          onClose={() => setIsEditModalOpen(false)}
+          onUpdateSuccess={() => fetchFamilyRoster(formData.household_no)}
+        />
       )}
 
       {/* View Family Modal */}

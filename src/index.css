@@ -278,6 +278,16 @@ button:active {
   animation: tps-panel-in 150ms var(--ease-out) both;
 }
 
+/* 5b. Minimalist line loader progress animation */
+@keyframes tps-line-progress {
+  0% { transform: translateX(-100%); }
+  50% { transform: translateX(0%); }
+  100% { transform: translateX(100%); }
+}
+.animate-tps-line {
+  animation: tps-line-progress 1s ease-in-out infinite;
+}
+
 /* 6. Stagger for list items entering together */
 .tps-stagger > *    { opacity: 0; transform: translateY(6px); animation: tps-page-in 200ms var(--ease-out) both; }
 .tps-stagger > *:nth-child(1) { animation-delay: 0ms; }

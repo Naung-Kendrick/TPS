@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { SkeletonStatGrid, SkeletonBar } from './Skeleton';
 import { supabase } from '../lib/supabase';
-import { Users, User, Home, Search, BarChart2, Printer, FileSpreadsheet, Send, CheckCircle2 } from 'lucide-react';
+import { Users, User, Home, Search, BarChart2, Printer, FileSpreadsheet, Send, CheckCircle2, ChevronDown } from 'lucide-react';
 import EmptyState from './EmptyState';
 import { printStatistics, exportStatisticsExcel } from '../lib/statisticsPrint';
 
@@ -165,6 +165,112 @@ const clearCache = () => {
   try { sessionStorage.removeItem(CACHE_KEY); } catch {}
 };
 
+// ─── Custom Responsive Dropdown Selector ─────────────────────
+const CustomLocationSelect = ({ value, onChange, options, placeholder, disabled, isMobile }) => {
+  const [open, setOpen] = useState(false);
+  const ref = React.useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    document.addEventListener('touchstart', handler);
+    return () => {
+      document.removeEventListener('mousedown', handler);
+      document.removeEventListener('touchstart', handler);
+    };
+  }, [open]);
+
+  const selectedLabel = value || placeholder;
+
+  return (
+    <div ref={ref} style={{ position: 'relative', width: '100%' }}>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => setOpen(v => !v)}
+        style={{
+          width: '100%',
+          padding: '6px 24px 6px 10px',
+          borderRadius: '0px',
+          border: '1px solid #E5E7EB',
+          fontSize: '11px',
+          fontFamily: "Inter, 'Pyidaungsu', sans-serif",
+          backgroundColor: disabled ? '#FAFAFA' : '#FFFFFF',
+          boxSizing: 'border-box',
+          marginTop: '4px',
+          color: disabled ? '#9CA3AF' : '#1A1A1A',
+          height: '32px',
+          lineHeight: '1.4',
+          textAlign: 'left',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          cursor: disabled ? 'not-allowed' : 'pointer',
+          opacity: disabled ? 0.65 : 1,
+        }}
+      >
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {selectedLabel}
+        </span>
+        <ChevronDown size={12} color="#737373" style={{ flexShrink: 0, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 150ms' }} />
+      </button>
+
+      {open && !disabled && (
+        <div style={{
+          position: 'absolute',
+          top: 'calc(100% + 2px)',
+          left: 0, right: 0,
+          backgroundColor: '#FFFFFF',
+          border: '1px solid #1A1A1A',
+          boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+          maxHeight: '220px',
+          overflowY: 'auto',
+          zIndex: 999,
+          borderRadius: '0px',
+        }}>
+          <div
+            onClick={() => { onChange(''); setOpen(false); }}
+            style={{
+              padding: '8px 12px',
+              fontSize: '11px',
+              color: !value ? '#FFFFFF' : '#1A1A1A',
+              backgroundColor: !value ? '#1A1A1A' : '#FFFFFF',
+              fontWeight: !value ? '600' : '400',
+              cursor: 'pointer',
+              borderBottom: '1px solid #F3F4F6',
+            }}
+          >
+            {placeholder}
+          </div>
+          {options.map(opt => {
+            const isSelected = value === opt;
+            return (
+              <div
+                key={opt}
+                onClick={() => { onChange(opt); setOpen(false); }}
+                style={{
+                  padding: '8px 12px',
+                  fontSize: '11px',
+                  color: isSelected ? '#FFFFFF' : '#1A1A1A',
+                  backgroundColor: isSelected ? '#1A1A1A' : '#FFFFFF',
+                  fontWeight: isSelected ? '600' : '400',
+                  cursor: 'pointer',
+                  borderBottom: '1px solid #F9FAFB',
+                }}
+              >
+                {opt}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ─── Main Component ───────────────────────────────────────
 const PopulationStatistics = ({ user }) => {
   const districtFilter = (user?.access_level !== 'central' && user?.allowed_districts?.length > 0)
@@ -192,6 +298,13 @@ const PopulationStatistics = ({ user }) => {
   const [selectedWard, setSelectedWard] = useState('');
   const [selectedVillage, setSelectedVillage] = useState('');
   const [selectedGroup, setSelectedGroup] = useState('');
+
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 640);
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 640);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const PAGE_SIZE = 25;
   const [page1, setPage1] = useState(1);
@@ -617,10 +730,14 @@ const PopulationStatistics = ({ user }) => {
             <label style={{ fontSize: '11px', fontWeight: '500', color: '#737373', display: 'block', letterSpacing: '0.02em' }}>
               ခရိုင် (DISTRICT)
             </label>
-            <select value={selectedDistrict} onChange={(e) => setSelectedDistrict(e.target.value)} style={selectStyle}>
-              <option value="">--- အားလုံး (All Districts) ---</option>
-              {districts.map(d => <option key={d} value={d}>{d}</option>)}
-            </select>
+            <CustomLocationSelect
+              value={selectedDistrict}
+              onChange={(val) => setSelectedDistrict(val)}
+              options={districts}
+              placeholder={isMobile ? "--- အားလုံး (All) ---" : "--- အားလုံး (All Districts) ---"}
+              disabled={false}
+              isMobile={isMobile}
+            />
           </div>
 
           {/* Township */}
@@ -628,10 +745,14 @@ const PopulationStatistics = ({ user }) => {
             <label style={{ fontSize: '11px', fontWeight: '500', color: '#737373', display: 'block', letterSpacing: '0.02em' }}>
               မြို့နယ် (TOWNSHIP)
             </label>
-            <select value={selectedTownship} onChange={(e) => setSelectedTownship(e.target.value)} style={selectStyle} disabled={!selectedDistrict}>
-              <option value="">--- အားလုံး (All Townships) ---</option>
-              {townships.map(t => <option key={t} value={t}>{t}</option>)}
-            </select>
+            <CustomLocationSelect
+              value={selectedTownship}
+              onChange={(val) => setSelectedTownship(val)}
+              options={townships}
+              placeholder={isMobile ? "--- အားလုံး (All) ---" : "--- အားလုံး (All Townships) ---"}
+              disabled={!selectedDistrict}
+              isMobile={isMobile}
+            />
           </div>
 
           {/* Ward */}
@@ -639,10 +760,14 @@ const PopulationStatistics = ({ user }) => {
             <label style={{ fontSize: '11px', fontWeight: '500', color: '#737373', display: 'block', letterSpacing: '0.02em' }}>
               ရပ်ကွက် (WARD)
             </label>
-            <select value={selectedWard} onChange={(e) => { setSelectedWard(e.target.value); setPage1(1); setPage2(1); }} style={selectStyle} disabled={!selectedTownship}>
-              <option value="">--- အားလုံး (All Wards) ---</option>
-              {wards.map(w => <option key={w} value={w}>{w}</option>)}
-            </select>
+            <CustomLocationSelect
+              value={selectedWard}
+              onChange={(val) => { setSelectedWard(val); setPage1(1); setPage2(1); }}
+              options={wards}
+              placeholder={isMobile ? "--- အားလုံး (All) ---" : "--- အားလုံး (All Wards) ---"}
+              disabled={!selectedTownship}
+              isMobile={isMobile}
+            />
           </div>
 
           {/* Group */}
@@ -650,10 +775,14 @@ const PopulationStatistics = ({ user }) => {
             <label style={{ fontSize: '11px', fontWeight: '500', color: '#737373', display: 'block', letterSpacing: '0.02em' }}>
               အုပ်စု (GROUP)
             </label>
-            <select value={selectedGroup} onChange={(e) => { setSelectedGroup(e.target.value); setPage1(1); setPage2(1); }} style={selectStyle} disabled={!selectedTownship || !!selectedWard}>
-              <option value="">--- အားလုံး (All Groups) ---</option>
-              {groups.map(g => <option key={g} value={g}>{g}</option>)}
-            </select>
+            <CustomLocationSelect
+              value={selectedGroup}
+              onChange={(val) => { setSelectedGroup(val); setPage1(1); setPage2(1); }}
+              options={groups}
+              placeholder={isMobile ? "--- အားလုံး (All) ---" : "--- အားလုံး (All Groups) ---"}
+              disabled={!selectedTownship || !!selectedWard}
+              isMobile={isMobile}
+            />
           </div>
 
           {/* Village */}
@@ -661,10 +790,14 @@ const PopulationStatistics = ({ user }) => {
             <label style={{ fontSize: '11px', fontWeight: '500', color: '#737373', display: 'block', letterSpacing: '0.02em' }}>
               ကျေးရွာ (VILLAGE)
             </label>
-            <select value={selectedVillage} onChange={(e) => { setSelectedVillage(e.target.value); setPage1(1); setPage2(1); }} style={selectStyle} disabled={!selectedGroup}>
-              <option value="">--- အားလုံး (All Villages) ---</option>
-              {filteredVillages.map(v => <option key={v} value={v}>{v}</option>)}
-            </select>
+            <CustomLocationSelect
+              value={selectedVillage}
+              onChange={(val) => { setSelectedVillage(val); setPage1(1); setPage2(1); }}
+              options={filteredVillages}
+              placeholder={isMobile ? "--- အားလုံး (All) ---" : "--- အားလုံး (All Villages) ---"}
+              disabled={!selectedGroup}
+              isMobile={isMobile}
+            />
           </div>
         </div>
 

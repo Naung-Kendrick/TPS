@@ -92,8 +92,8 @@ function dispatch() {
 }
 
 export function pushNotification({ type = NOTIF_TYPES.INFO, title, message }) {
-  // Only notify emergency and urgent cases (ERROR, WARNING, OFFLINE)
-  const isEmergencyOrUrgent = type === NOTIF_TYPES.ERROR || type === NOTIF_TYPES.WARNING || type === NOTIF_TYPES.OFFLINE;
+  // Only notify emergency and urgent cases (ERROR, WARNING) - OFFLINE disabled per request
+  const isEmergencyOrUrgent = (type === NOTIF_TYPES.ERROR || type === NOTIF_TYPES.WARNING) && type !== NOTIF_TYPES.OFFLINE;
   if (!isEmergencyOrUrgent) {
     return null;
   }
@@ -116,7 +116,7 @@ export function pushNotification({ type = NOTIF_TYPES.INFO, title, message }) {
 
 export function getNotifications() {
   const all = load();
-  return all.filter(n => n.type === NOTIF_TYPES.ERROR || n.type === NOTIF_TYPES.WARNING || n.type === NOTIF_TYPES.OFFLINE);
+  return all.filter(n => (n.type === NOTIF_TYPES.ERROR || n.type === NOTIF_TYPES.WARNING) && n.type !== NOTIF_TYPES.OFFLINE && n.title !== 'Gone Offline');
 }
 
 export function getUnreadCount() {

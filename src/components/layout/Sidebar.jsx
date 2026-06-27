@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { Users, UserPlus, LineChart, PieChart, FileText, Settings, Upload, ScanLine, Menu, X, MoreHorizontal, LogOut, CircleUserRound, UserCheck, Database } from 'lucide-react';
+import { Users, UserPlus, LineChart, PieChart, FileText, Settings, Upload, ScanLine, Menu, X, MoreHorizontal, LogOut, CircleUserRound, UserCheck, Database, HardDrive } from 'lucide-react';
 import logo from '../../assets/fonts/IDTL_logo.png';
 import { getProfileType } from '../../lib/roleHelper';
 import { getUnreadCount } from '../../lib/notifications';
@@ -9,11 +9,24 @@ import { Bell } from 'lucide-react';
 const Sidebar = ({ user, onLogout }) => {
   const [open, setOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
+  const [navigatingTo, setNavigatingTo] = useState(null);
   const location = useLocation();
   const navigate = useNavigate();
   const moreSheetRef = useRef(null);
   const touchStartX = useRef(null);
   const touchStartY = useRef(null);
+
+  // 0.2s delay before navigating to any page
+  const handleNav = (path, closeFn) => {
+    if (navigatingTo) return;
+    if (location.pathname === path) return;
+    setNavigatingTo(path);
+    if (closeFn) closeFn();
+    setTimeout(() => {
+      navigate(path);
+      setNavigatingTo(null);
+    }, 200);
+  };
 
   const [unreadCount, setUnreadCount] = useState(0);
 
@@ -77,14 +90,15 @@ const Sidebar = ({ user, onLogout }) => {
   }, [moreOpen]);
 
   const menuItems = [
-    { id: 'verification',     path: '/verification',     label: 'Data Verification',      icon: UserCheck      },
-    { id: 'upload',           path: '/upload',           label: 'Data Upload',            icon: Upload         },
-    { id: 'scanner',          path: '/scanner',          label: 'ID Card Scanner',        icon: ScanLine       },
-    { id: 'statistics',       path: '/statistics',       label: 'Population Statistics',  icon: LineChart      },
-    { id: 'demographics',     path: '/demographics',     label: 'Demographic Dashboard',  icon: PieChart       },
-    { id: 'registration',     path: '/registration',     label: 'Household Registration', icon: UserPlus       },
-    { id: 'central-database', path: '/central-database', label: 'Central Database',       icon: Database       },
-    { id: 'users',            path: '/users',            label: 'User Management',        icon: Users          },
+    { id: 'verification', path: '/verification', label: 'Data Verification', icon: UserCheck },
+    { id: 'upload', path: '/upload', label: 'Data Upload', icon: Upload },
+    { id: 'scanner', path: '/scanner', label: 'ID Card Scanner', icon: ScanLine },
+    { id: 'statistics', path: '/statistics', label: 'Population Statistics', icon: LineChart },
+    { id: 'demographics', path: '/demographics', label: 'Demographic Dashboard', icon: PieChart },
+    { id: 'registration', path: '/registration', label: 'Household Registration', icon: UserPlus },
+    { id: 'central-database', path: '/central-database', label: 'Central Database', icon: Database },
+    { id: 'backup', path: '/backup', label: 'Database Backup', icon: HardDrive },
+    { id: 'users', path: '/users', label: 'User Management', icon: Users },
     { id: 'notifications-requests', path: '/notifications-requests', label: 'Notifications & Requests', icon: Bell },
   ];
 
@@ -93,12 +107,126 @@ const Sidebar = ({ user, onLogout }) => {
     if (item.id === 'users') return user?.role === 'system' || user?.role === 'master';
     if (item.id === 'upload') return user?.role === 'system' || user?.role === 'master' || user?.role === 'admin' || user?.role === 'ops';
     if (item.id === 'central-database') return user?.access_level !== 'viewer' && user?.access_level !== 'sub_township';
+    if (item.id === 'backup') return (user?.role === 'system' || user?.role === 'master') && (user?.access_level || user?.profile?.access_level) === 'central';
     return true;
   });
 
   // Bottom nav: first 4 primary + "More" for the rest
   const primaryNav = filteredMenuItems.slice(0, 4);
   const moreNav = filteredMenuItems.slice(4);
+
+  const renderUserFooter = (isMobile = false) => {
+    const uRole = user?.role || user?.profile?.role || 'field';
+    const uLevel = user?.access_level || user?.profile?.access_level || 'central';
+    const prof = getProfileType(uRole, uLevel);
+    const displayName = user?.profile?.display_name || user?.profile?.username || user?.username || 'Officer';
+    const allowedDistricts = user?.allowed_districts || user?.profile?.allowed_districts || [];
+    const allowedTownships = user?.allowed_townships || user?.profile?.allowed_townships || [];
+
+    return (
+      <div style={{
+        borderTop: '1px solid #E5E7EB',
+        padding: isMobile ? '12px 16px 14px' : '12px 10px 14px',
+        backgroundColor: '#FAFAFA',
+        marginTop: isMobile ? '8px' : '0'
+      }}>
+        {/* Signed-in user card */}
+        <div style={{
+          padding: '10px 12px',
+          backgroundColor: '#FFFFFF',
+          border: `1px solid ${prof.border}`,
+          borderLeft: `4px solid ${prof.color}`,
+          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
+          marginBottom: '8px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '4px'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <CircleUserRound size={13} style={{ color: prof.color, flexShrink: 0 }} />
+            <span style={{ fontSize: '11px', fontWeight: '700', color: '#1A1A1A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {displayName.toUpperCase()}
+            </span>
+          </div>
+          <div style={{ fontSize: '10px', fontWeight: '600', color: '#404040', letterSpacing: '0.01em' }}>
+            {prof.typicalPerson}
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px', marginTop: '2px' }}>
+            <span style={{
+              fontSize: '8px',
+              fontWeight: '700',
+              color: prof.color,
+              backgroundColor: prof.bg,
+              padding: '1px 4px',
+              textTransform: 'uppercase',
+              letterSpacing: '0.03em',
+              border: `1px solid ${prof.border}`
+            }}>
+              {prof.roleName}
+            </span>
+            <span style={{
+              fontSize: '8px',
+              fontWeight: '700',
+              color: '#4B5563',
+              backgroundColor: '#F3F4F6',
+              padding: '1px 4px',
+              textTransform: 'uppercase',
+              letterSpacing: '0.03em',
+              border: '1px solid #E5E7EB'
+            }}>
+              {prof.accessLevel}
+            </span>
+          </div>
+
+          {(uLevel === 'district' || uLevel === 'viewer') && allowedDistricts.length > 0 && (
+            <div style={{
+              fontSize: '9.5px', fontWeight: '600', color: '#1E40AF', backgroundColor: '#EFF6FF',
+              padding: '4px 6px', border: '1px solid #BFDBFE', marginTop: '4px',
+              display: 'flex', flexDirection: 'column', gap: '2px'
+            }}>
+              <span style={{ fontSize: '7.5px', fontWeight: '800', color: '#1D4ED8', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Allowed Districts:</span>
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#1E3A8A' }}>
+                {allowedDistricts.join(', ')}
+              </span>
+            </div>
+          )}
+
+          {(uLevel === 'township' || uLevel === 'sub_township') && allowedTownships.length > 0 && (
+            <div style={{
+              fontSize: '9.5px', fontWeight: '600', color: '#3730A3', backgroundColor: '#EEF2FF',
+              padding: '4px 6px', border: '1px solid #C7D2FE', marginTop: '4px',
+              display: 'flex', flexDirection: 'column', gap: '2px'
+            }}>
+              <span style={{ fontSize: '7.5px', fontWeight: '800', color: '#4338CA', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Allowed Townships:</span>
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#312E81' }}>
+                {allowedTownships.join(', ')}
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* Sign Out button */}
+        <button
+          onClick={() => {
+            if (isMobile) setMoreOpen(false);
+            onLogout();
+          }}
+          style={{
+            width: '100%', display: 'flex', alignItems: 'center', gap: '8px',
+            padding: '8px 12px', background: 'none', border: '1px solid transparent',
+            cursor: 'pointer', color: '#B71C1C', fontSize: '11px', fontWeight: '500',
+            letterSpacing: '0.04em', textAlign: 'left',
+            transition: 'border-color 100ms, background-color 100ms',
+          }}
+          onMouseEnter={e => { e.currentTarget.style.borderColor = '#B71C1C'; e.currentTarget.style.backgroundColor = '#FDF2F2'; }}
+          onMouseLeave={e => { e.currentTarget.style.borderColor = 'transparent'; e.currentTarget.style.backgroundColor = 'transparent'; }}
+        >
+          <LogOut size={13} style={{ flexShrink: 0 }} />
+          Sign Out
+        </button>
+      </div>
+    );
+  };
 
   const SidebarContent = () => (
     <div style={{
@@ -116,7 +244,7 @@ const Sidebar = ({ user, onLogout }) => {
         {/* Issuing body */}
         <div style={{ marginBottom: '10px' }}>
           <div style={{ fontSize: '10px', fontWeight: '600', color: '#1A1A1A', letterSpacing: '0.02em', lineHeight: 1.4, marginBottom: '2px' }}>
-            တီုင်စေတ်မေန်းတိုအီး အဆိုးယကပီုန်တအာင်း
+            တီုင်စေတ်မေန်းတိုအီး အစိုးယကပီုန်တအာင်း
           </div>
           <div style={{ fontSize: '8px', fontWeight: '700', color: '#737373', letterSpacing: '0.12em', textTransform: 'uppercase' }}>
             Ta'ang Land Immigration Dept.
@@ -163,166 +291,57 @@ const Sidebar = ({ user, onLogout }) => {
         <div style={{ fontSize: '10px', fontWeight: '600', color: '#737373', padding: '0 12px 8px', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
           Navigation
         </div>
-        {filteredMenuItems.map(item => (
-          <NavLink
-            key={item.id}
-            to={item.path}
-            style={({ isActive }) => ({
-              display: 'flex', alignItems: 'center', gap: '10px',
-              padding: '9px 12px', marginBottom: '4px',
-              border: isActive ? '1px solid #1A1A1A' : '1px solid transparent',
-              backgroundColor: isActive ? '#FFFFFF' : 'transparent',
-              color: '#1A1A1A', fontWeight: isActive ? '600' : '400',
-              textDecoration: 'none', fontSize: '12px', letterSpacing: '0.02em', transition: 'background-color 100ms, color 100ms, border-color 100ms',
-            })}
-          >
-            {({ isActive }) => (
-              <>
-                <item.icon size={14} strokeWidth={isActive ? 2 : 1.5} style={{ color: '#1A1A1A', flexShrink: 0 }} />
-                <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.label}</span>
-                {item.id === 'notifications-requests' && unreadCount > 0 && (
-                  <span style={{
-                    backgroundColor: '#DC2626',
-                    color: '#FFFFFF',
-                    fontSize: '9px',
-                    fontWeight: '700',
-                    padding: '1px 5px',
-                    borderRadius: '10px',
-                    lineHeight: 1,
-                    marginLeft: 'auto',
-                    flexShrink: 0
-                  }}>
-                    {unreadCount}
-                  </span>
-                )}
-              </>
-            )}
-          </NavLink>
-        ))}
+        {filteredMenuItems.map(item => {
+          const isActive = location.pathname === item.path;
+          const isPending = navigatingTo === item.path;
+          return (
+            <button
+              key={item.id}
+              onClick={() => handleNav(item.path)}
+              disabled={!!navigatingTo}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '10px',
+                padding: '9px 12px', marginBottom: '4px', width: '100%', textAlign: 'left',
+                border: isActive ? '1px solid #1A1A1A' : '1px solid transparent',
+                backgroundColor: isActive ? '#FFFFFF' : 'transparent',
+                color: '#1A1A1A', fontWeight: isActive ? '600' : '400',
+                textDecoration: 'none', fontSize: '12px', letterSpacing: '0.02em',
+                transition: 'background-color 100ms, color 100ms, border-color 100ms',
+                cursor: isPending ? 'default' : 'pointer',
+                opacity: isPending ? 0.6 : 1,
+                borderRadius: '0px',
+              }}
+            >
+              <item.icon size={14} strokeWidth={isActive ? 2 : 1.5} style={{ color: '#1A1A1A', flexShrink: 0 }} />
+              <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.label}</span>
+              {item.id === 'notifications-requests' && unreadCount > 0 && (
+                <span style={{
+                  backgroundColor: '#DC2626',
+                  color: '#FFFFFF',
+                  fontSize: '9px',
+                  fontWeight: '700',
+                  padding: '1px 5px',
+                  borderRadius: '10px',
+                  lineHeight: 1,
+                  marginLeft: 'auto',
+                  flexShrink: 0
+                }}>
+                  {unreadCount}
+                </span>
+              )}
+            </button>
+          );
+        })}
       </div>
 
       {/* User + Logout */}
-      <div style={{ borderTop: '1px solid #E5E7EB', padding: '12px 10px 14px', backgroundColor: '#FAFAFA' }}>
-        {/* Signed-in user card */}
-        {(() => {
-          const uRole = user?.role || user?.profile?.role || 'field';
-          const uLevel = user?.access_level || user?.profile?.access_level || 'central';
-          const prof = getProfileType(uRole, uLevel);
-          const displayName = user?.profile?.display_name || user?.profile?.username || user?.username || 'Officer';
-          const allowedDistricts = user?.allowed_districts || user?.profile?.allowed_districts || [];
-          const allowedTownships = user?.allowed_townships || user?.profile?.allowed_townships || [];
-          
-          return (
-            <div style={{
-              padding: '10px 12px',
-              backgroundColor: '#FFFFFF',
-              border: `1px solid ${prof.border}`,
-              borderLeft: `4px solid ${prof.color}`,
-              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
-              marginBottom: '8px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '4px'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <CircleUserRound size={13} style={{ color: prof.color, flexShrink: 0 }} />
-                <span style={{ fontSize: '11px', fontWeight: '700', color: '#1A1A1A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {displayName.toUpperCase()}
-                </span>
-              </div>
-              <div style={{ fontSize: '10px', fontWeight: '600', color: '#404040', letterSpacing: '0.01em' }}>
-                {prof.typicalPerson}
-              </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px', marginTop: '2px' }}>
-                <span style={{
-                  fontSize: '8px',
-                  fontWeight: '700',
-                  color: prof.color,
-                  backgroundColor: prof.bg,
-                  padding: '1px 4px',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.03em',
-                  border: `1px solid ${prof.border}`
-                }}>
-                  {prof.roleName}
-                </span>
-                <span style={{
-                  fontSize: '8px',
-                  fontWeight: '700',
-                  color: '#4B5563',
-                  backgroundColor: '#F3F4F6',
-                  padding: '1px 4px',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.03em',
-                  border: '1px solid #E5E7EB'
-                }}>
-                  {prof.accessLevel}
-                </span>
-              </div>
-
-              {/* Allowed District/Township names */}
-              {(uLevel === 'district' || uLevel === 'viewer') && allowedDistricts.length > 0 && (
-                <div style={{
-                  fontSize: '9.5px',
-                  fontWeight: '600',
-                  color: '#1E40AF',
-                  backgroundColor: '#EFF6FF',
-                  padding: '4px 6px',
-                  border: '1px solid #BFDBFE',
-                  marginTop: '4px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '2px'
-                }}>
-                  <span style={{ fontSize: '7.5px', fontWeight: '800', color: '#1D4ED8', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Allowed Districts:</span>
-                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#1E3A8A' }}>
-                    {allowedDistricts.join(', ')}
-                  </span>
-                </div>
-              )}
-
-              {(uLevel === 'township' || uLevel === 'sub_township') && allowedTownships.length > 0 && (
-                <div style={{
-                  fontSize: '9.5px',
-                  fontWeight: '600',
-                  color: '#3730A3',
-                  backgroundColor: '#EEF2FF',
-                  padding: '4px 6px',
-                  border: '1px solid #C7D2FE',
-                  marginTop: '4px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '2px'
-                }}>
-                  <span style={{ fontSize: '7.5px', fontWeight: '800', color: '#4338CA', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Allowed Townships:</span>
-                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#312E81' }}>
-                    {allowedTownships.join(', ')}
-                  </span>
-                </div>
-              )}
-            </div>
-          );
-        })()}
-        {/* Sign Out button */}
-        <button
-          onClick={onLogout}
-          style={{
-            width: '100%', display: 'flex', alignItems: 'center', gap: '8px',
-            padding: '8px 12px', background: 'none', border: '1px solid transparent',
-            cursor: 'pointer', color: '#B71C1C', fontSize: '11px', fontWeight: '500',
-            letterSpacing: '0.04em', textAlign: 'left',
-            transition: 'border-color 100ms, background-color 100ms',
-          }}
-          onMouseEnter={e => { e.currentTarget.style.borderColor = '#B71C1C'; e.currentTarget.style.backgroundColor = '#FDF2F2'; }}
-          onMouseLeave={e => { e.currentTarget.style.borderColor = 'transparent'; e.currentTarget.style.backgroundColor = 'transparent'; }}
-        >
-          <LogOut size={13} style={{ flexShrink: 0 }} />
-          Sign Out
-        </button>
-      </div>
-
+      {renderUserFooter(false)}
     </div>
   );
+
+  const uRole = user?.role || user?.profile?.role || 'field';
+  const uLevel = user?.access_level || user?.profile?.access_level || 'central';
+  const prof = getProfileType(uRole, uLevel);
 
   return (
     <>
@@ -351,14 +370,15 @@ const Sidebar = ({ user, onLogout }) => {
           <span style={{ fontSize: '9px', fontWeight: '600', color: '#737373', letterSpacing: '0.05em', textTransform: 'uppercase', lineHeight: 1, whiteSpace: 'nowrap' }}>Ta'ang Population System</span>
         </div>
 
-        {/* Official badge — pushed to right */}
+        {/* Dynamic User Role badge with respective colors — pushed to right */}
         <span style={{
           marginLeft: 'auto', flexShrink: 0,
-          fontSize: '9px', fontWeight: '700', color: '#FFFFFF',
-          backgroundColor: '#1A1A1A',
-          padding: '4px 8px', letterSpacing: '0.08em', textTransform: 'uppercase',
+          fontSize: '9px', fontWeight: '700', color: prof.color,
+          backgroundColor: prof.bg,
+          border: `1px solid ${prof.border}`,
+          padding: '3px 8px', letterSpacing: '0.06em', textTransform: 'uppercase',
           whiteSpace: 'nowrap',
-        }}>OFFICIAL</span>
+        }}>{prof.roleName}</span>
       </div>
 
       {/* ── Desktop sidebar ── */}
@@ -395,16 +415,20 @@ const Sidebar = ({ user, onLogout }) => {
       }}>
         {primaryNav.map(item => {
           const isActive = location.pathname === item.path;
+          const isPending = navigatingTo === item.path;
           return (
             <button
               key={item.id}
-              onClick={() => navigate(item.path)}
+              onClick={() => handleNav(item.path)}
+              disabled={!!navigatingTo}
               style={{
                 flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
                 justifyContent: 'center', gap: '3px', background: 'none', border: 'none',
-                cursor: 'pointer', padding: '6px 4px',
+                cursor: isPending ? 'default' : 'pointer', padding: '6px 4px',
                 color: isActive ? '#1A1A1A' : '#9CA3AF',
                 minWidth: 0,
+                opacity: isPending ? 0.5 : 1,
+                transition: 'opacity 150ms',
               }}
             >
               <item.icon size={20} strokeWidth={isActive ? 2 : 1.5} />
@@ -461,7 +485,8 @@ const Sidebar = ({ user, onLogout }) => {
             style={{
               position: 'fixed', bottom: '60px', left: 0, right: 0, zIndex: 1101,
               backgroundColor: '#FFFFFF', borderTop: '1px solid #E5E7EB',
-              padding: '8px 0',
+              paddingTop: '8px', paddingBottom: '0',
+              maxHeight: '78vh', overflowY: 'auto',
             }}
           >
             {moreNav.map(item => {
@@ -469,14 +494,18 @@ const Sidebar = ({ user, onLogout }) => {
               return (
                 <button
                   key={item.id}
-                  onClick={() => { navigate(item.path); setMoreOpen(false); }}
+                  onClick={() => handleNav(item.path, () => setMoreOpen(false))}
+                  disabled={!!navigatingTo}
                   style={{
                     width: '100%', display: 'flex', alignItems: 'center', gap: '14px',
-                    padding: '14px 24px', background: 'none', border: 'none', cursor: 'pointer',
+                    padding: '14px 24px', background: 'none', border: 'none',
+                    cursor: navigatingTo === item.path ? 'default' : 'pointer',
                     color: isActive ? '#1A1A1A' : '#737373',
                     fontWeight: isActive ? '600' : '400',
                     fontSize: '13px', textAlign: 'left',
                     borderLeft: isActive ? '3px solid #1A1A1A' : '3px solid transparent',
+                    opacity: navigatingTo === item.path ? 0.5 : 1,
+                    transition: 'opacity 150ms',
                   }}
                 >
                   <item.icon size={18} strokeWidth={isActive ? 2 : 1.5} />
@@ -498,6 +527,9 @@ const Sidebar = ({ user, onLogout }) => {
                 </button>
               );
             })}
+
+            {/* Officer Profile Card & Sign Out Button inside Mobile Responsive Menu */}
+            {renderUserFooter(true)}
           </div>
         </>
       )}

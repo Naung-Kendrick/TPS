@@ -5,7 +5,7 @@ import { pushNotification, NOTIF_TYPES } from '../lib/notifications';
 import {
   ScanLine, Search, X, CheckCircle2, AlertCircle, Loader2,
   User, Home, MapPin, CreditCard, Hash, Camera, Keyboard,
-  ZoomIn, Users
+  ZoomIn, Users, Zap, RotateCcw, Target, ShieldCheck
 } from 'lucide-react';
 
 const IDCardScanner = () => {
@@ -23,6 +23,11 @@ const IDCardScanner = () => {
   const [familyLoading, setFamilyLoading] = useState(false);
   const [verificationRef, setVerificationRef] = useState(null);
   const [verifiedAt, setVerifiedAt] = useState(null);
+
+  // Advanced camera controls state
+  const [facingMode, setFacingMode] = useState('environment'); // 'environment' | 'user'
+  const [hasTorch, setHasTorch] = useState(false);
+  const [torchOn, setTorchOn] = useState(false);
 
   const generateVerifRef = (householdNo, idNo) => {
     const seed = (householdNo || '') + (idNo || '') + Date.now();
@@ -55,6 +60,71 @@ const IDCardScanner = () => {
     const digits = trimmed.match(/[0-9]{8,}/);
     if (digits) return digits[0];
     return trimmed;
+  };
+
+  // Audio chime notifications using Web Audio API for offline zero-latency playback
+  const playSuccessSound = () => {
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      
+      const osc1 = ctx.createOscillator();
+      const gain1 = ctx.createGain();
+      osc1.type = 'sine';
+      osc1.frequency.setValueAtTime(783.99, ctx.currentTime);
+      gain1.gain.setValueAtTime(0.15, ctx.currentTime);
+      gain1.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+      osc1.connect(gain1);
+      gain1.connect(ctx.destination);
+      osc1.start(ctx.currentTime);
+      osc1.stop(ctx.currentTime + 0.15);
+
+      const osc2 = ctx.createOscillator();
+      const gain2 = ctx.createGain();
+      osc2.type = 'sine';
+      osc2.frequency.setValueAtTime(1046.50, ctx.currentTime + 0.1);
+      gain2.gain.setValueAtTime(0.2, ctx.currentTime + 0.1);
+      gain2.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+      osc2.connect(gain2);
+      gain2.connect(ctx.destination);
+      osc2.start(ctx.currentTime + 0.1);
+      osc2.stop(ctx.currentTime + 0.35);
+    } catch (e) {
+      console.warn('Audio playback error:', e);
+    }
+  };
+
+  const playFailureSound = () => {
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+
+      const osc1 = ctx.createOscillator();
+      const gain1 = ctx.createGain();
+      osc1.type = 'sawtooth';
+      osc1.frequency.setValueAtTime(164.81, ctx.currentTime);
+      gain1.gain.setValueAtTime(0.18, ctx.currentTime);
+      gain1.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
+      osc1.connect(gain1);
+      gain1.connect(ctx.destination);
+      osc1.start(ctx.currentTime);
+      osc1.stop(ctx.currentTime + 0.2);
+
+      const osc2 = ctx.createOscillator();
+      const gain2 = ctx.createGain();
+      osc2.type = 'sawtooth';
+      osc2.frequency.setValueAtTime(130.81, ctx.currentTime + 0.15);
+      gain2.gain.setValueAtTime(0.2, ctx.currentTime + 0.15);
+      gain2.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+      osc2.connect(gain2);
+      gain2.connect(ctx.destination);
+      osc2.start(ctx.currentTime + 0.15);
+      osc2.stop(ctx.currentTime + 0.4);
+    } catch (e) {
+      console.warn('Audio playback error:', e);
+    }
   };
 
   const lookupID = async (rawId) => {
@@ -98,11 +168,13 @@ const IDCardScanner = () => {
 
     if (dbError) {
       setError('Database error: ' + dbError.message);
+      playFailureSound();
       return;
     }
 
     if (!data) {
       setError(`No record found for Ta'ang Land ID: ${numericId}`);
+      playFailureSound();
       return;
     }
 
@@ -110,6 +182,7 @@ const IDCardScanner = () => {
     setVerificationRef(ref);
     setVerifiedAt(new Date());
     setResult(data);
+    playSuccessSound();
     pushNotification({
       type: NOTIF_TYPES.VERIFICATION,
       title: 'Verification Complete',
@@ -131,21 +204,29 @@ const IDCardScanner = () => {
     }
     trackRef.current = null;
     setScanning(false);
+    setTorchOn(false);
+    setHasTorch(false);
     setZoom(1);
     setZoomRange({ min: 1, max: 4 });
   }, []);
 
-  const startCamera = async () => {
+  const startCameraWithMode = async (modeToUse) => {
     setError(null);
     setResult(null);
     setScanning(true);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }
+        video: { facingMode: modeToUse || facingMode, width: { ideal: 1920 }, height: { ideal: 1080 } }
       });
       streamRef.current = stream;
       const track = stream.getVideoTracks()[0];
       trackRef.current = track;
+
+      // Check torch capability
+      try {
+        const caps = track.getCapabilities?.() || {};
+        if (caps.torch) setHasTorch(true);
+      } catch (_) {}
 
       // Always allow CSS zoom 1–4x; also enable hardware zoom if supported
       setZoomRange({ min: 1, max: 4 });
@@ -217,6 +298,30 @@ const IDCardScanner = () => {
       setScanning(false);
       setError('Camera error: ' + (err?.message || 'Could not access camera.'));
     }
+  };
+
+  const startCamera = () => startCameraWithMode(facingMode);
+
+  const toggleTorch = async () => {
+    if (!trackRef.current) return;
+    try {
+      const nextTorch = !torchOn;
+      await trackRef.current.applyConstraints({
+        advanced: [{ torch: nextTorch }]
+      });
+      setTorchOn(nextTorch);
+    } catch (e) {
+      console.warn('Torch toggle error:', e);
+    }
+  };
+
+  const switchCamera = () => {
+    const nextMode = facingMode === 'environment' ? 'user' : 'environment';
+    setFacingMode(nextMode);
+    stopCamera();
+    setTimeout(() => {
+      startCameraWithMode(nextMode);
+    }, 200);
   };
 
   const handleZoomChange = async (val) => {
@@ -421,14 +526,14 @@ const IDCardScanner = () => {
               </button>
             </div>
           ) : (
-            /* ── Fullscreen Camera Overlay ── */
+            /* ── TPS Main Theme QR Camera Overlay ── */
             <div style={{
               position: 'fixed', inset: 0, zIndex: 9999,
-              backgroundColor: '#000',
+              backgroundColor: '#1A1A1A',
               display: 'flex', flexDirection: 'column',
               overflow: 'hidden',
             }}>
-              {/* Video */}
+              {/* Video Stream */}
               <video
                 ref={videoRef}
                 playsInline
@@ -440,130 +545,154 @@ const IDCardScanner = () => {
               {/* Dark vignette overlay with card cutout */}
               <div style={{
                 position: 'absolute', inset: 0,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                pointerEvents: 'none', zIndex: 5
               }}>
-                {/* Semi-dark mask around the card frame */}
-                <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }} xmlns="http://www.w3.org/2000/svg">
-                  <defs>
-                    <mask id="cutout">
-                      <rect width="100%" height="100%" fill="white" />
-                      <rect x="50%" y="50%" width="78vw" height="49vw"
-                        transform="translate(-39vw,-24.5vw)"
-                        rx="4" ry="4" fill="black" />
-                    </mask>
-                  </defs>
-                  <rect width="100%" height="100%" fill="rgba(0,0,0,0.55)" mask="url(#cutout)" />
-                </svg>
-
-                {/* Card frame with corner brackets */}
+                {/* Viewfinder Target Frame (Standard ID Card Ratio) */}
                 <div style={{
                   position: 'relative',
-                  width: '78vw', height: '49vw',
-                  maxWidth: '560px', maxHeight: '352px',
-                }}
-                >
+                  width: '82vw', height: '51.5vw',
+                  maxWidth: '480px', maxHeight: '300px',
+                  boxShadow: '0 0 0 9999px rgba(26, 26, 26, 0.82)',
+                  pointerEvents: 'auto'
+                }}>
                   {/* Scan flash */}
                   {scanFlash && (
                     <div style={{
                       position: 'absolute', inset: 0,
-                      backgroundColor: 'rgba(255,255,255,0.35)',
+                      backgroundColor: 'rgba(255, 255, 255, 0.35)',
                       pointerEvents: 'none', zIndex: 2,
                     }} />
                   )}
 
-                  {/* Corner brackets — top-left */}
-                  <div style={{ position:'absolute', top:0, left:0, width:28, height:28,
-                    borderTop:'3px solid #4FC3F7', borderLeft:'3px solid #4FC3F7' }} />
-                  {/* top-right */}
-                  <div style={{ position:'absolute', top:0, right:0, width:28, height:28,
-                    borderTop:'3px solid #4FC3F7', borderRight:'3px solid #4FC3F7' }} />
-                  {/* bottom-left */}
-                  <div style={{ position:'absolute', bottom:0, left:0, width:28, height:28,
-                    borderBottom:'3px solid #4FC3F7', borderLeft:'3px solid #4FC3F7' }} />
-                  {/* bottom-right */}
-                  <div style={{ position:'absolute', bottom:0, right:0, width:28, height:28,
-                    borderBottom:'3px solid #4FC3F7', borderRight:'3px solid #4FC3F7' }} />
+                  {/* Sharp corner brackets matching TPS theme */}
+                  <div style={{ position:'absolute', top:-2, left:-2, width:30, height:30,
+                    borderTop:'3.5px solid #FFFFFF', borderLeft:'3.5px solid #FFFFFF' }} />
+                  <div style={{ position:'absolute', top:-2, right:-2, width:30, height:30,
+                    borderTop:'3.5px solid #FFFFFF', borderRight:'3.5px solid #FFFFFF' }} />
+                  <div style={{ position:'absolute', bottom:-2, left:-2, width:30, height:30,
+                    borderBottom:'3.5px solid #FFFFFF', borderLeft:'3.5px solid #FFFFFF' }} />
+                  <div style={{ position:'absolute', bottom:-2, right:-2, width:30, height:30,
+                    borderBottom:'3.5px solid #FFFFFF', borderRight:'3.5px solid #FFFFFF' }} />
 
-                  {/* Animated scan line */}
+                  {/* Animated crisp scan laser line */}
                   <div style={{
-                    position: 'absolute', left: 8, right: 8, height: '2px',
-                    background: 'linear-gradient(90deg, transparent, #4FC3F7, transparent)',
-                    animation: 'scanline 2s linear infinite',
+                    position: 'absolute', left: 2, right: 2, height: '2px',
+                    background: 'linear-gradient(90deg, transparent, #FFFFFF, transparent)',
+                    boxShadow: '0 0 10px #FFFFFF',
+                    animation: 'scanline 2s ease-in-out infinite alternate',
                     zIndex: 1,
                   }} />
                 </div>
+
+                {/* Instruction Banner positioned cleanly below frame */}
+                <div style={{ marginTop: '24px', pointerEvents: 'auto' }}>
+                  <div className="inline-flex items-center gap-2 px-4 py-2 bg-[#1A1A1A] border border-[#404040]">
+                    <p style={{ color: '#D4D4D4', fontSize: '11px', fontWeight: '600', margin: 0, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+                      ALIGN ID CARD QR CODE WITHIN FRAME
+                    </p>
+                  </div>
+                </div>
               </div>
 
-              {/* Top bar */}
+              {/* Top Bar matching TPS Topbar/Header */}
               <div style={{
                 position: 'absolute', top: 0, left: 0, right: 0,
                 paddingTop: 'calc(16px + env(safe-area-inset-top, 0px))',
-                paddingBottom: '16px',
-                paddingLeft: '20px',
-                paddingRight: '20px',
+                paddingBottom: '16px', paddingLeft: '20px', paddingRight: '20px',
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                background: 'linear-gradient(to bottom, rgba(0,0,0,0.6), transparent)',
+                backgroundColor: '#1A1A1A',
+                borderBottom: '1px solid #333333',
+                zIndex: 10
               }}>
-                <div className="flex items-center gap-2">
-                  <ScanLine size={18} color="#4FC3F7" />
-                  <span style={{ color: '#fff', fontSize: '13px', fontWeight: '600', letterSpacing: '0.05em' }}>ID CARD SCANNER</span>
+                <div className="flex items-center gap-3">
+                  <ScanLine size={18} className="text-white" />
+                  <div>
+                    <span style={{ color: '#FFFFFF', fontSize: '13px', fontWeight: '700', letterSpacing: '0.05em', textTransform: 'uppercase', fontFamily: 'sans-serif' }}>
+                      ID CARD SCANNER
+                    </span>
+                    <p style={{ color: '#9CA3AF', fontSize: '10px', margin: 0, letterSpacing: '0.02em' }}>
+                      TA'ANG LAND IMMIGRATION DEPT.
+                    </p>
+                  </div>
                 </div>
-                <button
-                  onClick={stopCamera}
-                  style={{ background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '50%', width: 36, height: 36, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                >
-                  <X size={18} color="#fff" />
-                </button>
+
+                <div className="flex items-center gap-2">
+                  {/* Torch toggle */}
+                  {hasTorch && (
+                    <button
+                      type="button"
+                      onClick={toggleTorch}
+                      style={{
+                        backgroundColor: torchOn ? '#FFFFFF' : '#262626',
+                        color: torchOn ? '#1A1A1A' : '#FFFFFF',
+                        border: '1px solid #404040', borderRadius: '0px', width: 36, height: 36, cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s'
+                      }}
+                    >
+                      <Zap size={16} />
+                    </button>
+                  )}
+                  {/* Camera switcher */}
+                  <button
+                    type="button"
+                    onClick={switchCamera}
+                    style={{
+                      backgroundColor: '#262626', color: '#FFFFFF',
+                      border: '1px solid #404040', borderRadius: '0px', width: 36, height: 36, cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center'
+                    }}
+                  >
+                    <RotateCcw size={16} />
+                  </button>
+                  {/* Close button */}
+                  <button
+                    type="button"
+                    onClick={stopCamera}
+                    style={{
+                      backgroundColor: '#262626', color: '#FFFFFF',
+                      border: '1px solid #404040', borderRadius: '0px', width: 36, height: 36, cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center'
+                    }}
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
               </div>
 
-              {/* Hint text */}
-              <div style={{
-                position: 'absolute',
-                top: '50%', left: '50%',
-                transform: 'translate(-50%, calc(-50% + 30vw))',
-                maxWidth: '78vw',
-                textAlign: 'center',
-                marginTop: '8px',
-              }}>
-                <p style={{ color: 'rgba(255,255,255,0.8)', fontSize: '12px', margin: 0 }}>
-                  Align the ID card within the frame to scan QR code
-                </p>
-              </div>
 
-              {/* Bottom bar — tap-to-zoom button */}
+
+              {/* Bottom Control Toolbar */}
               <div style={{
                 position: 'absolute', bottom: 0, left: 0, right: 0,
-                paddingTop: '20px',
-                paddingBottom: 'calc(40px + env(safe-area-inset-bottom, 0px))',
-                background: 'linear-gradient(to top, rgba(0,0,0,0.85) 60%, transparent)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                paddingTop: '16px',
+                paddingBottom: 'calc(24px + env(safe-area-inset-bottom, 0px))',
+                backgroundColor: '#1A1A1A',
+                borderTop: '1px solid #333333',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px',
+                zIndex: 10
               }}>
-                <button
-                  onClick={() => {
-                    const steps = [1, 1.5, 2, 2.5, 3];
-                    const idx = steps.indexOf(zoom);
-                    const next = steps[(idx + 1) % steps.length];
-                    handleZoomChange(next);
-                  }}
-                  style={{
-                    background: 'rgba(255,255,255,0.18)', border: '1.5px solid rgba(255,255,255,0.4)',
-                    borderRadius: '50px', cursor: 'pointer', padding: '10px 22px',
-                    display: 'flex', alignItems: 'center', gap: '8px',
-                    color: '#fff', fontSize: '15px', fontWeight: '700', letterSpacing: '0.04em',
-                    backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)',
-                    userSelect: 'none', WebkitUserSelect: 'none',
-                  }}
-                >
-                  <ZoomIn size={18} color="#4FC3F7" />
-                  {parseFloat(zoom).toFixed(1)}×
-                </button>
+                {/* Zoom Chips */}
+                <div className="flex items-center gap-2 bg-[#262626] p-1 border border-[#404040]">
+                  <span className="text-[10px] text-gray-400 px-2 font-mono uppercase font-bold">ZOOM</span>
+                  {[1, 1.5, 2, 3].map((val) => (
+                    <button
+                      key={val}
+                      type="button"
+                      onClick={() => handleZoomChange(val)}
+                      className={`px-3 py-1 text-xs font-bold font-mono transition-all ${zoom === val ? 'bg-white text-black' : 'text-gray-300 hover:bg-[#333333]'}`}
+                      style={{ borderRadius: '0px' }}
+                    >
+                      {val.toFixed(1)}×
+                    </button>
+                  ))}
+                </div>
               </div>
 
               <style>{`
                 @keyframes scanline {
-                  0%   { top: 8px; }
-                  50%  { top: calc(100% - 10px); }
-                  100% { top: 8px; }
+                  0%   { top: 4px; }
+                  100% { top: calc(100% - 6px); }
                 }
               `}</style>
             </div>

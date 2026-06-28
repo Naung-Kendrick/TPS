@@ -1581,11 +1581,11 @@ const CsvUploader = ({ onUploadSuccess }) => {
           <Upload size={24} />
         </div>
         <div>
-          <h2 className="text-[#1A1A1A]">
-            <span className="hidden sm:inline text-xl font-bold">Bulk Upload Households (Excel / CSV / JSON)</span>
-            <span className="inline sm:hidden text-base font-bold">Bulk Upload Households</span>
+          <h2 style={{ fontSize: '20px', margin: '0 0 8px 0', color: '#1A1A1A', fontWeight: '500', letterSpacing: '0.02em' }}>
+            <span className="hidden sm:inline">BULK UPLOAD HOUSEHOLDS (EXCEL / CSV / JSON)</span>
+            <span className="inline sm:hidden">BULK UPLOAD HOUSEHOLDS</span>
           </h2>
-          <p className="text-sm text-[#737373]">
+          <p style={{ margin: 0, color: '#737373', fontSize: '11px', fontWeight: '500', fontFamily: "'Inter', sans-serif", textTransform: 'uppercase', letterSpacing: '0.05em' }}>
             <span className="hidden sm:inline">Upload an Excel workbook, CSV file, or a previously exported JSON backup.</span>
             <span className="inline sm:hidden">Upload Excel, CSV, or JSON backup file.</span>
           </p>

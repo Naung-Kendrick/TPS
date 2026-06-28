@@ -5,7 +5,8 @@ import { pushNotification, NOTIF_TYPES } from '../lib/notifications';
 import {
   ScanLine, Search, X, CheckCircle2, AlertCircle, Loader2,
   User, Home, MapPin, CreditCard, Hash, Camera, Keyboard,
-  ZoomIn, Users, Zap, RotateCcw, Target, ShieldCheck
+  ZoomIn, Users, Zap, RotateCcw, Target, ShieldCheck,
+  Calendar, Globe, Briefcase, HeartHandshake, Layers, Building, Landmark, Compass, UserCheck
 } from 'lucide-react';
 
 const IDCardScanner = () => {
@@ -779,22 +780,22 @@ const IDCardScanner = () => {
             <InfoRow icon={User} label="Full Name" value={result.name} />
             <InfoRow icon={CreditCard} label="Ta'ang Land ID No." value={result.taang_land_id_no} />
             <InfoRow icon={Hash} label="Household No." value={result.household_no} />
-            <InfoRow icon={User} label="Gender" value={result.gender} />
-            <InfoRow icon={User} label="Date of Birth" value={result.date_of_birth} />
-            <InfoRow icon={User} label="Nationality" value={result.nationality} />
-            <InfoRow icon={User} label="Occupation" value={result.occupation} />
-            <InfoRow icon={User} label="Household Relationship" value={result.household_relationship} />
+            <InfoRow icon={UserCheck} label="Gender" value={result.gender} />
+            <InfoRow icon={Calendar} label="Date of Birth" value={result.date_of_birth} />
+            <InfoRow icon={Globe} label="Nationality" value={result.nationality} />
+            <InfoRow icon={Briefcase} label="Occupation" value={result.occupation} />
+            <InfoRow icon={HeartHandshake} label="Household Relationship" value={result.household_relationship} />
           </div>
 
           {/* Address Section */}
           <div className="p-4 border-b border-[#E5E7EB]">
             <p className="text-xs font-semibold text-[#737373] uppercase tracking-widest mb-3">Address</p>
             <InfoRow icon={Home} label="House No." value={result.house_no} />
-            <InfoRow icon={MapPin} label="Ward / Village / Group" value={result.ward_village_group} />
-            <InfoRow icon={MapPin} label="Township" value={result.township} />
-            <InfoRow icon={MapPin} label="District" value={result.district} />
+            <InfoRow icon={Layers} label="Ward / Village / Group" value={result.ward_village_group} />
+            <InfoRow icon={Building} label="Township" value={result.township} />
+            <InfoRow icon={Landmark} label="District" value={result.district} />
             {result.address && (
-              <InfoRow icon={MapPin} label="Full Address" value={result.address} />
+              <InfoRow icon={Compass} label="Full Address" value={result.address} />
             )}
           </div>
 

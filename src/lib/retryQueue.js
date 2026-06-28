@@ -2,9 +2,23 @@
 import { supabase } from './supabase';
 
 const QUEUE_KEY = 'tps_retry_queue';
+const MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours — auto-purge stale PII
 
 function loadQueue() {
-  try { return JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]'); } catch (_) { return []; }
+  try {
+    const items = JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]');
+    // Security: auto-remove entries older than 24 hours
+    const now = Date.now();
+    const fresh = items.filter(op => {
+      if (!op.queuedAt) return false;
+      return (now - new Date(op.queuedAt).getTime()) < MAX_AGE_MS;
+    });
+    // Save back if we pruned anything
+    if (fresh.length !== items.length) {
+      try { localStorage.setItem(QUEUE_KEY, JSON.stringify(fresh)); } catch (_) {}
+    }
+    return fresh;
+  } catch (_) { return []; }
 }
 
 function saveQueue(q) {

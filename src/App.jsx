@@ -96,6 +96,13 @@ function App() {
   }, [user?.id]);
 
   const handleLogout = () => {
+    // Security: clear all PII data from localStorage on logout
+    try {
+      localStorage.removeItem('tps_retry_queue');
+      localStorage.removeItem('tps_household_form_draft');
+      localStorage.removeItem('tps_backup_history_logs');
+      sessionStorage.clear();
+    } catch (_) {}
     setUser(null);
   };
 

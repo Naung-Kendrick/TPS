@@ -826,17 +826,22 @@ const IDCardScanner = () => {
 
       {/* Family Modal */}
       {familyModal && (
-        <div style={{
-          position: 'fixed', inset: 0, zIndex: 10000,
-          backgroundColor: 'rgba(0,0,0,0.5)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          padding: '16px',
-        }}>
+        <div 
+          className="tps-panel-enter"
+          style={{
+            position: 'fixed', top: 0, bottom: 0, left: 0, right: 0, zIndex: 10000,
+            backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(2px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: '16px', overflowY: 'auto'
+          }}
+          onClick={(e) => { if (e.target === e.currentTarget) setFamilyModal(false); }}
+        >
           <div style={{
             backgroundColor: '#FFFFFF',
-            width: '100%', maxWidth: '95vw',
-            maxHeight: '90vh', display: 'flex', flexDirection: 'column',
-            border: '1px solid #E5E7EB',
+            width: '100%', maxWidth: '950px',
+            maxHeight: '82vh', display: 'flex', flexDirection: 'column',
+            border: '1px solid #1A1A1A', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.3)',
+            borderRadius: '0px', overflow: 'hidden', margin: 'auto'
           }}>
             {/* Modal Header */}
             <div style={{

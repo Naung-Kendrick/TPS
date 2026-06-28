@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { SkeletonStatGrid, SkeletonBar } from './Skeleton';
 import { supabase } from '../lib/supabase';
-import { Users, User, Home, Search, BarChart2, Printer, FileSpreadsheet, Send, CheckCircle2, ChevronDown } from 'lucide-react';
+import { Users, User, Home, Search, BarChart2, Printer, FileSpreadsheet, Send, CheckCircle2, ChevronDown, Loader2 } from 'lucide-react';
 import EmptyState from './EmptyState';
 import { printStatistics, exportStatisticsExcel } from '../lib/statisticsPrint';
 
@@ -650,7 +650,7 @@ const PopulationStatistics = ({ user }) => {
     textTransform: 'uppercase', letterSpacing: '0.05em'
   };
 
-  if (loading) {
+  if (loading && !statsData) {
     return (
       <div style={{ padding: '32px' }} className="max-w-7xl xl:max-w-[1440px] mx-auto">
         <SkeletonBar width="200px" height="22px" style={{ marginBottom: '8px' }} />
@@ -835,6 +835,16 @@ const PopulationStatistics = ({ user }) => {
           </div>
         )}
       </div>
+
+      {/* ─── Loading Circle in Gap when filtering ────────────── */}
+      {loading && (
+        <div className="tps-panel-enter flex items-center justify-center gap-2 py-3 px-4 my-2 bg-gray-50 border border-gray-200">
+          <Loader2 size={16} className="animate-spin text-gray-900" />
+          <span className="text-xs font-semibold text-gray-900 uppercase tracking-wider">
+            Updating Statistics Data...
+          </span>
+        </div>
+      )}
 
       {/* ─── Summary Cards ─────────────────────────────────── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 xl:gap-5 mb-4 sm:mb-6">

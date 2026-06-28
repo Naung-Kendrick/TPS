@@ -985,15 +985,16 @@ const processAndUpload = async (formattedData, setValidationErrors, setShowModal
   let duplicateCount = 0;
   let dbErrors = [];
 
-  // ── Phase 1 Optimization: bulk duplicate check + batched insert ──
-  // Fields used to identify a duplicate row (must stay in sync with fingerprint below)
-  const DUP_FIELDS = [
-    'household_no', 'name', 'date_of_birth', 'gender',
-    'fathers_name', 'mothers_name', 'household_relationship', 'occupation',
-    'previous_id_no', 'taang_land_id_no', 'nationality', 'resident_status',
-    'religious', 'house_no', 'ward_village_group', 'township', 'district',
-  ];
-  const fingerprint = (row) => DUP_FIELDS.map(f => row[f] || '').join('\u0001');
+  // ── Phase 1 Optimization: intelligent multi-layer duplicate person detection ──
+  // A person is identified as duplicate if:
+  //   1. household_no + name + date_of_birth match (core person identity)
+  //   2. OR taang_land_id_no matches (if non-empty)
+  //   3. OR previous_id_no matches (if non-empty)
+  const existingPersonKeys = new Set();
+  const existingTaangIds   = new Set();
+  const existingNrcs       = new Set();
+
+  const getPersonKey = (row) => `${row.household_no || ''}\u0001${row.name || ''}\u0001${row.date_of_birth || ''}`;
 
   // 1. Collect unique household numbers in the upload (narrows the DB scan)
   const uniqueHouseholdNos = [...new Set(
@@ -1005,11 +1006,9 @@ const processAndUpload = async (formattedData, setValidationErrors, setShowModal
     setProgress({ current: 0, total: uniqueHouseholdNos.length, stage: 'Checking for duplicates...' });
   }
 
-  // 2. Fetch existing rows from DB in chunks
-  // OPTIMIZATION: Reduced chunk size to 25, added logging & timeout protection
-  const existingFingerprints = new Set();
+  // 2. Fetch existing rows from DB in chunks (selecting core identity fields)
   const SELECT_CHUNK = 25;
-  console.log(`[processAndUpload] Starting duplicate check for ${uniqueHouseholdNos.length} unique households...`);
+  console.log(`[processAndUpload] Starting intelligent duplicate check for ${uniqueHouseholdNos.length} unique households...`);
 
   for (let i = 0; i < uniqueHouseholdNos.length; i += SELECT_CHUNK) {
     const slice = uniqueHouseholdNos.slice(i, i + SELECT_CHUNK);
@@ -1019,7 +1018,7 @@ const processAndUpload = async (formattedData, setValidationErrors, setShowModal
 
     const { data: existingRows, error: selErr } = await supabase
       .from('households')
-      .select(DUP_FIELDS.join(','))
+      .select('household_no, name, date_of_birth, taang_land_id_no, previous_id_no')
       .in('household_no', slice);
 
     const duration = Date.now() - startTime;
@@ -1030,7 +1029,12 @@ const processAndUpload = async (formattedData, setValidationErrors, setShowModal
       dbErrors.push(`Duplicate check failed: ${selErr.message}`);
       continue;
     }
-    (existingRows || []).forEach(r => existingFingerprints.add(fingerprint(r)));
+
+    (existingRows || []).forEach(r => {
+      existingPersonKeys.add(getPersonKey(r));
+      if (r.taang_land_id_no) existingTaangIds.add(r.taang_land_id_no.trim());
+      if (r.previous_id_no)   existingNrcs.add(r.previous_id_no.trim());
+    });
 
     // Update progress during duplicate check
     if (setProgress) {
@@ -1043,26 +1047,37 @@ const processAndUpload = async (formattedData, setValidationErrors, setShowModal
       await new Promise(resolve => setTimeout(resolve, 100));
     }
   }
-  console.log(`[processAndUpload] Duplicate check complete. ${existingFingerprints.size} unique fingerprints found.`);
+  console.log(`[processAndUpload] Duplicate check complete. ${existingPersonKeys.size} person keys, ${existingTaangIds.size} Ta'ang IDs, ${existingNrcs.size} NRCs indexed.`);
 
-  // 3. Partition: new rows go to insert queue, duplicates are counted
+  // 3. Partition: new rows go to insert queue, duplicates are identified and skipped
   const rowsToInsert = [];
   const insertSourceIndex = []; // maps batch index → original row index for error reporting
   for (let i = 0; i < processedData.length; i++) {
-    const fp = fingerprint(processedData[i]);
-    if (existingFingerprints.has(fp)) {
+    const row = processedData[i];
+    const pKey = getPersonKey(row);
+    const tId  = row.taang_land_id_no ? row.taang_land_id_no.trim() : '';
+    const nrc  = row.previous_id_no   ? row.previous_id_no.trim()   : '';
+
+    const isDuplicate = existingPersonKeys.has(pKey) || 
+                        (tId !== '' && existingTaangIds.has(tId)) || 
+                        (nrc !== '' && existingNrcs.has(nrc));
+
+    if (isDuplicate) {
       duplicateCount++;
     } else {
       // Clean row before inserting: strip non-column fields like 'address' and convert empty string dates to null
-      const cleanRow = { ...processedData[i] };
+      const cleanRow = { ...row };
       delete cleanRow.address;
       if (!cleanRow.submission_date || String(cleanRow.submission_date).trim() === '') {
         delete cleanRow.submission_date;
       }
       rowsToInsert.push(cleanRow);
       insertSourceIndex.push(i);
-      // Also add to set so duplicates *within* the same CSV are skipped
-      existingFingerprints.add(fp);
+
+      // Add to sets so duplicates WITHIN the same file are also caught and skipped
+      existingPersonKeys.add(pKey);
+      if (tId !== '') existingTaangIds.add(tId);
+      if (nrc !== '') existingNrcs.add(nrc);
     }
   }
 

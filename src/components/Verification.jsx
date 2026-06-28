@@ -240,7 +240,7 @@ const Verification = ({ user }) => {
                   name="household_no" 
                   value={formData.household_no} 
                   onChange={handleChange}
-                  className="w-full px-3 py-2 bg-white border border-gray-200 rounded-none focus:outline-none focus:border-gray-900 transition-colors text-sm font-mono"
+                  className="w-full px-3 py-2 bg-white border border-gray-200 rounded-none focus:outline-none focus:border-gray-900 transition-colors text-xs"
                   placeholder="Enter Household Number"
                   autoComplete="off"
                 />
@@ -252,7 +252,7 @@ const Verification = ({ user }) => {
                   name="name" 
                   value={formData.name} 
                   onChange={handleChange}
-                  className="w-full px-3 py-2 bg-white border border-gray-200 rounded-none focus:outline-none focus:border-gray-900 transition-colors text-sm"
+                  className="w-full px-3 py-2 bg-white border border-gray-200 rounded-none focus:outline-none focus:border-gray-900 transition-colors text-xs"
                   placeholder="Enter name"
                   autoComplete="off"
                 />
@@ -264,7 +264,7 @@ const Verification = ({ user }) => {
                   name="fathers_name" 
                   value={formData.fathers_name} 
                   onChange={handleChange}
-                  className="w-full px-3 py-2 bg-white border border-gray-200 rounded-none focus:outline-none focus:border-gray-900 transition-colors text-sm"
+                  className="w-full px-3 py-2 bg-white border border-gray-200 rounded-none focus:outline-none focus:border-gray-900 transition-colors text-xs"
                   placeholder="Enter father's name"
                   autoComplete="off"
                 />
@@ -276,7 +276,7 @@ const Verification = ({ user }) => {
                   name="ward" 
                   value={formData.ward} 
                   onChange={handleChange}
-                  className="w-full px-3 py-2 bg-white border border-gray-200 rounded-none focus:outline-none focus:border-gray-900 transition-colors text-sm"
+                  className="w-full px-3 py-2 bg-white border border-gray-200 rounded-none focus:outline-none focus:border-gray-900 transition-colors text-xs"
                   placeholder="Enter ward name"
                   autoComplete="off"
                 />
@@ -288,7 +288,7 @@ const Verification = ({ user }) => {
                   name="village" 
                   value={formData.village} 
                   onChange={handleChange}
-                  className="w-full px-3 py-2 bg-white border border-gray-200 rounded-none focus:outline-none focus:border-gray-900 transition-colors text-sm"
+                  className="w-full px-3 py-2 bg-white border border-gray-200 rounded-none focus:outline-none focus:border-gray-900 transition-colors text-xs"
                   placeholder="Enter village name"
                   autoComplete="off"
                 />
@@ -300,7 +300,7 @@ const Verification = ({ user }) => {
                   name="group" 
                   value={formData.group} 
                   onChange={handleChange}
-                  className="w-full px-3 py-2 bg-white border border-gray-200 rounded-none focus:outline-none focus:border-gray-900 transition-colors text-sm"
+                  className="w-full px-3 py-2 bg-white border border-gray-200 rounded-none focus:outline-none focus:border-gray-900 transition-colors text-xs"
                   placeholder="Enter group name"
                   autoComplete="off"
                 />
@@ -312,7 +312,7 @@ const Verification = ({ user }) => {
                   name="township" 
                   value={formData.township} 
                   onChange={handleChange}
-                  className="w-full px-3 py-2 bg-white border border-gray-200 rounded-none focus:outline-none focus:border-gray-900 transition-colors text-sm"
+                  className="w-full px-3 py-2 bg-white border border-gray-200 rounded-none focus:outline-none focus:border-gray-900 transition-colors text-xs"
                   placeholder="Enter township name"
                   autoComplete="off"
                 />
@@ -324,7 +324,7 @@ const Verification = ({ user }) => {
                   name="district" 
                   value={formData.district} 
                   onChange={handleChange}
-                  className="w-full px-3 py-2 bg-white border border-gray-200 rounded-none focus:outline-none focus:border-gray-900 transition-colors text-sm"
+                  className="w-full px-3 py-2 bg-white border border-gray-200 rounded-none focus:outline-none focus:border-gray-900 transition-colors text-xs"
                   placeholder="Enter district name"
                   autoComplete="off"
                 />
@@ -342,7 +342,7 @@ const Verification = ({ user }) => {
                   name="previous_id_region" 
                   value={formData.previous_id_region} 
                   onChange={handleChange}
-                  className="flex-[2] min-w-0 px-1 sm:px-3 py-2 bg-white border border-gray-200 rounded-none focus:outline-none focus:border-gray-900 transition-colors text-xs sm:text-sm text-center font-mono"
+                  className="flex-[2] min-w-0 px-1 sm:px-3 py-2 bg-white border border-gray-200 rounded-none focus:outline-none focus:border-gray-900 transition-colors text-xs text-center"
                   placeholder="၁၃"
                   maxLength="3"
                 />
@@ -352,7 +352,7 @@ const Verification = ({ user }) => {
                   name="previous_id_township" 
                   value={formData.previous_id_township} 
                   onChange={handleChange}
-                  className="flex-[3] min-w-0 px-1 sm:px-3 py-2 bg-white border border-gray-200 rounded-none focus:outline-none focus:border-gray-900 transition-colors text-xs sm:text-sm text-center font-mono"
+                  className="flex-[3] min-w-0 px-1 sm:px-3 py-2 bg-white border border-gray-200 rounded-none focus:outline-none focus:border-gray-900 transition-colors text-xs text-center"
                   placeholder="နခန"
                   maxLength="5"
                 />
@@ -362,7 +362,7 @@ const Verification = ({ user }) => {
                   name="previous_id_type" 
                   value={formData.previous_id_type} 
                   onChange={handleChange}
-                  className="flex-[2] min-w-0 px-1 sm:px-3 py-2 bg-white border border-gray-200 rounded-none focus:outline-none focus:border-gray-900 transition-colors text-xs sm:text-sm text-center font-mono"
+                  className="flex-[2] min-w-0 px-1 sm:px-3 py-2 bg-white border border-gray-200 rounded-none focus:outline-none focus:border-gray-900 transition-colors text-xs text-center"
                   placeholder="နိုင်"
                   maxLength="4"
                 />
@@ -372,7 +372,7 @@ const Verification = ({ user }) => {
                   name="previous_id_serial" 
                   value={formData.previous_id_serial} 
                   onChange={handleChange}
-                  className="flex-[4] min-w-0 px-1 sm:px-3 py-2 bg-white border border-gray-200 rounded-none focus:outline-none focus:border-gray-900 transition-colors text-xs sm:text-sm text-center font-mono"
+                  className="flex-[4] min-w-0 px-1 sm:px-3 py-2 bg-white border border-gray-200 rounded-none focus:outline-none focus:border-gray-900 transition-colors text-xs text-center"
                   placeholder="၀၉၆၉၁၅"
                   maxLength="8"
                 />

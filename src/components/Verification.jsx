@@ -383,16 +383,34 @@ const Verification = ({ user }) => {
               <button 
                 type="submit" 
                 disabled={loading}
-                className="flex items-center gap-2 bg-gray-900 hover:bg-white hover:text-gray-900 border border-transparent hover:border-gray-900 text-white px-5 py-2 rounded-none font-medium transition-colors text-xs uppercase letter-spacing-0.05 disabled:opacity-50"
+                onMouseOver={e => { if (!loading) { e.currentTarget.style.backgroundColor = '#FFFFFF'; e.currentTarget.style.color = '#1A1A1A'; } }}
+                onMouseOut={e => { if (!loading) { e.currentTarget.style.backgroundColor = '#1A1A1A'; e.currentTarget.style.color = '#FFFFFF'; } }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '6px',
+                  padding: '8px 16px', border: '1px solid #1A1A1A', backgroundColor: '#1A1A1A',
+                  color: '#FFFFFF', fontWeight: '500', fontSize: '11px',
+                  cursor: loading ? 'not-allowed' : 'pointer', textTransform: 'uppercase', letterSpacing: '0.05em',
+                  opacity: loading ? 0.5 : 1,
+                  transition: 'background-color 120ms cubic-bezier(0.23,1,0.32,1), color 120ms cubic-bezier(0.23,1,0.32,1)'
+                }}
               >
-                {loading ? <RotateCcw size={14} className="animate-spin" /> : null}
+                {loading ? <RotateCcw size={13} className="animate-spin" /> : null}
                 VERIFY DATA
               </button>
               <button 
                 type="button" 
                 onClick={handleClear}
                 disabled={loading}
-                className="flex items-center gap-2 bg-white border border-gray-900 text-gray-900 px-5 py-2 rounded-none font-medium text-xs uppercase letter-spacing-0.05 disabled:opacity-50"
+                onMouseOver={e => { e.currentTarget.style.backgroundColor = '#F9FAFB'; }}
+                onMouseOut={e => { e.currentTarget.style.backgroundColor = '#FFFFFF'; }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '6px',
+                  padding: '8px 16px', border: '1px solid #1A1A1A', backgroundColor: '#FFFFFF',
+                  color: '#1A1A1A', fontWeight: '500', fontSize: '11px',
+                  cursor: loading ? 'not-allowed' : 'pointer', textTransform: 'uppercase', letterSpacing: '0.05em',
+                  opacity: loading ? 0.5 : 1,
+                  transition: 'background-color 120ms cubic-bezier(0.23,1,0.32,1)'
+                }}
               >
                 CLEAR FILTERS
               </button>
@@ -612,17 +630,33 @@ const Verification = ({ user }) => {
                                               <button
                                                 type="button"
                                                 onClick={() => handlePrintPdf(expandedHouseholdNo, familyMembers)}
-                                                className="flex items-center gap-2 bg-gray-900 hover:bg-white hover:text-gray-900 border border-gray-900 text-white px-4 py-2 rounded-none font-medium transition-colors text-xs uppercase letter-spacing-0.05"
+                                                onMouseOver={e => { e.currentTarget.style.backgroundColor = '#FFFFFF'; e.currentTarget.style.color = '#1A1A1A'; }}
+                                                onMouseOut={e => { e.currentTarget.style.backgroundColor = '#1A1A1A'; e.currentTarget.style.color = '#FFFFFF'; }}
+                                                style={{
+                                                  display: 'flex', alignItems: 'center', gap: '6px',
+                                                  padding: '8px 16px', border: '1px solid #1A1A1A', backgroundColor: '#1A1A1A',
+                                                  color: '#FFFFFF', fontWeight: '500', fontSize: '11px',
+                                                  cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.05em',
+                                                  transition: 'background-color 120ms cubic-bezier(0.23,1,0.32,1), color 120ms cubic-bezier(0.23,1,0.32,1)'
+                                                }}
                                               >
-                                                <Printer size={14} />
+                                                <Printer size={13} />
                                                 Print PDF
                                               </button>
                                               <button
                                                 type="button"
                                                 onClick={() => handleExportExcel(expandedHouseholdNo, familyMembers)}
-                                                className="flex items-center gap-2 bg-white border border-gray-900 text-gray-900 px-4 py-2 rounded-none font-medium text-xs uppercase letter-spacing-0.05"
+                                                onMouseOver={e => { e.currentTarget.style.backgroundColor = '#F9FAFB'; }}
+                                                onMouseOut={e => { e.currentTarget.style.backgroundColor = '#FFFFFF'; }}
+                                                style={{
+                                                  display: 'flex', alignItems: 'center', gap: '6px',
+                                                  padding: '8px 16px', border: '1px solid #1A1A1A', backgroundColor: '#FFFFFF',
+                                                  color: '#1A1A1A', fontWeight: '500', fontSize: '11px',
+                                                  cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.05em',
+                                                  transition: 'background-color 120ms cubic-bezier(0.23,1,0.32,1)'
+                                                }}
                                               >
-                                                <FileSpreadsheet size={14} />
+                                                <FileSpreadsheet size={13} />
                                                 Export Excel
                                               </button>
                                             </div>

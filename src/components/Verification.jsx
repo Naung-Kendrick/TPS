@@ -74,7 +74,7 @@ const Verification = ({ user }) => {
     if (parts.length === 1) return str;
     return parts.map((part, i) =>
       regex.test(part)
-        ? <mark key={i} style={{ backgroundColor: '#C8E6C9', color: '#1B5E20', fontWeight: '700', padding: '0 2px', borderRadius: '2px' }}>{part}</mark>
+        ? <mark key={i} style={{ backgroundColor: '#DBEAFE', color: '#1D4ED8', fontWeight: '700', padding: '0 2px', borderRadius: '2px' }}>{part}</mark>
         : part
     );
   };

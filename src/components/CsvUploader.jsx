@@ -1029,11 +1029,24 @@ const processAndUpload = async (formattedData, setValidationErrors, setShowModal
     if (existingFingerprints.has(fp)) {
       duplicateCount++;
     } else {
-      rowsToInsert.push(processedData[i]);
+      // Clean row before inserting: strip non-column fields like 'address' and convert empty string dates to null
+      const cleanRow = { ...processedData[i] };
+      delete cleanRow.address;
+      if (!cleanRow.submission_date || String(cleanRow.submission_date).trim() === '') {
+        delete cleanRow.submission_date;
+      }
+      rowsToInsert.push(cleanRow);
       insertSourceIndex.push(i);
       // Also add to set so duplicates *within* the same CSV are skipped
       existingFingerprints.add(fp);
     }
+  }
+
+  // Ensure Supabase session is active before inserting
+  try {
+    await supabase.auth.getSession();
+  } catch (authE) {
+    console.warn('[processAndUpload] Auth session check warning:', authE);
   }
 
   // 4. Insert in batches; on batch failure, retry per-row to attribute errors
@@ -1054,6 +1067,13 @@ const processAndUpload = async (formattedData, setValidationErrors, setShowModal
     if (!batchErr) {
       successCount += batch.length;
     } else {
+      console.error('[processAndUpload] Batch insert error:', batchErr);
+      // If unauthorized / forbidden or session expired, don't retry 200 times
+      if (batchErr.status === 401 || batchErr.code === 'PGRST301' || batchErr.code === '42501' || (batchErr.message && batchErr.message.toLowerCase().includes('unauthorized'))) {
+        dbErrors.push(`Authentication / Access Error: ${batchErr.message || 'Unauthorized (401). Please re-login.'}`);
+        break;
+      }
+
       // Batch failed — fall back to per-row inserts so we can identify which row(s) broke
       for (let j = 0; j < batch.length; j++) {
         const { error: rowErr } = await supabase.from('households').insert(batch[j]);

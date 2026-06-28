@@ -217,7 +217,7 @@ const Verification = ({ user }) => {
         <h2 style={{ fontSize: '20px', margin: '0 0 8px 0', color: '#1A1A1A', fontWeight: '500', letterSpacing: '0.02em' }}>
           DATA VERIFICATION
         </h2>
-        <p style={{ margin: 0, color: '#737373', fontSize: '12px' }}>
+        <p style={{ margin: 0, color: '#737373', fontSize: '12px', fontFamily: "'Inter', sans-serif", letterSpacing: '0.01em' }}>
           Strictly verify household members.
         </p>
       </div>

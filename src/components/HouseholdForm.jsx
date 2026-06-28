@@ -1197,7 +1197,7 @@ const HouseholdForm = ({ user }) => {
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
         <div>
           <h2 style={{ fontSize: '20px', margin: '0 0 8px 0', color: '#1A1A1A', fontWeight: '500', letterSpacing: '0.02em' }}>HOUSEHOLD REGISTRATION</h2>
-          <p style={{ margin: 0, color: '#737373', fontSize: '12px' }}>Please fill out the form to register household members.</p>
+          <p style={{ margin: 0, color: '#737373', fontSize: '12px', fontFamily: "'Inter', sans-serif", letterSpacing: '0.01em' }}>Please fill out the form to register household members.</p>
         </div>
       </div>
 

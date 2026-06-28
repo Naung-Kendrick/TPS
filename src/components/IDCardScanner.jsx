@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import jsQR from 'jsqr';
 import { supabase } from '../lib/supabase';
 import { pushNotification, NOTIF_TYPES } from '../lib/notifications';
+import TpsScrollWrapper from './layout/TpsScrollWrapper';
 import {
   ScanLine, Search, X, CheckCircle2, AlertCircle, Loader2,
   User, Home, MapPin, CreditCard, Hash, Camera, Keyboard,
@@ -371,6 +372,10 @@ const IDCardScanner = () => {
 
   const openFamilyModal = async () => {
     if (!result?.household_no) return;
+    if (familyModal) {
+      setFamilyModal(false);
+      return;
+    }
     setFamilyModal(true);
     setFamilyLoading(true);
     const { data } = await supabase
@@ -799,132 +804,104 @@ const IDCardScanner = () => {
             )}
           </div>
 
-          {/* View Family Button */}
+          {/* View Family Button & Inline Roster */}
           <div className="p-4">
             <button
               onClick={openFamilyModal}
-              className="flex items-center gap-2 w-full justify-center hover:bg-[#1A1A1A] hover:text-white transition-colors"
+              onMouseOver={e => { e.currentTarget.style.backgroundColor = familyModal ? '#FFFFFF' : '#1A1A1A'; e.currentTarget.style.color = familyModal ? '#1A1A1A' : '#FFFFFF'; }}
+              onMouseOut={e => { e.currentTarget.style.backgroundColor = familyModal ? '#1A1A1A' : '#FFFFFF'; e.currentTarget.style.color = familyModal ? '#FFFFFF' : '#1A1A1A'; }}
               style={{
-                padding: '10px 24px',
-                backgroundColor: '#FFFFFF',
-                color: '#1A1A1A',
-                fontSize: '12px',
-                fontWeight: '700',
+                display: 'flex', alignItems: 'center', gap: '6px', width: '100%', justifyContent: 'center',
+                padding: '8px 16px',
+                backgroundColor: familyModal ? '#1A1A1A' : '#FFFFFF',
+                color: familyModal ? '#FFFFFF' : '#1A1A1A',
+                fontSize: '11px',
+                fontWeight: '500',
                 border: '1px solid #1A1A1A',
                 borderRadius: '0px',
                 cursor: 'pointer',
                 textTransform: 'uppercase',
-                letterSpacing: '0.05em'
+                letterSpacing: '0.05em',
+                transition: 'background-color 120ms cubic-bezier(0.23,1,0.32,1), color 120ms cubic-bezier(0.23,1,0.32,1)'
               }}
             >
-              <Users size={14} />
-              View All Family Members
+              <Users size={13} />
+              {familyModal ? 'Close Family Roster' : 'View All Family Members'}
             </button>
           </div>
-        </div>
-      )}
 
-      {/* Family Modal */}
-      {familyModal && (
-        <div 
-          className="tps-panel-enter"
-          style={{
-            position: 'fixed', top: 0, bottom: 0, left: 0, right: 0, zIndex: 10000,
-            backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(2px)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            padding: '16px', overflowY: 'auto'
-          }}
-          onClick={(e) => { if (e.target === e.currentTarget) setFamilyModal(false); }}
-        >
-          <div style={{
-            backgroundColor: '#FFFFFF',
-            width: '100%', maxWidth: '950px',
-            maxHeight: '82vh', display: 'flex', flexDirection: 'column',
-            border: '1px solid #1A1A1A', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.3)',
-            borderRadius: '0px', overflow: 'hidden', margin: 'auto'
-          }}>
-            {/* Modal Header */}
-            <div style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              padding: '12px 16px', borderBottom: '1px solid #E5E7EB', backgroundColor: '#FAFAFA',
-              flexShrink: 0,
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <Users size={16} style={{ color: '#1A1A1A' }} />
-                <div>
-                  <p style={{ margin: 0, fontSize: '13px', fontWeight: '600', color: '#1A1A1A', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Family Roster: {result.household_no}</p>
+          {/* Inline Family Roster Box directly below button */}
+          {familyModal && (
+            <div className="tps-panel-enter border-t border-[#E5E7EB] bg-[#FAFAFA] p-4 sm:p-6">
+              <div className="bg-white border border-[#E5E7EB]">
+                <div className="px-4 py-3 border-b border-[#E5E7EB] flex items-center justify-between bg-[#FAFAFA]">
+                  <div className="flex items-center gap-2">
+                    <Users size={15} className="text-[#1A1A1A]" />
+                    <span className="text-xs font-semibold text-[#1A1A1A] uppercase tracking-wider">
+                      Family Roster: {result.household_no}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-[10px] text-[#737373] uppercase tracking-wider font-mono">
+                      {familyMembers.length} member{familyMembers.length !== 1 ? 's' : ''}
+                    </span>
+                    <button onClick={() => setFamilyModal(false)} className="text-[#737373] hover:text-[#1A1A1A]">
+                      <X size={15} />
+                    </button>
+                  </div>
                 </div>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <span style={{ fontSize: '10px', color: '#737373', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{familyMembers.length} member{familyMembers.length !== 1 ? 's' : ''}</span>
-                <button onClick={() => setFamilyModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: '#737373' }}>
-                  <X size={16} />
-                </button>
-              </div>
-            </div>
 
-            {/* Modal Body — scrollable table */}
-            <div style={{ overflowY: 'auto', overflowX: 'auto', flex: 1 }}>
-              {familyLoading ? (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', padding: '40px' }}>
-                  <Loader2 size={18} className="animate-spin" style={{ color: '#4A6572' }} />
-                  <span style={{ fontSize: '12px', color: '#4A6572' }}>Loading family members...</span>
-                </div>
-              ) : familyMembers.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '40px', color: '#737373', fontSize: '12px' }}>No family members found.</div>
-              ) : (
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px', tableLayout: 'auto' }}>
-                  <thead>
-                    <tr style={{ backgroundColor: '#FAFAFA', borderBottom: '1px solid #E5E7EB' }}>
-                      {['No.', 'Name', 'Date of Birth', 'Gender', "Father's Name", "Mother's Name", 'Relationship', 'Occupation', 'Previous ID No.', "Ta'ang Land ID No.", 'Nationality', 'Resident Status', 'Religious', 'Submission Date'].map((h, i) => (
-                        <th key={i} style={{ padding: '8px 8px', fontSize: '9.5px', fontWeight: 600, color: '#737373', textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap', textAlign: 'left' }}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {familyMembers.map((m, i) => {
-                      const isMe = m.taang_land_id_no === result.taang_land_id_no;
-                      const rowBg = isMe ? '#F3F4F6' : '#FFFFFF';
-                      const td = (val) => <td style={{ padding: '7px 8px', whiteSpace: 'nowrap', color: '#737373' }}>{val || '—'}</td>;
-                      return (
-                        <tr key={m.id || i} style={{ borderBottom: '1px solid #F3F4F6', backgroundColor: rowBg }}>
-                          <td style={{ padding: '7px 8px', color: '#9CA3AF', fontWeight: 600, whiteSpace: 'nowrap' }}>{i + 1}</td>
-                          <td style={{ padding: '7px 8px', fontWeight: isMe ? 700 : 600, whiteSpace: 'nowrap', color: '#1A1A1A' }}>
-                            {m.name}
-                            {m.household_relationship === 'ဦးစီး' && <span style={{ marginLeft: '4px', border: '1px solid #1A1A1A', padding: '0 3px', fontSize: '8px', fontWeight: 700 }}>HEAD</span>}
-                            {isMe && <span style={{ marginLeft: '4px', backgroundColor: '#1A1A1A', color: '#fff', padding: '0 4px', fontSize: '8px', fontWeight: 700, letterSpacing: '0.05em' }}>YOU</span>}
-                          </td>
-                          {td(m.date_of_birth)}
-                          {td(m.gender)}
-                          {td(m.fathers_name)}
-                          {td(m.mothers_name)}
-                          {td(m.household_relationship)}
-                          {td(m.occupation)}
-                          {td(m.previous_id_no)}
-                          {td(m.taang_land_id_no)}
-                          {td(m.nationality)}
-                          {td(m.resident_status)}
-                          {td(m.religious)}
-                          {td(m.submission_date || (m.created_at ? m.created_at.split('T')[0] : null))}
+                {familyLoading ? (
+                  <div className="flex items-center justify-center gap-2 py-10 text-[#4A6572]">
+                    <Loader2 size={18} className="animate-spin" />
+                    <span className="text-xs font-medium">Loading family members...</span>
+                  </div>
+                ) : familyMembers.length === 0 ? (
+                  <div className="text-center py-10 text-[#737373] text-xs">No family members found.</div>
+                ) : (
+                  <TpsScrollWrapper>
+                    <table className="w-full text-left border-collapse text-xs whitespace-nowrap">
+                      <thead>
+                        <tr className="bg-[#FAFAFA] border-b border-[#E5E7EB]">
+                          {['No.', 'Name', 'Date of Birth', 'Gender', "Father's Name", "Mother's Name", 'Relationship', 'Occupation', 'Previous ID No.', "Ta'ang Land ID No.", 'Nationality', 'Resident Status', 'Religious', 'Submission Date'].map((h, i) => (
+                            <th key={i} className="px-3 py-2 text-[10px] font-semibold text-[#737373] uppercase tracking-wider border-b border-[#E5E7EB]">{h}</th>
+                          ))}
                         </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              )}
+                      </thead>
+                      <tbody>
+                        {familyMembers.map((m, i) => {
+                          const isMe = m.taang_land_id_no === result.taang_land_id_no;
+                          const rowBg = isMe ? 'bg-[#F3F4F6]' : 'bg-white';
+                          return (
+                            <tr key={m.id || i} className={`border-b border-[#F3F4F6] hover:bg-[#F9FAFB] transition-colors ${rowBg}`}>
+                              <td className="px-3 py-2 text-[#9CA3AF] font-mono font-semibold">{i + 1}</td>
+                              <td className="px-3 py-2 font-medium text-[#1A1A1A]">
+                                {m.name}
+                                {m.household_relationship === 'ဦးစီး' && <span className="ml-1.5 border border-[#1A1A1A] px-1 py-0.5 text-[8px] font-bold">HEAD</span>}
+                                {isMe && <span className="ml-1.5 bg-[#1A1A1A] text-white px-1 py-0.5 text-[8px] font-bold tracking-wider">YOU</span>}
+                              </td>
+                              <td className="px-3 py-2 text-[#737373] font-mono">{m.date_of_birth || '—'}</td>
+                              <td className="px-3 py-2 text-[#737373]">{m.gender || '—'}</td>
+                              <td className="px-3 py-2 text-[#737373]">{m.fathers_name || '—'}</td>
+                              <td className="px-3 py-2 text-[#737373]">{m.mothers_name || '—'}</td>
+                              <td className="px-3 py-2 text-[#737373] font-medium">{m.household_relationship || '—'}</td>
+                              <td className="px-3 py-2 text-[#737373]">{m.occupation || '—'}</td>
+                              <td className="px-3 py-2 text-[#737373] font-mono">{m.previous_id_no || '—'}</td>
+                              <td className="px-3 py-2 text-[#737373] font-mono">{m.taang_land_id_no || '—'}</td>
+                              <td className="px-3 py-2 text-[#737373]">{m.nationality || '—'}</td>
+                              <td className="px-3 py-2 text-[#737373]">{m.resident_status || '—'}</td>
+                              <td className="px-3 py-2 text-[#737373]">{m.religious || '—'}</td>
+                              <td className="px-3 py-2 text-[#737373] font-mono">{m.submission_date || (m.created_at ? m.created_at.split('T')[0] : '—')}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </TpsScrollWrapper>
+                )}
+              </div>
             </div>
-
-            {/* Modal Footer */}
-            <div style={{ padding: '10px 16px', borderTop: '1px solid #E5E7EB', backgroundColor: '#FAFAFA', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
-              <span style={{ fontSize: '11px', color: '#737373' }}>{familyMembers.length} member{familyMembers.length !== 1 ? 's' : ''} in household</span>
-              <button
-                onClick={() => setFamilyModal(false)}
-                style={{ padding: '6px 20px', backgroundColor: '#1A1A1A', color: '#fff', border: 'none', fontSize: '11px', fontWeight: '600', cursor: 'pointer', letterSpacing: '0.05em' }}
-              >
-                CLOSE
-              </button>
-            </div>
-          </div>
+          )}
         </div>
       )}
     </div>

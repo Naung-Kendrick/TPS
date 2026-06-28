@@ -225,6 +225,18 @@ const Login = ({ onLogin }) => {
       }
       if (verifyResult?.error) throw new Error(verifyResult.error);
 
+      // Re-verify profile is_active in case admin deactivated during OTP step
+      const { data: latestProfile } = await supabase
+        .from('profiles')
+        .select('is_active')
+        .eq('id', pendingUser.authData.user.id)
+        .single();
+
+      if (latestProfile?.is_active === false) {
+        await supabase.auth.signOut();
+        throw new Error('ဤအကောင့်ကို ပိတ်ပင်ထားပါသည်။ စီမံခန့်ခွဲသူထံ ဆက်သွယ်ပါ။ (Account deactivated — contact your administrator)');
+      }
+
       // Stamp last_seen_at
       await supabase.from('profiles').update({ last_seen_at: new Date().toISOString() }).eq('id', pendingUser.authData.user.id);
 

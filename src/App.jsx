@@ -51,15 +51,90 @@ const Placeholder = ({ title }) => (
 
 function App() {
   const [user, setUser] = useState(null);
+  const [sessionLoading, setSessionLoading] = useState(true);
   const [introShown, setIntroShown] = useState(false);
 
   const handleIntroDone = () => {
     setIntroShown(true);
   };
 
+  const handleLogout = async () => {
+    // Security: clear all PII data from localStorage on logout
+    try {
+      localStorage.removeItem('tps_retry_queue');
+      localStorage.removeItem('tps_household_form_draft');
+      localStorage.removeItem('tps_backup_history_logs');
+      sessionStorage.clear();
+      await supabase.auth.signOut();
+    } catch (_) {}
+    setUser(null);
+  };
+
   const handleLogin = (data) => {
     setUser(data);
   };
+
+  // 1. Session Restoration on Mount / Page Refresh
+  useEffect(() => {
+    let mounted = true;
+    const restoreSession = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('id, role, is_active, last_seen_at, access_level, allowed_districts, allowed_townships')
+            .eq('id', session.user.id)
+            .single();
+
+          if (profile && profile.is_active !== false && mounted) {
+            setUser({
+              ...session.user,
+              profile,
+              role: profile.role,
+              access_level: profile.access_level || 'central',
+              allowed_districts: profile.allowed_districts || [],
+              allowed_townships: profile.allowed_townships || [],
+            });
+          } else if (profile?.is_active === false) {
+            await supabase.auth.signOut();
+          }
+        }
+      } catch (err) {
+        console.error('Session restoration error:', err);
+      } finally {
+        if (mounted) setSessionLoading(false);
+      }
+    };
+
+    restoreSession();
+    return () => { mounted = false; };
+  }, []);
+
+  // 2. 30-Minute Idle Timeout (Auto-Logout on inactivity)
+  useEffect(() => {
+    if (!user) return;
+
+    const IDLE_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
+    let idleTimer;
+
+    const resetIdleTimer = () => {
+      clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => {
+        console.log('User inactive for 30 minutes. Auto logging out...');
+        handleLogout();
+      }, IDLE_TIMEOUT_MS);
+    };
+
+    const activityEvents = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'];
+    activityEvents.forEach(evt => window.addEventListener(evt, resetIdleTimer));
+    resetIdleTimer(); // start timer
+
+    return () => {
+      clearTimeout(idleTimer);
+      activityEvents.forEach(evt => window.removeEventListener(evt, resetIdleTimer));
+    };
+  }, [user]);
 
   // Heartbeat: refresh last_seen_at every 2 minutes while logged in
   useEffect(() => {
@@ -82,6 +157,10 @@ function App() {
         filter: `id=eq.${user.id}`,
       }, (payload) => {
         const updated = payload.new;
+        if (updated.is_active === false) {
+          handleLogout();
+          return;
+        }
         setUser(prev => ({
           ...prev,
           role:               updated.role               ?? prev.role,
@@ -95,16 +174,9 @@ function App() {
     return () => supabase.removeChannel(channel);
   }, [user?.id]);
 
-  const handleLogout = () => {
-    // Security: clear all PII data from localStorage on logout
-    try {
-      localStorage.removeItem('tps_retry_queue');
-      localStorage.removeItem('tps_household_form_draft');
-      localStorage.removeItem('tps_backup_history_logs');
-      sessionStorage.clear();
-    } catch (_) {}
-    setUser(null);
-  };
+  if (sessionLoading) {
+    return <PageFallback />;
+  }
 
   // Gate: Username + PIN + Email OTP login
   if (!user) {

@@ -1070,6 +1070,16 @@ const DemographicDashboard = ({ user }) => {
         )}
       </div>
 
+      {/* ─── Loading Circle in Gap when filtering ────────────── */}
+      {loading && (
+        <div className="tps-panel-enter flex flex-col items-center justify-center gap-3 py-8 my-3 bg-white border border-gray-200 shadow-sm">
+          <div className="w-8 h-8 border-2 border-gray-200 border-t-gray-900 rounded-full animate-spin" />
+          <span className="text-[11px] font-bold text-gray-900 uppercase tracking-[0.2em] font-mono">
+            LOADING
+          </span>
+        </div>
+      )}
+
       {/* ─── Error ───────────────────────────────────────── */}
       {error && !loading && (
         <div style={{ border: '1px solid #E5E7EB', marginBottom: '24px' }}>
@@ -1082,19 +1092,8 @@ const DemographicDashboard = ({ user }) => {
         </div>
       )}
 
-      {/* ─── Loading skeleton ────────────────────────────── */}
-      {loading && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
-          {[1,2,3,4,5].map(i => (
-            <div key={i} style={{ ...sectionCardStyle, minHeight: '140px' }}>
-              <SkeletonBar />
-            </div>
-          ))}
-        </div>
-      )}
-
       {/* ─── Charts ──────────────────────────────────────── */}
-      {!loading && !error && statsData && (
+      {!error && statsData && (
         <>
           {/* ── Summary Strip ──────────────────────────────── */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 xl:gap-4 mb-4">

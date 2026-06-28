@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { cacheGet, cacheSet } from '../lib/offlineCache';
 import { SkeletonTable, SkeletonBar } from './Skeleton';
-import { ChevronRight, Search, Map as MapIcon, MapPin, Home, Users, User, ArrowLeft, Loader2, AlertCircle, Printer, FileSpreadsheet, Pencil, Trash2, Check, X, Download } from 'lucide-react';
+import { ChevronRight, Search, Map as MapIcon, MapPin, Home, Users, User, ArrowLeft, Loader2, AlertCircle, Printer, FileSpreadsheet, Pencil, Trash2, Check, X, Download, Layers } from 'lucide-react';
 import EmptyState from './EmptyState';
 import TpsScrollWrapper from './layout/TpsScrollWrapper';
 import { exportHouseholdExcel, printHouseholdPdf, exportAllExcel } from '../lib/householdPrint';
@@ -993,7 +993,7 @@ const Reports = ({ user }) => {
                             {level === 1 && <MapIcon size={15} />}
                             {level === 2 && <MapPin size={15} />}
                             {level === 3 && item.locationType === 'ward' && <Home size={15} />}
-                            {level === 3 && item.locationType === 'group' && <Users size={15} />}
+                            {level === 3 && item.locationType === 'group' && <Layers size={15} />}
                           </div>
                           <span className="font-semibold text-gray-900 text-xs leading-snug">{item.name}</span>
                         </div>

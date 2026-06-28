@@ -36,7 +36,7 @@ const UploadPage = ({ user }) => (
   <div className="flex flex-col gap-8 p-6 sm:p-8 xl:p-10 max-w-7xl xl:max-w-[1440px] mx-auto">
     <div>
       <h2 style={{ fontSize: '20px', margin: '0 0 8px 0', color: '#1A1A1A', fontWeight: '500', letterSpacing: '0.02em' }}>DATA UPLOAD</h2>
-      <p style={{ margin: 0, color: '#737373', fontSize: '12px' }}>Bulk import household records from Excel, CSV, or JSON files.</p>
+      <p style={{ margin: 0, color: '#737373', fontSize: '11px', fontWeight: '500', fontFamily: "'Inter', sans-serif", textTransform: 'uppercase', letterSpacing: '0.05em' }}>Bulk import household records from Excel, CSV, or JSON files.</p>
     </div>
     <CsvUploader user={user} />
   </div>

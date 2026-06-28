@@ -639,13 +639,20 @@ const Reports = ({ user }) => {
       alert('Please enter a reason for editing.');
       return;
     }
-    if (editPin.trim() !== '510237') {
-      setEditPinError('Incorrect PIN code. Authorization denied.');
-      return;
-    }
-    setEditPinError('');
     setSaving(true);
+    setEditPinError('');
     try {
+      // Real Supabase Auth PIN/password verification
+      const userEmail = user?.email || (user?.profile?.username ? `${user.profile.username}@tps.idtl` : (user?.username ? (user.username.includes('@') ? user.username : `${user.username}@tps.idtl`) : ''));
+      const { error: authErr } = await supabase.auth.signInWithPassword({
+        email: userEmail,
+        password: editPin.trim(),
+      });
+      if (authErr) {
+        setEditPinError('လျှို့ဝှက်နံပါတ် မှားယွင်းနေပါသည်။ (Incorrect PIN / password).');
+        setSaving(false);
+        return;
+      }
       const { id, created_at, ...fields } = editForm;
       if (fields.date_of_birth) {
         fields.date_of_birth = normalizeDateOfBirth(fields.date_of_birth);
@@ -715,13 +722,20 @@ const Reports = ({ user }) => {
       alert('Please enter a reason for deletion.');
       return;
     }
-    if (deletePin.trim() !== '510237') {
-      setDeletePinError('Incorrect PIN code. Authorization denied.');
-      return;
-    }
-    setDeletePinError('');
     setDeleting(true);
+    setDeletePinError('');
     try {
+      // Real Supabase Auth PIN/password verification
+      const userEmail = user?.email || (user?.profile?.username ? `${user.profile.username}@tps.idtl` : (user?.username ? (user.username.includes('@') ? user.username : `${user.username}@tps.idtl`) : ''));
+      const { error: authErr } = await supabase.auth.signInWithPassword({
+        email: userEmail,
+        password: deletePin.trim(),
+      });
+      if (authErr) {
+        setDeletePinError('လျှို့ဝှက်နံပါတ် မှားယွင်းနေပါသည်။ (Incorrect PIN / password).');
+        setDeleting(false);
+        return;
+      }
       const member = deleteConfirmMember;
 
       // 1. Log audit trail in Supabase

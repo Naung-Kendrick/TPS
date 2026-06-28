@@ -55,8 +55,8 @@ export default function IntroAnimation({ onDone }) {
             left: '50%',
             marginLeft: '-80px',
             marginTop: '-72px',
-            height: '1px',
-            background: '#1A1A1A',
+            height: '3px',
+            background: '#1D4ED8',
             width: phase >= 1 ? '160px' : '0px',
             transition: 'width 400ms cubic-bezier(0.23,1,0.32,1)',
           }}
@@ -102,9 +102,9 @@ export default function IntroAnimation({ onDone }) {
               fontSize: 'clamp(8px, 2.5vw, 10px)',
               letterSpacing: '0.2em',
               textTransform: 'uppercase',
-              color: '#737373',
+              color: '#1D4ED8',
               fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
-              fontWeight: '500',
+              fontWeight: '600',
             }}
           >
             Ta&apos;ang Population System
@@ -119,8 +119,8 @@ export default function IntroAnimation({ onDone }) {
             left: '50%',
             marginLeft: '-40px',
             marginTop: '52px',
-            height: '1px',
-            background: '#E5E7EB',
+            height: '2px',
+            background: '#1D4ED8',
             width: phase >= 3 ? '80px' : '0px',
             WebkitTransition: 'width 350ms cubic-bezier(0.23,1,0.32,1)',
             transition: 'width 350ms cubic-bezier(0.23,1,0.32,1)',

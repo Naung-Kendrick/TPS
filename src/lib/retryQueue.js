@@ -1,12 +1,13 @@
 // retryQueue.js — persists failed Supabase writes and replays them when online
 import { supabase } from './supabase';
+import { getSecureItem, setSecureItem } from './secureStorage';
 
 const QUEUE_KEY = 'tps_retry_queue';
 const MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours — auto-purge stale PII
 
 function loadQueue() {
   try {
-    const items = JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]');
+    const items = getSecureItem(QUEUE_KEY) || [];
     // Security: auto-remove entries older than 24 hours
     const now = Date.now();
     const fresh = items.filter(op => {
@@ -15,14 +16,14 @@ function loadQueue() {
     });
     // Save back if we pruned anything
     if (fresh.length !== items.length) {
-      try { localStorage.setItem(QUEUE_KEY, JSON.stringify(fresh)); } catch (_) {}
+      try { setSecureItem(QUEUE_KEY, fresh); } catch (_) {}
     }
     return fresh;
   } catch (_) { return []; }
 }
 
 function saveQueue(q) {
-  try { localStorage.setItem(QUEUE_KEY, JSON.stringify(q)); } catch (_) {}
+  try { setSecureItem(QUEUE_KEY, q); } catch (_) {}
 }
 
 // Add a failed operation to the queue

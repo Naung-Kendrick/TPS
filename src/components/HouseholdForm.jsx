@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Pencil, Trash2, ChevronDown } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { enqueue } from '../lib/retryQueue';
+import { getSecureItem, setSecureItem, removeSecureItem } from '../lib/secureStorage';
 import EditHouseholdModal from './EditHouseholdModal';
 
 // ─── Custom Responsive Form Dropdown Selector ─────────────────────
@@ -398,9 +399,9 @@ const HouseholdForm = ({ user }) => {
   // Restore draft on mount
   useEffect(() => {
     try {
-      const saved = localStorage.getItem(DRAFT_KEY);
+      const saved = getSecureItem(DRAFT_KEY);
       if (saved) {
-        const { formData: savedForm, dob: savedDob } = JSON.parse(saved);
+        const { formData: savedForm, dob: savedDob } = saved;
         if (savedForm && savedForm.household_no) {
           setFormData(savedForm);
           if (savedDob) setDob(savedDob);
@@ -414,7 +415,7 @@ const HouseholdForm = ({ user }) => {
   // Auto-save draft on every change
   useEffect(() => {
     try {
-      localStorage.setItem(DRAFT_KEY, JSON.stringify({ formData, dob }));
+      setSecureItem(DRAFT_KEY, { formData, dob });
     } catch (_) {}
   }, [formData, dob]);
 
@@ -804,7 +805,7 @@ const HouseholdForm = ({ user }) => {
       setDob({ day: '', month: '', year: '' });
       setSubmittedMembers(prev => [...prev, payload]);
       fetchFamilyRoster(payload.household_no);
-      localStorage.removeItem(DRAFT_KEY);
+      removeSecureItem(DRAFT_KEY);
       
       if (mode === 'SAME_HOUSEHOLD') {
         setFormData(prev => ({
@@ -947,7 +948,7 @@ const HouseholdForm = ({ user }) => {
     setError(null);
     setHouseholdNoError('');
     setTaangLandIdError('');
-    localStorage.removeItem(DRAFT_KEY);
+    removeSecureItem(DRAFT_KEY);
   }, [DRAFT_KEY]);
 
   const formFieldsJSX = useMemo(() => (
@@ -1218,7 +1219,7 @@ const HouseholdForm = ({ user }) => {
         {draftRestored && (
           <div style={{ margin: '12px 20px 0', padding: '8px 12px', border: '1px solid #E5E7EB', backgroundColor: '#F3F4F6', color: '#1A1A1A', fontSize: '11px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span>📋 Draft restored — your previous unsaved data has been reloaded.</span>
-            <button type="button" onClick={() => { localStorage.removeItem(DRAFT_KEY); setDraftRestored(false); }} style={{ background: 'none', border: '1px solid #E5E7EB', fontSize: '10px', cursor: 'pointer', padding: '2px 8px', color: '#737373', textTransform: 'uppercase' }}>Clear</button>
+            <button type="button" onClick={() => { removeSecureItem(DRAFT_KEY); setDraftRestored(false); }} style={{ background: 'none', border: '1px solid #E5E7EB', fontSize: '10px', cursor: 'pointer', padding: '2px 8px', color: '#737373', textTransform: 'uppercase' }}>Clear</button>
           </div>
         )}
         {savedOffline && (

@@ -111,6 +111,7 @@ CREATE TRIGGER on_auth_user_created
 
 ALTER TABLE public.households ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.audit_logs ENABLE ROW LEVEL SECURITY;
 
 -- 1. Households: Authenticated users can read
 CREATE POLICY "Authenticated users can view data" 
@@ -145,6 +146,22 @@ WITH CHECK (
       AND access_level IS NOT DISTINCT FROM (SELECT p.access_level FROM public.profiles p WHERE p.id = auth.uid())
       AND is_active IS NOT DISTINCT FROM (SELECT p.is_active FROM public.profiles p WHERE p.id = auth.uid())
     )
+  )
+);
+
+-- 4. Audit Logs: Append-only for staff; read-only for admins (tamper-proof)
+CREATE POLICY "authenticated_append_audit_logs" 
+ON public.audit_logs FOR INSERT 
+WITH CHECK (auth.role() = 'authenticated');
+
+CREATE POLICY "admins_read_audit_logs" 
+ON public.audit_logs FOR SELECT 
+USING (
+  EXISTS (
+    SELECT 1 FROM public.profiles 
+    WHERE id = auth.uid() 
+      AND (is_active IS NOT FALSE)
+      AND role IN ('system', 'master', 'admin')
   )
 );
 

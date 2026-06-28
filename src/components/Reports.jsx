@@ -1143,9 +1143,9 @@ const Reports = ({ user }) => {
                 {showEditReasonModal && (
                   <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
                     <div className="bg-white border border-gray-200 p-6 w-full max-w-md shadow-xl">
-                      <h4 className="text-sm font-bold text-gray-900 uppercase tracking-wide mb-1">Reason for Edit & PIN Verification</h4>
+                      <h4 className="text-sm font-bold text-gray-900 uppercase tracking-wide mb-1">Reason for Edit & Password Verification</h4>
                       <p className="text-xs text-gray-600 mb-4">
-                        You are modifying record details for <strong>{editForm.name}</strong> ({editForm.household_no}). Please state the reason and enter your authorization PIN.
+                        You are modifying record details for <strong>{editForm.name}</strong> ({editForm.household_no}). Please state the reason and enter your account password.
                       </p>
                       <div className="mb-3">
                         <label className="block text-[11px] font-semibold text-gray-700 uppercase tracking-wider mb-1">
@@ -1162,15 +1162,14 @@ const Reports = ({ user }) => {
                       </div>
                       <div className="mb-4">
                         <label className="block text-[11px] font-semibold text-gray-700 uppercase tracking-wider mb-1">
-                          SECURITY AUTHORIZATION PIN <span className="text-red-500">*</span>
+                          ACCOUNT PASSWORD / PIN <span className="text-red-500">*</span>
                         </label>
                         <input
                           type="password"
-                          maxLength={6}
                           value={editPin}
                           onChange={(e) => { setEditPin(e.target.value); setEditPinError(''); }}
-                          placeholder="Enter 6-digit PIN code"
-                          className="w-full p-2 text-xs border border-gray-300 outline-none focus:border-gray-900 font-mono tracking-widest"
+                          placeholder="Enter account password / PIN"
+                          className="w-full p-2 text-xs border border-gray-300 outline-none focus:border-gray-900 font-sans"
                         />
                         {editPinError && <p className="text-[11px] text-red-600 font-medium mt-1">{editPinError}</p>}
                       </div>
@@ -1201,9 +1200,9 @@ const Reports = ({ user }) => {
                 {deleteConfirmMember && (
                   <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
                     <div className="bg-white border border-gray-200 p-6 w-full max-w-md shadow-xl">
-                      <h4 className="text-sm font-bold text-red-600 uppercase tracking-wide mb-1">Reason for Deletion & PIN Verification</h4>
+                      <h4 className="text-sm font-bold text-red-600 uppercase tracking-wide mb-1">Reason for Deletion & Password Verification</h4>
                       <p className="text-xs text-gray-600 mb-4">
-                        You are about to delete record for <strong>{deleteConfirmMember.name}</strong> ({deleteConfirmMember.household_no}). Please state the reason and enter your authorization PIN.
+                        You are about to delete record for <strong>{deleteConfirmMember.name}</strong> ({deleteConfirmMember.household_no}). Please state the reason and enter your account password.
                       </p>
                       <div className="mb-3">
                         <label className="block text-[11px] font-semibold text-gray-700 uppercase tracking-wider mb-1">
@@ -1220,15 +1219,14 @@ const Reports = ({ user }) => {
                       </div>
                       <div className="mb-4">
                         <label className="block text-[11px] font-semibold text-gray-700 uppercase tracking-wider mb-1">
-                          SECURITY AUTHORIZATION PIN <span className="text-red-500">*</span>
+                          ACCOUNT PASSWORD / PIN <span className="text-red-500">*</span>
                         </label>
                         <input
                           type="password"
-                          maxLength={6}
                           value={deletePin}
                           onChange={(e) => { setDeletePin(e.target.value); setDeletePinError(''); }}
-                          placeholder="Enter 6-digit PIN code"
-                          className="w-full p-2 text-xs border border-gray-300 outline-none focus:border-red-600 font-mono tracking-widest"
+                          placeholder="Enter account password / PIN"
+                          className="w-full p-2 text-xs border border-gray-300 outline-none focus:border-red-600 font-sans"
                         />
                         {deletePinError && <p className="text-[11px] text-red-600 font-medium mt-1">{deletePinError}</p>}
                       </div>

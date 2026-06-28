@@ -652,11 +652,11 @@ const PopulationStatistics = ({ user }) => {
 
   if (loading && !statsData) {
     return (
-      <div style={{ padding: '32px' }} className="max-w-7xl xl:max-w-[1440px] mx-auto">
-        <SkeletonBar width="200px" height="22px" style={{ marginBottom: '8px' }} />
-        <SkeletonBar width="320px" height="12px" style={{ marginBottom: '24px' }} />
-        <SkeletonStatGrid />
-        <SkeletonStatGrid />
+      <div className="flex flex-col items-center justify-center min-h-[450px] gap-3 max-w-7xl xl:max-w-[1440px] mx-auto bg-white p-8">
+        <div className="w-9 h-9 border-2 border-gray-200 border-t-gray-900 rounded-full animate-spin" />
+        <span className="text-[11px] font-bold text-gray-900 uppercase tracking-[0.2em] font-mono">
+          LOADING
+        </span>
       </div>
     );
   }
@@ -838,10 +838,10 @@ const PopulationStatistics = ({ user }) => {
 
       {/* ─── Loading Circle in Gap when filtering ────────────── */}
       {loading && (
-        <div className="tps-panel-enter flex items-center justify-center gap-2 py-3 px-4 my-2 bg-gray-50 border border-gray-200">
-          <Loader2 size={16} className="animate-spin text-gray-900" />
-          <span className="text-xs font-semibold text-gray-900 uppercase tracking-wider">
-            Updating Statistics Data...
+        <div className="tps-panel-enter flex flex-col items-center justify-center gap-3 py-8 my-3 bg-white border border-gray-200 shadow-sm">
+          <div className="w-8 h-8 border-2 border-gray-200 border-t-gray-900 rounded-full animate-spin" />
+          <span className="text-[11px] font-bold text-gray-900 uppercase tracking-[0.2em] font-mono">
+            LOADING
           </span>
         </div>
       )}

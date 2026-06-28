@@ -414,7 +414,7 @@ const IDCardScanner = () => {
         <h2 style={{ fontSize: '20px', margin: '0 0 8px 0', color: '#1A1A1A', fontWeight: '500', letterSpacing: '0.02em' }}>
           ID CARD SCANNER
         </h2>
-        <p style={{ margin: 0, color: '#737373', fontSize: '12px', fontFamily: "'Inter', sans-serif", letterSpacing: '0.01em' }}>
+        <p style={{ margin: 0, color: '#737373', fontSize: '11px', fontWeight: '500', fontFamily: "'Inter', sans-serif", textTransform: 'uppercase', letterSpacing: '0.05em' }}>
           Scan QR code or enter Ta'ang Land ID to verify household records.
         </p>
       </div>

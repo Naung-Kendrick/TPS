@@ -944,7 +944,7 @@ const DemographicDashboard = ({ user }) => {
           <h2 style={{ fontSize: '20px', margin: '0 0 8px 0', color: '#1A1A1A', fontWeight: '500', letterSpacing: '0.02em' }}>
             DEMOGRAPHIC DASHBOARD
           </h2>
-          <p style={{ margin: 0, color: '#737373', fontSize: '12px', fontFamily: "'Inter', sans-serif", letterSpacing: '0.01em' }}>
+          <p style={{ margin: 0, color: '#737373', fontSize: '11px', fontWeight: '500', fontFamily: "'Inter', sans-serif", textTransform: 'uppercase', letterSpacing: '0.05em' }}>
             Visual analysis of functional age pyramids, gender proportions, religious statistics, and occupational metrics.
           </p>
         </div>

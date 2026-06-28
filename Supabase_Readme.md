@@ -174,9 +174,10 @@ After you sign up your first user in the Supabase Dashboard (Authentication > Us
 
 ```sql
 -- Promote specific account to Master Admin (Level 4)
+-- Replace YOUR_USER_UUID_HERE with the actual UUID from Supabase Dashboard > Authentication > Users
 UPDATE public.profiles 
 SET role = 'system', role_title = 'Master Administrator'
-WHERE id = '7618f2f1-63d6-4af1-bc65-8beffecd357d';
+WHERE id = 'YOUR_USER_UUID_HERE';
 ```
 
 ---

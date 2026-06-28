@@ -1162,14 +1162,14 @@ const Reports = ({ user }) => {
                       </div>
                       <div className="mb-4">
                         <label className="block text-[11px] font-semibold text-gray-700 uppercase tracking-wider mb-1">
-                          ACCOUNT PASSWORD / PIN <span className="text-red-500">*</span>
+                          ACCOUNT PASSWORD VERIFICATION <span className="text-red-500">*</span>
                         </label>
                         <input
                           type="password"
                           value={editPin}
                           onChange={(e) => { setEditPin(e.target.value); setEditPinError(''); }}
-                          placeholder="Enter account password / PIN"
-                          className="w-full p-2 text-xs border border-gray-300 outline-none focus:border-gray-900 font-sans"
+                          placeholder="Enter your account password / PIN"
+                          className="w-full p-2 text-xs border border-gray-300 outline-none focus:border-gray-900 font-sans tracking-wide"
                         />
                         {editPinError && <p className="text-[11px] text-red-600 font-medium mt-1">{editPinError}</p>}
                       </div>
@@ -1219,14 +1219,14 @@ const Reports = ({ user }) => {
                       </div>
                       <div className="mb-4">
                         <label className="block text-[11px] font-semibold text-gray-700 uppercase tracking-wider mb-1">
-                          ACCOUNT PASSWORD / PIN <span className="text-red-500">*</span>
+                          ACCOUNT PASSWORD VERIFICATION <span className="text-red-500">*</span>
                         </label>
                         <input
                           type="password"
                           value={deletePin}
                           onChange={(e) => { setDeletePin(e.target.value); setDeletePinError(''); }}
-                          placeholder="Enter account password / PIN"
-                          className="w-full p-2 text-xs border border-gray-300 outline-none focus:border-red-600 font-sans"
+                          placeholder="Enter your account password / PIN"
+                          className="w-full p-2 text-xs border border-gray-300 outline-none focus:border-red-600 font-sans tracking-wide"
                         />
                         {deletePinError && <p className="text-[11px] text-red-600 font-medium mt-1">{deletePinError}</p>}
                       </div>

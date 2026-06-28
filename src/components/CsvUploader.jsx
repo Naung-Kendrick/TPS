@@ -841,6 +841,30 @@ export const playUploadFailureSound = () => {
   }
 };
 
+export const playUploadSkippedSound = () => {
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+
+    const notes = [440.00, 554.37];
+    notes.forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq, ctx.currentTime + i * 0.12);
+      gain.gain.setValueAtTime(0.16, ctx.currentTime + i * 0.12);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.12 + 0.18);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(ctx.currentTime + i * 0.12);
+      osc.stop(ctx.currentTime + i * 0.12 + 0.18);
+    });
+  } catch (e) {
+    console.warn('Audio playback error:', e);
+  }
+};
+
 // Shared: run validation + Supabase upsert for a flat array of parsed rows
 const processAndUpload = async (formattedData, setValidationErrors, setShowModal, setLoading, setSuccessMsg, onUploadSuccess, fileInputRef, setProgress) => {
   const errorsFound = [];
@@ -1098,6 +1122,13 @@ const processAndUpload = async (formattedData, setValidationErrors, setShowModal
     pushNotification({
       type: NOTIF_TYPES.UPLOAD,
       title: 'Upload Complete',
+      message: msg,
+    });
+  } else if (duplicateCount > 0) {
+    playUploadSkippedSound();
+    pushNotification({
+      type: NOTIF_TYPES.UPLOAD,
+      title: 'Duplicates Skipped',
       message: msg,
     });
   } else if (dbErrors.length > 0) {

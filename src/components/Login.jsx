@@ -358,11 +358,11 @@ const Login = ({ onLogin }) => {
 
         {/* Security Banner */}
         <div style={{
-          backgroundColor: '#FEF2F2', borderBottom: '1px solid #FEE2E2',
+          backgroundColor: '#EFF6FF', borderBottom: '1px solid #BFDBFE',
           padding: '0.75rem 1.25rem', display: 'flex', alignItems: 'center', gap: '0.75rem',
         }}>
-          <ShieldAlert size={18} color="#DC2626" />
-          <span style={{ fontSize: '0.75rem', color: '#991B1B', fontWeight: '600' }}>
+          <ShieldAlert size={18} color="#1D4ED8" />
+          <span style={{ fontSize: '0.75rem', color: '#1E40AF', fontWeight: '600', letterSpacing: '0.04em' }}>
             OFFICIAL ACCESS ONLY — AUTHORIZED PERSONNEL ONLY
           </span>
         </div>

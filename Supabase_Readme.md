@@ -129,14 +129,24 @@ USING (
   )
 );
 
--- 3. Profiles: Users can read all profiles but only update their own
+-- 3. Profiles: Users can read profiles; non-admins can only update safe fields on their own profile (preventing privilege escalation)
 CREATE POLICY "Profiles are viewable by all staff" 
 ON public.profiles FOR SELECT 
 USING (auth.role() = 'authenticated');
 
-CREATE POLICY "Users can update own profile" 
+CREATE POLICY "Users can update own safe profile fields" 
 ON public.profiles FOR UPDATE 
-USING (auth.uid() = id);
+USING (auth.uid() = id)
+WITH CHECK (
+  auth.uid() = id AND (
+    (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('system', 'master', 'admin')))
+    OR (
+      role = (SELECT p.role FROM public.profiles p WHERE p.id = auth.uid())
+      AND access_level IS NOT DISTINCT FROM (SELECT p.access_level FROM public.profiles p WHERE p.id = auth.uid())
+      AND is_active IS NOT DISTINCT FROM (SELECT p.is_active FROM public.profiles p WHERE p.id = auth.uid())
+    )
+  )
+);
 
 -- ==========================================
 -- IV. REALTIME SETTINGS

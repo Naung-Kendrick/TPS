@@ -737,10 +737,10 @@ const IDCardScanner = () => {
 
       {/* Result Card */}
       {result && !loading && (
-        <div className="bg-white border border-[#E5E7EB]" style={{ borderRadius: '0px', borderLeft: '3px solid #1A1A1A' }}>
+        <div className="bg-white border border-[#E5E7EB]" style={{ borderRadius: '0px', borderLeft: '3px solid #1D4ED8' }}>
 
           {/* ── Verification Stamp Header ── */}
-          <div className="tps-success-enter" style={{ backgroundColor: '#1A1A1A', padding: '12px 16px' }}>
+          <div className="tps-success-enter" style={{ backgroundColor: '#1D4ED8', padding: '12px 16px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 {/* Stamp seal */}

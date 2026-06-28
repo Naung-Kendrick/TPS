@@ -6,9 +6,9 @@ import EmptyState from './EmptyState';
 import { printStatistics, exportStatisticsExcel } from '../lib/statisticsPrint';
 
 const toMyanmarNum = (num) => {
-  if (num === null || num === undefined) return '';
-  const myanmarNumbers = ['၀', '၁', '၂', '၃', '၄', '၅', '၆', '၇', '၈', '၉'];
-  return num.toString().split('').map(digit => myanmarNumbers[parseInt(digit)] || digit).join('');
+  if (num === null || num === undefined || num === '') return '0';
+  const n = typeof num === 'number' ? num : Number(num);
+  return isNaN(n) ? num.toString() : n.toLocaleString('en-US');
 };
 
 // Normalize mixed nationalities for display (e.g., 'ဗမာ+ရှမ်း' → 'ဗမာ')

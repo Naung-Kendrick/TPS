@@ -10,9 +10,9 @@ const safeHtml = (v) => {
 };
 
 const toMM = (num) => {
-  if (num === null || num === undefined) return '၀';
-  const map = { '0':'၀','1':'၁','2':'၂','3':'၃','4':'၄','5':'၅','6':'၆','7':'၇','8':'၈','9':'၉' };
-  return String(num).replace(/[0-9]/g, d => map[d]);
+  if (num === null || num === undefined || num === '') return '0';
+  const n = typeof num === 'number' ? num : Number(num);
+  return isNaN(n) ? String(num) : n.toLocaleString('en-US');
 };
 
 // Normalize mixed nationalities for display (e.g., 'ဗမာ+ရှမ်း' → 'ဗမာ')

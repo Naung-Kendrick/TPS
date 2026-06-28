@@ -1629,7 +1629,7 @@ const CsvUploader = ({ onUploadSuccess }) => {
                     className="h-full transition-all duration-300 ease-out"
                     style={{
                       width: `${(progress.current / progress.total) * 100}%`,
-                      backgroundColor: '#2E7D32'
+                      backgroundColor: '#1D4ED8'
                     }}
                   />
                 </div>
@@ -1639,8 +1639,8 @@ const CsvUploader = ({ onUploadSuccess }) => {
         )}
 
         {successMsg && !loading && (
-          <div className="tps-success-enter flex items-center gap-3 font-medium p-4" style={{ borderRadius: '0px', backgroundColor: '#F0F7F0', border: '1px solid #A5D6A7', color: '#1B5E20' }}>
-            <CheckCircle2 size={20} style={{ color: '#2E7D32', flexShrink: 0 }} />
+          <div className="tps-success-enter flex items-center gap-3 font-medium p-4" style={{ borderRadius: '0px', backgroundColor: '#EFF6FF', border: '1px solid #BFDBFE', color: '#1E40AF' }}>
+            <CheckCircle2 size={20} style={{ color: '#1D4ED8', flexShrink: 0 }} />
             {successMsg}
           </div>
         )}

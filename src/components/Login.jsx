@@ -43,10 +43,54 @@ const Login = ({ onLogin }) => {
   };
 
   // ── Step 1: Verify username + PIN, then send OTP ──────────────────────────
+  const MAX_ATTEMPTS = 5;
+  const LOCKOUT_MS = 5 * 60 * 1000; // 5 minutes
+
+  const checkRateLimit = () => {
+    try {
+      const lockoutUntil = parseInt(localStorage.getItem('tps_login_lockout_until') || '0', 10);
+      if (Date.now() < lockoutUntil) {
+        const remainingSec = Math.ceil((lockoutUntil - Date.now()) / 1000);
+        const remainingMin = Math.ceil(remainingSec / 60);
+        return `အကြိမ်ပေါင်းများစွာ မှားယွင်းသောကြောင့် ${remainingMin} မိနစ် ခေတ္တခဏ ပိတ်ထားပါသည်။ (Too many failed attempts. Try again in ${remainingMin}m).`;
+      }
+    } catch (_) {}
+    return null;
+  };
+
+  const recordFailedAttempt = () => {
+    try {
+      let attempts = parseInt(localStorage.getItem('tps_login_attempts') || '0', 10) + 1;
+      localStorage.setItem('tps_login_attempts', attempts.toString());
+      if (attempts >= MAX_ATTEMPTS) {
+        const lockoutUntil = Date.now() + LOCKOUT_MS;
+        localStorage.setItem('tps_login_lockout_until', lockoutUntil.toString());
+        return `အကြိမ်ပေါင်းများစွာ မှားယွင်းသောကြောင့် ၅ မိနစ် ခေတ္တခဏ ပိတ်ထားပါသည်။ (Too many failed attempts. Locked for 5 minutes).`;
+      }
+      return `အသုံးပြုသူအမည် သို့မဟုတ် လျှို့ဝှက်နံပါတ် မှားယွင်းနေပါသည်။ (ကျန်ရှိသော အကြိမ်အရေအတွက်: ${MAX_ATTEMPTS - attempts} ကြိမ်)`;
+    } catch (_) {
+      return 'အသုံးပြုသူအမည် သို့မဟုတ် လျှို့ဝှက်နံပါတ် မှားယွင်းနေပါသည်။ (Invalid username or PIN)';
+    }
+  };
+
+  const clearFailedAttempts = () => {
+    try {
+      localStorage.removeItem('tps_login_attempts');
+      localStorage.removeItem('tps_login_lockout_until');
+    } catch (_) {}
+  };
+
   const handlePinSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError('');
+
+    const lockoutError = checkRateLimit();
+    if (lockoutError) {
+      setError(lockoutError);
+      setLoading(false);
+      return;
+    }
 
     if (!formData.username || !formData.pinCode) {
       setError('ကျေးဇူးပြု၍ အချက်အလက်အားလုံး ပြည့်စုံစွာ ဖြည့်စွက်ပါ။ (Please fill all fields)');
@@ -65,6 +109,9 @@ const Login = ({ onLogin }) => {
         password: formData.pinCode,
       });
       if (authError) throw authError;
+
+      // Clear rate limiting on success
+      clearFailedAttempts();
 
       // 2. Fetch profile
       const { data: profile, error: profileError } = await supabase
@@ -117,7 +164,8 @@ const Login = ({ onLogin }) => {
     } catch (err) {
       console.error('Login error:', err);
       if (err.message === 'Invalid login credentials') {
-        setError('အသုံးပြုသူအမည် သို့မဟုတ် လျှို့ဝှက်နံပါတ် မှားယွင်းနေပါသည်။ (Invalid username or PIN)');
+        const lockoutMsg = recordFailedAttempt();
+        setError(lockoutMsg);
       } else if (err.message === 'Email not confirmed') {
         setError('Error: Turn off "Confirm Email" in Supabase Auth Settings.');
       } else if (err.code === 'PGRST116') {

@@ -678,7 +678,7 @@ const PopulationStatistics = ({ user }) => {
 
   // Expanded Theme Palette (8 Muted Earthy & Nature Tones)
   const colors = {
-    forestGreen: '#2E7D32', // 1
+    forestGreen: '#1D4ED8', // 1
     earthyBrown: '#8D6E63', // 2
     slateGray:   '#4A6572', // 3
     mutedClay:   '#A1887F', // 4

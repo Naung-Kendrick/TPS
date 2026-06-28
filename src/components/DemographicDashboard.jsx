@@ -524,7 +524,7 @@ const writeCache = (key, data) => {
 
 // ─── Colors ────────────────────────────────────────────────
 const colors = {
-  forestGreen: '#2E7D32',
+  forestGreen: '#1D4ED8',
   earthyBrown: '#8D6E63',
   slateGray:   '#4A6572',
   tealDusk:    '#00695C',

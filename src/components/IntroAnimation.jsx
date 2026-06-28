@@ -53,11 +53,11 @@ export default function IntroAnimation({ onDone }) {
             position: 'absolute',
             top: '50%',
             left: '50%',
-            marginLeft: '-80px',
+            marginLeft: '-110px',
             marginTop: '-72px',
-            height: '3px',
-            background: '#1D4ED8',
-            width: phase >= 1 ? '160px' : '0px',
+            height: '2px',
+            background: '#1A1A1A',
+            width: phase >= 1 ? '220px' : '0px',
             transition: 'width 400ms cubic-bezier(0.23,1,0.32,1)',
           }}
         />
@@ -100,7 +100,7 @@ export default function IntroAnimation({ onDone }) {
           <span
             style={{
               fontSize: 'clamp(8px, 2.5vw, 10px)',
-              letterSpacing: '0.2em',
+              letterSpacing: '0.22em',
               textTransform: 'uppercase',
               color: '#1D4ED8',
               fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
@@ -117,11 +117,11 @@ export default function IntroAnimation({ onDone }) {
             position: 'absolute',
             top: '50%',
             left: '50%',
-            marginLeft: '-40px',
-            marginTop: '52px',
+            marginLeft: '-110px',
+            marginTop: '56px',
             height: '2px',
             background: '#1D4ED8',
-            width: phase >= 3 ? '80px' : '0px',
+            width: phase >= 3 ? '220px' : '0px',
             WebkitTransition: 'width 350ms cubic-bezier(0.23,1,0.32,1)',
             transition: 'width 350ms cubic-bezier(0.23,1,0.32,1)',
           }}

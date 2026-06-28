@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 import logo from '../assets/fonts/IDTL_logo.png';
 
 const RESEND_COOLDOWN = 60; // seconds before user can resend OTP
-const SKIP_OTP = false;  // ← set false to re-enable OTP
+const SKIP_OTP = import.meta.env.DEV && import.meta.env.VITE_SKIP_OTP === 'true'; // ← only skippable in local dev, never in production
 
 const Login = ({ onLogin }) => {
   // Step 1: username+PIN  →  Step 2: email OTP

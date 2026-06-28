@@ -104,7 +104,7 @@ const recordMatchesLocation = (record, selectedName, expectedType) => {
 };
 
 // ─── Stat Card ────────────────────────────────────────────
-const StatCard = ({ label, value, icon: Icon, color = '#1A1A1A' }) => (
+const StatCard = ({ label, value, icon: Icon, color = '#1A1A1A', textColor }) => (
   <div style={{
     backgroundColor: '#FFFFFF',
     border: '1px solid #E5E7EB',
@@ -126,7 +126,7 @@ const StatCard = ({ label, value, icon: Icon, color = '#1A1A1A' }) => (
     </div>
     <div>
       <div style={{ fontSize: '10px', color: '#737373', fontWeight: '600', marginBottom: '4px', letterSpacing: '0.05em', textTransform: 'uppercase' }}>{label}</div>
-      <div style={{ fontSize: '24px', fontWeight: '500', color: '#1A1A1A', lineHeight: 1.2, fontFamily: 'var(--font-mono)' }}>{toMyanmarNum(value)}</div>
+      <div style={{ fontSize: '24px', fontWeight: '500', color: textColor || '#1A1A1A', lineHeight: 1.2, fontFamily: 'var(--font-mono)' }}>{toMyanmarNum(value)}</div>
     </div>
   </div>
 );
@@ -848,7 +848,7 @@ const PopulationStatistics = ({ user }) => {
 
       {/* ─── Summary Cards ─────────────────────────────────── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 xl:gap-5 mb-4 sm:mb-6">
-        <StatCard label="Total Population" value={totalPopulation} icon={Users} color={colors.forestGreen} />
+        <StatCard label="Total Population" value={totalPopulation} icon={Users} color={colors.forestGreen} textColor={colors.forestGreen} />
         <StatCard label="Male" value={totalMale} icon={User} color={colors.slateGray} />
         <StatCard label="Female" value={totalFemale} icon={User} color={colors.mutedClay} />
         <StatCard label="Households" value={totalStats.households || 0} icon={Home} color={colors.earthyBrown} />
@@ -865,10 +865,10 @@ const PopulationStatistics = ({ user }) => {
             <div style={{ fontSize: '11px', color: '#737373', marginBottom: '12px' }}>အသက် ၁၆ နှစ်အောက်</div>
             <div style={{ fontSize: '32px', fontWeight: '500', color: colors.slateGray, fontFamily: 'var(--font-mono)' }}>{toMyanmarNum(under16)}</div>
           </div>
-          <div style={{ padding: '24px', border: `1px solid ${colors.forestGreen}`, textAlign: 'center' }}>
+          <div style={{ padding: '24px', border: `1px solid ${colors.slateGray}`, textAlign: 'center' }}>
             <div style={{ fontSize: '10px', color: '#737373', fontWeight: '600', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>16 – 60</div>
             <div style={{ fontSize: '11px', color: '#737373', marginBottom: '12px' }}>အသက် ၁၆ - ၆၀ နှစ်</div>
-            <div style={{ fontSize: '32px', fontWeight: '500', color: colors.forestGreen, fontFamily: 'var(--font-mono)' }}>{toMyanmarNum(between16and60)}</div>
+            <div style={{ fontSize: '32px', fontWeight: '500', color: colors.slateGray, fontFamily: 'var(--font-mono)' }}>{toMyanmarNum(between16and60)}</div>
           </div>
           <div style={{ padding: '24px', border: `1px solid ${colors.earthyBrown}`, textAlign: 'center' }}>
             <div style={{ fontSize: '10px', color: '#737373', fontWeight: '600', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Above 60</div>

@@ -1575,24 +1575,15 @@ const CsvUploader = ({ onUploadSuccess }) => {
   };
 
   return (
-    <div className="bg-white p-6 xl:p-8 border border-[#E5E7EB] mb-8" style={{ borderRadius: '0px' }}>
-      <div className="flex items-center gap-3 mb-4 xl:mb-6">
-        <div className="bg-[#F3F4F6] text-[#1A1A1A] p-2" style={{ borderRadius: '0px' }}>
-          <Upload size={24} />
-        </div>
-        <div>
-          <h2 style={{ fontSize: '20px', margin: '0 0 8px 0', color: '#1A1A1A', fontWeight: '500', letterSpacing: '0.02em' }}>
-            <span className="hidden sm:inline">BULK UPLOAD HOUSEHOLDS (EXCEL / CSV / JSON)</span>
-            <span className="inline sm:hidden">BULK UPLOAD HOUSEHOLDS</span>
-          </h2>
-          <p style={{ margin: 0, color: '#737373', fontSize: '11px', fontWeight: '500', fontFamily: "'Inter', sans-serif", textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            <span className="hidden sm:inline">Upload an Excel workbook, CSV file, or a previously exported JSON backup.</span>
-            <span className="inline sm:hidden">Upload Excel, CSV, or JSON backup file.</span>
-          </p>
-        </div>
+    <div className="bg-white border border-gray-200">
+      <div className="px-6 xl:px-8 py-4 border-b border-gray-200 flex items-center justify-between">
+        <h3 className="text-xs font-semibold text-gray-900 flex items-center gap-2 uppercase letter-spacing-0.05">
+          <Upload size={14} className="text-gray-900" /> 
+          Bulk Household File Import (Excel / CSV / JSON)
+        </h3>
       </div>
-
-      <div className="flex flex-col gap-4">
+      <div className="p-6 xl:p-8">
+        <div className="flex flex-col gap-4">
 
         <label className="flex flex-col items-center justify-center w-full h-32 border border-dashed border-[#E5E7EB] cursor-pointer bg-[#FAFAFA] hover:bg-[#F3F4F6] transition-colors" style={{ borderRadius: '0px' }}>
           <div className="flex flex-col items-center justify-center pt-5 pb-6">
@@ -1655,6 +1646,7 @@ const CsvUploader = ({ onUploadSuccess }) => {
         )}
 
       </div>
+    </div>
 
       {/* ERROR MODAL */}
       {showModal && (

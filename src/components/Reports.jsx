@@ -815,24 +815,25 @@ const Reports = ({ user }) => {
               Browse and manage household records and family records across regions.
             </p>
           </div>
-          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+          <div className="flex flex-col sm:flex-row items-center gap-2 w-full sm:w-auto">
             <button
               type="button"
               onClick={exportAllExcelData}
               disabled={exportingExcel}
               className="flex items-center justify-center gap-2 hover:bg-[#1A1A1A] hover:text-white transition-colors disabled:opacity-50 w-full sm:w-auto"
               style={{
-                padding: '10px 24px',
+                padding: '8px 16px',
+                height: '34px',
                 backgroundColor: '#FFFFFF',
                 color: '#1A1A1A',
-                fontSize: '12px',
-                fontWeight: '700',
+                fontSize: '11px',
+                fontWeight: '500',
                 border: '1px solid #1A1A1A',
                 borderRadius: '0px',
                 cursor: exportingExcel ? 'not-allowed' : 'pointer',
                 textTransform: 'uppercase',
                 letterSpacing: '0.05em',
-                marginTop: '4px'
+                boxSizing: 'border-box'
               }}
             >
               {exportingExcel ? <Loader2 size={12} className="animate-spin" /> : <FileSpreadsheet size={12} />}
@@ -844,17 +845,18 @@ const Reports = ({ user }) => {
               disabled={exportingJson}
               className="flex items-center justify-center gap-2 hover:bg-[#1A1A1A] hover:text-white transition-colors disabled:opacity-50 w-full sm:w-auto"
               style={{
-                padding: '10px 24px',
+                padding: '8px 16px',
+                height: '34px',
                 backgroundColor: '#FFFFFF',
                 color: '#1A1A1A',
-                fontSize: '12px',
-                fontWeight: '700',
+                fontSize: '11px',
+                fontWeight: '500',
                 border: '1px solid #1A1A1A',
                 borderRadius: '0px',
                 cursor: exportingJson ? 'not-allowed' : 'pointer',
                 textTransform: 'uppercase',
                 letterSpacing: '0.05em',
-                marginTop: '4px'
+                boxSizing: 'border-box'
               }}
             >
               {exportingJson ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
@@ -931,7 +933,24 @@ const Reports = ({ user }) => {
       {/* CONTROLS */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 mb-4">
         {level > 1 ? (
-          <button onClick={handleGoBackStep} disabled={goingBack || !!navigatingId} className="flex items-center justify-center gap-2 px-4 py-2 bg-white border border-gray-900 text-gray-900 font-medium text-xs uppercase w-full sm:w-auto disabled:opacity-50">
+          <button
+            onClick={handleGoBackStep}
+            disabled={goingBack || !!navigatingId}
+            className="flex items-center justify-center gap-1.5 hover:bg-[#1A1A1A] hover:text-white transition-colors disabled:opacity-50 w-full sm:w-auto"
+            style={{
+              padding: '8px 16px',
+              height: '34px',
+              backgroundColor: '#FFFFFF',
+              color: '#1A1A1A',
+              fontSize: '11px',
+              fontWeight: '500',
+              border: '1px solid #1A1A1A',
+              borderRadius: '0px',
+              textTransform: 'uppercase',
+              letterSpacing: '0.05em',
+              boxSizing: 'border-box'
+            }}
+          >
             <ArrowLeft size={13} /> Back
           </button>
         ) : <div className="hidden sm:block" />}
@@ -946,7 +965,17 @@ const Reports = ({ user }) => {
               placeholder={`Search ${level === 1 ? 'districts' : level === 2 ? 'townships' : level === 3 ? 'locations' : level === 4 && path.locationType === 'ward' ? 'household heads' : 'villages'}...`}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 bg-white border border-gray-200 rounded-none focus:outline-none focus:border-gray-900 transition-colors text-xs"
+              style={{
+                height: '34px',
+                fontSize: '11px',
+                border: '1px solid #E5E7EB',
+                borderRadius: '0px',
+                backgroundColor: '#FFFFFF',
+                paddingLeft: '32px',
+                paddingRight: '12px',
+                boxSizing: 'border-box'
+              }}
+              className="w-full focus:outline-none focus:border-gray-900 transition-colors"
             />
           </div>
         )}
@@ -1042,9 +1071,23 @@ const Reports = ({ user }) => {
                                   handleNavigateStep(6, { headName: head.name, householdNo: head.household_no }, `h-${head.household_no}`);
                                 }}
                                 disabled={navigatingId === `h-${head.household_no}`}
-                                className="inline-flex items-center gap-1 bg-white border border-gray-900 text-gray-900 px-3 py-1 text-xs font-medium uppercase disabled:opacity-50"
+                                className="inline-flex items-center gap-1 hover:bg-[#1A1A1A] hover:text-white transition-colors disabled:opacity-50"
+                                style={{
+                                  padding: '4px 10px',
+                                  height: '26px',
+                                  backgroundColor: '#FFFFFF',
+                                  color: '#1A1A1A',
+                                  fontSize: '10px',
+                                  fontWeight: '500',
+                                  border: '1px solid #1A1A1A',
+                                  borderRadius: '0px',
+                                  textTransform: 'uppercase',
+                                  letterSpacing: '0.05em',
+                                  boxSizing: 'border-box',
+                                  cursor: 'pointer'
+                                }}
                               >
-                                View Family <ChevronRight size={13} />
+                                View Family <ChevronRight size={12} />
                               </button>
                             </td>
                           </tr>
@@ -1123,9 +1166,23 @@ const Reports = ({ user }) => {
                                 handleNavigateStep(6, { headName: head.name, householdNo: head.household_no }, `h5-${head.household_no}`);
                               }}
                               disabled={navigatingId === `h5-${head.household_no}`}
-                              className="inline-flex items-center gap-1 bg-white border border-gray-900 text-gray-900 px-3 py-1 text-xs font-medium uppercase disabled:opacity-50"
+                              className="inline-flex items-center gap-1 hover:bg-[#1A1A1A] hover:text-white transition-colors disabled:opacity-50"
+                              style={{
+                                padding: '4px 10px',
+                                height: '26px',
+                                backgroundColor: '#FFFFFF',
+                                color: '#1A1A1A',
+                                fontSize: '10px',
+                                fontWeight: '500',
+                                border: '1px solid #1A1A1A',
+                                borderRadius: '0px',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.05em',
+                                boxSizing: 'border-box',
+                                cursor: 'pointer'
+                              }}
                             >
-                              View Family <ChevronRight size={13} />
+                              View Family <ChevronRight size={12} />
                             </button>
                           </td>
                         </tr>
@@ -1348,7 +1405,21 @@ const Reports = ({ user }) => {
                       <button
                         type="button"
                         onClick={() => printHouseholdPdf(path.householdNo, familyMembers)}
-                        className="flex items-center justify-center gap-1.5 bg-gray-900 hover:bg-white hover:text-gray-900 hover:border-gray-900 border border-gray-900 text-white px-3 py-2 font-medium transition-colors text-xs uppercase"
+                        className="flex items-center justify-center gap-1.5 hover:bg-white hover:text-gray-900 transition-colors"
+                        style={{
+                          padding: '8px 16px',
+                          height: '34px',
+                          backgroundColor: '#1A1A1A',
+                          color: '#FFFFFF',
+                          fontSize: '11px',
+                          fontWeight: '500',
+                          border: '1px solid #1A1A1A',
+                          borderRadius: '0px',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em',
+                          boxSizing: 'border-box',
+                          cursor: 'pointer'
+                        }}
                       >
                         <Printer size={13} />
                         <span className="hidden sm:inline">Print PDF</span>
@@ -1357,7 +1428,21 @@ const Reports = ({ user }) => {
                       <button
                         type="button"
                         onClick={() => exportHouseholdExcel(path.householdNo, familyMembers)}
-                        className="flex items-center justify-center gap-1.5 bg-white border border-gray-900 text-gray-900 px-3 py-2 font-medium text-xs uppercase"
+                        className="flex items-center justify-center gap-1.5 hover:bg-[#1A1A1A] hover:text-white transition-colors"
+                        style={{
+                          padding: '8px 16px',
+                          height: '34px',
+                          backgroundColor: '#FFFFFF',
+                          color: '#1A1A1A',
+                          fontSize: '11px',
+                          fontWeight: '500',
+                          border: '1px solid #1A1A1A',
+                          borderRadius: '0px',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em',
+                          boxSizing: 'border-box',
+                          cursor: 'pointer'
+                        }}
                       >
                         <FileSpreadsheet size={13} />
                         <span className="hidden sm:inline">Export Excel</span>
@@ -1366,7 +1451,21 @@ const Reports = ({ user }) => {
                       <button
                         type="button"
                         onClick={exportHouseholdJson}
-                        className="flex items-center justify-center gap-1.5 bg-white border border-gray-900 text-gray-900 px-3 py-2 font-medium text-xs uppercase"
+                        className="flex items-center justify-center gap-1.5 hover:bg-[#1A1A1A] hover:text-white transition-colors"
+                        style={{
+                          padding: '8px 16px',
+                          height: '34px',
+                          backgroundColor: '#FFFFFF',
+                          color: '#1A1A1A',
+                          fontSize: '11px',
+                          fontWeight: '500',
+                          border: '1px solid #1A1A1A',
+                          borderRadius: '0px',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em',
+                          boxSizing: 'border-box',
+                          cursor: 'pointer'
+                        }}
                       >
                         <Download size={13} />
                         <span className="hidden sm:inline">Export JSON</span>

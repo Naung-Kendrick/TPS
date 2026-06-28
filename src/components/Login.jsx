@@ -74,6 +74,12 @@ const Login = ({ onLogin }) => {
         .single();
       if (profileError) { profileError.userId = authData.user.id; throw profileError; }
 
+      // 2b. Block deactivated accounts immediately
+      if (profile.is_active === false) {
+        await supabase.auth.signOut(); // kill the Supabase session
+        throw new Error('ဤအကောင့်ကို ပိတ်ပင်ထားပါသည်။ စီမံခန့်ခွဲသူထံ ဆက်သွယ်ပါ။ (Account deactivated — contact your administrator)');
+      }
+
       // 3. Send OTP (skip if SKIP_OTP is enabled)
       if (SKIP_OTP) {
         await supabase.from('profiles').update({ last_seen_at: new Date().toISOString() }).eq('id', authData.user.id);

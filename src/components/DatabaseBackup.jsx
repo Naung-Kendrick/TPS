@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { Download, FileSpreadsheet, HardDrive, Clock, CheckCircle2, RefreshCw, Filter, ShieldCheck, ChevronDown } from 'lucide-react';
 import { deepEnsureUnicode } from './CsvUploader';
 import { exportAllExcel } from '../lib/householdPrint';
+import { getSecureItem, setSecureItem } from '../lib/secureStorage';
 
 const BACKUP_LOGS_KEY = 'tps_backup_history_logs';
 
@@ -111,11 +112,11 @@ const DatabaseBackup = ({ user }) => {
   // History logs
   const [backupLogs, setBackupLogs] = useState([]);
 
-  // Load backup history logs from localStorage on mount
+  // Load backup history logs from secureStorage on mount
   useEffect(() => {
     try {
-      const saved = localStorage.getItem(BACKUP_LOGS_KEY);
-      if (saved) setBackupLogs(JSON.parse(saved));
+      const saved = getSecureItem(BACKUP_LOGS_KEY);
+      if (saved) setBackupLogs(saved);
     } catch (_) {}
   }, []);
 
@@ -302,7 +303,7 @@ const DatabaseBackup = ({ user }) => {
 
       const updatedLogs = [newLog, ...backupLogs].slice(0, 30);
       setBackupLogs(updatedLogs);
-      localStorage.setItem(BACKUP_LOGS_KEY, JSON.stringify(updatedLogs));
+      setSecureItem(BACKUP_LOGS_KEY, updatedLogs);
 
     } catch (err) {
       alert('Backup Export Failed: ' + err.message);
@@ -335,7 +336,7 @@ const DatabaseBackup = ({ user }) => {
 
       const updatedLogs = [newLog, ...backupLogs].slice(0, 30);
       setBackupLogs(updatedLogs);
-      localStorage.setItem(BACKUP_LOGS_KEY, JSON.stringify(updatedLogs));
+      setSecureItem(BACKUP_LOGS_KEY, updatedLogs);
 
     } catch (err) {
       alert('Excel Export Failed: ' + err.message);

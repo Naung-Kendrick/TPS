@@ -117,13 +117,15 @@ CREATE POLICY "Authenticated users can view data"
 ON public.households FOR SELECT 
 USING (auth.role() = 'authenticated');
 
--- 2. Households: Only Admin/Master can insert or update
+-- 2. Households: Only Authorized active staff (Ops/Regional/System) can insert, update, or delete
 CREATE POLICY "Privileged users can modify data" 
 ON public.households FOR ALL 
 USING (
   EXISTS (
     SELECT 1 FROM public.profiles 
-    WHERE id = auth.uid() AND (role = 'admin' OR role = 'master')
+    WHERE id = auth.uid() 
+      AND (is_active IS NOT FALSE)
+      AND role IN ('system', 'master', 'admin', 'regional', 'ops')
   )
 );
 
@@ -148,8 +150,9 @@ ALTER PUBLICATION supabase_realtime ADD TABLE public.households;
 -- ==========================================
 
 -- Note: Run this in SQL if your plan supports it, otherwise create "id-scans" 
--- bucket in the Storage dashboard and set to 'Public'.
-INSERT INTO storage.buckets (id, name, public) VALUES ('id-scans', 'id-scans', true)
+-- bucket in the Storage dashboard and set to 'Private' (NOT Public).
+-- SECURITY: ID card photos must NEVER be in a public bucket.
+INSERT INTO storage.buckets (id, name, public) VALUES ('id-scans', 'id-scans', false)
 ON CONFLICT (id) DO NOTHING;
 ```
 

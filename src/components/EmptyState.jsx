@@ -102,7 +102,7 @@ const EmptyState = ({
       {detail && (
         <div style={{
           fontSize: '10px', color: '#9CA3AF',
-          fontFamily: 'monospace', letterSpacing: '0.02em',
+          fontFamily: 'var(--font-mono)', letterSpacing: '0.02em',
           backgroundColor: '#F3F4F6',
           padding: '6px 12px',
           maxWidth: '400px', wordBreak: 'break-word',

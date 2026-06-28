@@ -464,7 +464,7 @@ const IDCardScanner = () => {
               onChange={(e) => setInputValue(e.target.value)}
               placeholder="e.g. 01003821959002978"
               className="flex-1 px-3 py-2 border border-[#E5E7EB] text-sm text-[#1A1A1A] bg-[#FAFAFA] focus:outline-none focus:border-[#1A1A1A]"
-              style={{ borderRadius: '0px', fontFamily: 'JetBrains Mono, monospace', letterSpacing: '0.04em' }}
+              style={{ borderRadius: '0px', fontFamily: 'var(--font-mono)', letterSpacing: '0.04em' }}
               disabled={loading}
             />
             <button
@@ -608,7 +608,7 @@ const IDCardScanner = () => {
                 <div className="flex items-center gap-3">
                   <ScanLine size={18} className="text-white" />
                   <div>
-                    <span style={{ color: '#FFFFFF', fontSize: '13px', fontWeight: '700', letterSpacing: '0.05em', textTransform: 'uppercase', fontFamily: 'sans-serif' }}>
+                    <span style={{ color: '#FFFFFF', fontSize: '13px', fontWeight: '700', letterSpacing: '0.05em', textTransform: 'uppercase', fontFamily: 'var(--font-headline)' }}>
                       ID CARD SCANNER
                     </span>
                     <p style={{ color: '#9CA3AF', fontSize: '10px', margin: 0, letterSpacing: '0.02em' }}>
@@ -759,7 +759,7 @@ const IDCardScanner = () => {
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <span style={{ fontSize: '8.5px', fontWeight: '700', color: '#737373', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Ref No.</span>
-              <span style={{ fontSize: '10px', fontWeight: '700', color: '#1A1A1A', fontFamily: 'monospace', letterSpacing: '0.06em' }}>{verificationRef}</span>
+              <span style={{ fontSize: '10px', fontWeight: '700', color: '#1A1A1A', fontFamily: 'var(--font-mono)', letterSpacing: '0.06em' }}>{verificationRef}</span>
             </div>
             <span style={{ fontSize: '8.5px', color: '#737373', letterSpacing: '0.04em' }}>
               {verifiedAt && verifiedAt.toLocaleString('en-GB', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' })}

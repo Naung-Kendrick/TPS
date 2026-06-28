@@ -33,7 +33,7 @@ const StatCard = ({ title, value, icon: Icon, trend, subtitle, trendType }) => (
       </div>
     </div>
     <div style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', fontWeight: '500', marginBottom: '0.5rem' }}>{title}</div>
-    <div style={{ fontSize: '2rem', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '0.5rem', fontFamily: "'Public Sans', sans-serif" }}>{value}</div>
+    <div style={{ fontSize: '2rem', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '0.5rem', fontFamily: 'var(--font-mono)' }}>{value}</div>
     <div style={{ color: '#9CA3AF', fontSize: '0.75rem' }}>{subtitle}</div>
   </div>
 );

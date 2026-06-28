@@ -462,7 +462,7 @@ const Login = ({ onLogin }) => {
                     onPaste={i === 0 ? handleOtpPaste : undefined}
                     style={{
                       width: '48px', height: '56px', textAlign: 'center',
-                      fontSize: '22px', fontWeight: '700', fontFamily: 'monospace',
+                      fontSize: '22px', fontWeight: '700', fontFamily: 'var(--font-mono)',
                       border: `1px solid ${digit ? '#1A1A1A' : '#D1D5DB'}`,
                       backgroundColor: digit ? '#F9FAFB' : '#FAFAFA',
                       outline: 'none', borderRadius: 0,

@@ -1032,7 +1032,7 @@ const Reports = ({ user }) => {
                         filteredData.map(head => (
                           <tr key={head.id} className="hover:bg-gray-50 transition-colors">
                             <td style={tdStyle} className="font-medium">{head.name}</td>
-                            <td style={{ ...tdStyle, fontFamily: 'monospace' }}>{head.household_no}</td>
+                            <td style={{ ...tdStyle, fontFamily: 'var(--font-mono)' }}>{head.household_no}</td>
                             <td style={tdStyle}>{head.gender || '—'}</td>
                             <td style={tdStyle}>{head.occupation || '-'}</td>
                             <td style={{ ...tdStyle, textAlign: 'right' }}>
@@ -1113,7 +1113,7 @@ const Reports = ({ user }) => {
                       filteredData.map(head => (
                         <tr key={head.id} className="hover:bg-gray-50 transition-colors">
                           <td style={tdStyle} className="font-medium">{head.name}</td>
-                          <td style={{ ...tdStyle, fontFamily: 'monospace' }}>{head.household_no}</td>
+                          <td style={{ ...tdStyle, fontFamily: 'var(--font-mono)' }}>{head.household_no}</td>
                           <td style={tdStyle}>{head.gender || '—'}</td>
                           <td style={tdStyle}>{head.occupation || '-'}</td>
                           <td style={{ ...tdStyle, textAlign: 'right' }}>

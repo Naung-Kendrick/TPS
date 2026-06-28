@@ -15,6 +15,8 @@ const Sidebar = ({ user, onLogout }) => {
   const moreSheetRef = useRef(null);
   const touchStartX = useRef(null);
   const touchStartY = useRef(null);
+  const desktopSidebarRef = useRef(null);
+  const mobileDrawerRef = useRef(null);
 
   // 0.2s delay before navigating to any page
   const handleNav = (path, closeFn) => {
@@ -228,8 +230,8 @@ const Sidebar = ({ user, onLogout }) => {
     );
   };
 
-  const SidebarContent = () => (
-    <div style={{
+  const renderSidebarContent = (isMobileDrawer = false, scrollRef = null) => (
+    <div ref={scrollRef} style={{
       width: '240px', flexShrink: 0, backgroundColor: '#FFFFFF',
       borderRight: '1px solid #E5E7EB', display: 'flex', flexDirection: 'column',
       height: '100%', overflowY: 'auto',
@@ -383,7 +385,7 @@ const Sidebar = ({ user, onLogout }) => {
 
       {/* ── Desktop sidebar ── */}
       <div className="desktop-sidebar" style={{ position: 'sticky', top: 0, height: '100vh', flexShrink: 0 }}>
-        <SidebarContent />
+        {renderSidebarContent(false, desktopSidebarRef)}
       </div>
 
       {/* ── Mobile drawer overlay ── */}
@@ -403,7 +405,7 @@ const Sidebar = ({ user, onLogout }) => {
         transform: open ? 'translateX(0)' : 'translateX(-100%)',
         transition: 'transform 0.25s ease',
       }}>
-        <SidebarContent />
+        {renderSidebarContent(true, mobileDrawerRef)}
       </div>
 
       {/* ── Bottom Navigation Bar (mobile only) ── */}

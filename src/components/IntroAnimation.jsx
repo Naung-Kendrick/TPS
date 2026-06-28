@@ -47,21 +47,6 @@ export default function IntroAnimation({ onDone }) {
 
       <div className={`tps-intro-root${phase === 4 ? ' exit' : ''}`}>
 
-        {/* Top horizontal rule */}
-        <div
-          style={{
-            position: 'absolute',
-            top: '50%',
-            left: '50%',
-            marginLeft: '-110px',
-            marginTop: '-72px',
-            height: '2px',
-            background: '#1A1A1A',
-            width: phase >= 1 ? '220px' : '0px',
-            transition: 'width 400ms cubic-bezier(0.23,1,0.32,1)',
-          }}
-        />
-
         {/* TPS letters */}
         <div style={{ display: 'flex', marginBottom: '10px' }}>
           {letters.map((letter, i) => (

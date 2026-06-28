@@ -826,11 +826,11 @@ const IDCardScanner = () => {
               }}
             >
               <Users size={13} />
-              {familyModal ? 'Close Family Roster' : 'View All Family Members'}
+              {familyModal ? 'Close Family Records' : 'View All Family Members'}
             </button>
           </div>
 
-          {/* Inline Family Roster Box directly below button */}
+          {/* Inline Family Records Box directly below button */}
           {familyModal && (
             <div className="tps-panel-enter border-t border-[#E5E7EB] bg-[#FAFAFA] p-4 sm:p-6">
               <div className="bg-white border border-[#E5E7EB]">
@@ -838,7 +838,7 @@ const IDCardScanner = () => {
                   <div className="flex items-center gap-2">
                     <Users size={15} className="text-[#1A1A1A]" />
                     <span className="text-xs font-semibold text-[#1A1A1A] uppercase tracking-wider">
-                      Family Roster: {result.household_no}
+                      Family Records: {result.household_no}
                     </span>
                   </div>
                   <div className="flex items-center gap-3">

@@ -1288,7 +1288,7 @@ const HouseholdForm = ({ user }) => {
       </div>
 
 
-      {/* Family Roster Table matching user design */}
+      {/* Family Records Table matching user design */}
       {(() => {
         const activeHhNo = formData.household_no || (familyRoster[0]?.household_no) || (submittedMembers[submittedMembers.length - 1]?.household_no) || '';
         const targetNormalized = normalizeHouseholdNo(activeHhNo);
@@ -1314,7 +1314,7 @@ const HouseholdForm = ({ user }) => {
             {/* Header Bar matching image */}
             <div style={{ padding: '12px 20px', borderBottom: '1px solid #E5E7EB', backgroundColor: '#F9FAFB', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div style={{ fontSize: '12px', fontWeight: '700', color: '#374151', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                FAMILY ROSTER: {hhNoDisplay || '—'}
+                FAMILY RECORDS: {hhNoDisplay || '—'}
               </div>
               <div style={{ fontSize: '11px', fontWeight: '600', color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                 {displayMembers.length} MEMBERS

@@ -812,7 +812,7 @@ const Reports = ({ user }) => {
               CENTRAL DATABASE
             </h2>
             <p style={{ margin: 0, color: '#737373', fontSize: '12px' }}>
-              Browse and manage household records and family rosters across regions.
+              Browse and manage household records and family records across regions.
             </p>
           </div>
           <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
@@ -1254,7 +1254,7 @@ const Reports = ({ user }) => {
                 )}
 
                 <div className="px-4 py-3 border-b border-gray-200 bg-gray-50 flex flex-wrap items-center justify-between gap-1">
-                  <h3 className="font-semibold text-gray-900 text-xs uppercase tracking-wide">Family Roster: {path.householdNo}</h3>
+                  <h3 className="font-semibold text-gray-900 text-xs uppercase tracking-wide">Family Records: {path.householdNo}</h3>
                   <span className="text-[10px] text-gray-400 uppercase font-mono">{familyMembers.length} member{familyMembers.length !== 1 ? 's' : ''}</span>
                 </div>
 

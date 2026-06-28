@@ -520,7 +520,7 @@ const Verification = ({ user }) => {
                             </td>
                           </tr>
                           
-                          {/* INLINE FAMILY ROSTER PANEL */}
+                          {/* INLINE FAMILY RECORDS PANEL */}
                           {expandedHouseholdNo === person.household_no && (
                             <tr>
                               <td colSpan="20" className="p-0 bg-gray-50 border-b border-gray-200">
@@ -528,7 +528,7 @@ const Verification = ({ user }) => {
                                   <div className="bg-white border border-gray-200 tps-responsive-table">
                                     <div className="px-6 py-3 border-b border-gray-200 flex items-center justify-between">
                                       <h3 className="font-semibold text-gray-900 flex items-center gap-2 text-xs uppercase letter-spacing-0.05">
-                                        Family Roster - Household: {expandedHouseholdNo}
+                                        Family Records - Household: {expandedHouseholdNo}
                                       </h3>
                                       <button
                                         onClick={() => { setExpandedHouseholdNo(null); setFamilyMembers([]); }}

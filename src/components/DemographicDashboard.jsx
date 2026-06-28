@@ -1098,13 +1098,13 @@ const DemographicDashboard = ({ user }) => {
           {/* ── Summary Strip ──────────────────────────────── */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 xl:gap-4 mb-4">
             {[
-              { label: 'Total Population', value: totalPopulation, accent: colors.forestGreen },
+              { label: 'Total Population', value: totalPopulation, accent: colors.forestGreen, textColor: colors.forestGreen },
               { label: 'Male · ကျား',       value: totalMale,      accent: colors.slateGray   },
               { label: 'Female · မ',        value: totalFemale,    accent: '#A1887F'           },
-            ].map(({ label, value, accent }) => (
+            ].map(({ label, value, accent, textColor }) => (
               <div key={label} style={{ backgroundColor: '#fff', border: '1px solid #E5E7EB', padding: '16px 20px', borderTop: `3px solid ${accent}` }} className="xl:py-5 xl:px-6">
                 <div style={{ fontSize: '10px', color: '#737373', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>{label}</div>
-                <div style={{ fontSize: '28px', fontWeight: '700', color: '#1A1A1A', fontFamily: 'var(--font-mono)', lineHeight: 1 }}>{value.toLocaleString()}</div>
+                <div style={{ fontSize: '28px', fontWeight: '700', color: textColor || '#1A1A1A', fontFamily: 'var(--font-mono)', lineHeight: 1 }}>{value.toLocaleString()}</div>
               </div>
             ))}
           </div>

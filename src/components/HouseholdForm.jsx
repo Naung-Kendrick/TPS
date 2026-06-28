@@ -1071,7 +1071,7 @@ const HouseholdForm = ({ user }) => {
 
       <div style={{ ...groupStyle, gridColumn: 'span 1' }}>
         <label style={labelStyle}>PREVIOUS ID NO. (NRC)</label>
-        <input type="text" name="previous_id_no" value={formData.previous_id_no} onChange={handleChange} placeholder="Enter NRC number" style={inputStyle} autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} />
+        <input type="text" name="previous_id_no" value={formData.previous_id_no} onChange={handleChange} placeholder="Enter NRC number" style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }} autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} />
       </div>
 
       <div style={{ ...groupStyle, gridColumn: 'span 1' }}>
@@ -1084,6 +1084,7 @@ const HouseholdForm = ({ user }) => {
           placeholder="Enter Ta'ang Land ID number" 
           style={{ 
             ...inputStyle, 
+            fontFamily: 'var(--font-mono)',
             borderColor: taangLandIdError ? '#EF4444' : undefined 
           }} 
           autoComplete="off" 
@@ -1141,7 +1142,7 @@ const HouseholdForm = ({ user }) => {
 
       <div style={{ ...groupStyle, gridColumn: 'span 1' }}>
         <label style={labelStyle}>HOUSE NO.</label>
-        <input type="text" name="house_no" value={formData.house_no} onChange={handleChange} placeholder="Enter house number" style={inputStyle} autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} />
+        <input type="text" name="house_no" value={formData.house_no} onChange={handleChange} placeholder="Enter house number" style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }} autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} />
       </div>
 
       <div style={{ ...groupStyle, gridColumn: 'span 1' }}>

@@ -1251,28 +1251,36 @@ const HouseholdForm = ({ user }) => {
           display: 'flex', justifyContent: 'flex-end', gap: '12px',
           backgroundColor: '#FAFAFA'
         }}>
-          <button type="button" onClick={clearForNewHousehold} style={{
-            padding: '8px 16px', border: '1px solid #E5E7EB', backgroundColor: '#FFFFFF',
-            color: '#1A1A1A', fontWeight: '500', fontSize: '12px', cursor: 'pointer', textTransform: 'uppercase'
-          }}>
+          <button type="button" onClick={clearForNewHousehold}
+            onMouseOver={e => { e.currentTarget.style.backgroundColor = '#F9FAFB'; }}
+            onMouseOut={e => { e.currentTarget.style.backgroundColor = '#FFFFFF'; }}
+            style={{
+              padding: '8px 16px', border: '1px solid #1A1A1A', backgroundColor: '#FFFFFF',
+              color: '#1A1A1A', fontWeight: '500', fontSize: '11px', cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.05em',
+              transition: 'background-color 120ms cubic-bezier(0.23,1,0.32,1)'
+            }}>
             CLEAR FORM
           </button>
-          <button type="button" onClick={() => submitForm('SAME_HOUSEHOLD')} disabled={loading} style={{
-            padding: '8px 20px', border: '1px solid #1A1A1A', backgroundColor: '#1A1A1A',
-            color: '#FFFFFF', fontWeight: '600', fontSize: '12px',
-            cursor: loading ? 'not-allowed' : 'pointer', textTransform: 'uppercase', letterSpacing: '0.04em'
-          }}>
+          <button type="button" onClick={() => submitForm('SAME_HOUSEHOLD')} disabled={loading}
+            onMouseOver={e => { if (!loading) { e.currentTarget.style.backgroundColor = '#FFFFFF'; e.currentTarget.style.color = '#1A1A1A'; } }}
+            onMouseOut={e => { if (!loading) { e.currentTarget.style.backgroundColor = '#1A1A1A'; e.currentTarget.style.color = '#FFFFFF'; } }}
+            style={{
+              padding: '8px 16px', border: '1px solid #1A1A1A', backgroundColor: '#1A1A1A',
+              color: '#FFFFFF', fontWeight: '500', fontSize: '11px',
+              cursor: loading ? 'not-allowed' : 'pointer', textTransform: 'uppercase', letterSpacing: '0.05em',
+              transition: 'background-color 120ms cubic-bezier(0.23,1,0.32,1), color 120ms cubic-bezier(0.23,1,0.32,1)'
+            }}>
             {loading ? 'SAVING...' : '+ ADD MEMBER'}
           </button>
           <button type="button" onClick={() => submitForm('NEW_HOUSEHOLD')} disabled={loading}
-            onMouseOver={e => { e.currentTarget.style.backgroundColor = '#FFFFFF'; e.currentTarget.style.color = '#1A1A1A'; }}
-            onMouseOut={e => { e.currentTarget.style.backgroundColor = '#1A1A1A'; e.currentTarget.style.color = '#FFFFFF'; }}
+            onMouseOver={e => { if (!loading) { e.currentTarget.style.backgroundColor = '#FFFFFF'; e.currentTarget.style.color = '#1A1A1A'; } }}
+            onMouseOut={e => { if (!loading) { e.currentTarget.style.backgroundColor = '#1A1A1A'; e.currentTarget.style.color = '#FFFFFF'; } }}
             style={{
               padding: '8px 16px', border: '1px solid #1A1A1A', backgroundColor: '#1A1A1A',
-              color: '#FFFFFF', fontWeight: '500', fontSize: '12px',
-              cursor: loading ? 'not-allowed' : 'pointer', textTransform: 'uppercase',
-              transition: 'background-color 120ms cubic-bezier(0.23,1,0.32,1), color 120ms cubic-bezier(0.23,1,0.32,1)',
-          }}>
+              color: '#FFFFFF', fontWeight: '500', fontSize: '11px',
+              cursor: loading ? 'not-allowed' : 'pointer', textTransform: 'uppercase', letterSpacing: '0.05em',
+              transition: 'background-color 120ms cubic-bezier(0.23,1,0.32,1), color 120ms cubic-bezier(0.23,1,0.32,1)'
+            }}>
             NEW HOUSEHOLD
           </button>
         </div>

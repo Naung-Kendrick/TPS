@@ -470,18 +470,22 @@ const IDCardScanner = () => {
             <button
               type="submit"
               disabled={loading || !inputValue.trim()}
-              className="flex items-center gap-2 hover:bg-white hover:text-[#1A1A1A] transition-colors"
+              onMouseOver={e => { if (!loading && inputValue.trim()) { e.currentTarget.style.backgroundColor = '#FFFFFF'; e.currentTarget.style.color = '#1A1A1A'; } }}
+              onMouseOut={e => { if (!loading && inputValue.trim()) { e.currentTarget.style.backgroundColor = '#1A1A1A'; e.currentTarget.style.color = '#FFFFFF'; } }}
               style={{
-                padding: '10px 24px',
+                display: 'flex', alignItems: 'center', gap: '6px',
+                padding: '8px 16px',
                 backgroundColor: '#1A1A1A',
                 color: '#FFFFFF',
-                fontSize: '12px',
-                fontWeight: '700',
+                fontSize: '11px',
+                fontWeight: '500',
                 border: '1px solid #1A1A1A',
                 borderRadius: '0px',
-                cursor: 'pointer',
+                cursor: loading || !inputValue.trim() ? 'not-allowed' : 'pointer',
                 textTransform: 'uppercase',
-                letterSpacing: '0.05em'
+                letterSpacing: '0.05em',
+                opacity: loading || !inputValue.trim() ? 0.5 : 1,
+                transition: 'background-color 120ms cubic-bezier(0.23,1,0.32,1), color 120ms cubic-bezier(0.23,1,0.32,1)'
               }}
             >
               {loading ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
@@ -507,21 +511,24 @@ const IDCardScanner = () => {
               </div>
               <button
                 onClick={startCamera}
-                className="flex items-center gap-2 hover:bg-white hover:text-[#1A1A1A] transition-colors"
+                onMouseOver={e => { e.currentTarget.style.backgroundColor = '#FFFFFF'; e.currentTarget.style.color = '#1A1A1A'; }}
+                onMouseOut={e => { e.currentTarget.style.backgroundColor = '#1A1A1A'; e.currentTarget.style.color = '#FFFFFF'; }}
                 style={{
-                  padding: '10px 24px',
+                  display: 'flex', alignItems: 'center', gap: '6px',
+                  padding: '8px 16px',
                   backgroundColor: '#1A1A1A',
                   color: '#FFFFFF',
-                  fontSize: '12px',
-                  fontWeight: '700',
+                  fontSize: '11px',
+                  fontWeight: '500',
                   border: '1px solid #1A1A1A',
                   borderRadius: '0px',
                   cursor: 'pointer',
                   textTransform: 'uppercase',
-                  letterSpacing: '0.05em'
+                  letterSpacing: '0.05em',
+                  transition: 'background-color 120ms cubic-bezier(0.23,1,0.32,1), color 120ms cubic-bezier(0.23,1,0.32,1)'
                 }}
               >
-                <Camera size={14} />
+                <Camera size={13} />
                 START CAMERA
               </button>
             </div>

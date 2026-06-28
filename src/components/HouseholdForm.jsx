@@ -33,12 +33,12 @@ const FormCustomSelect = ({ name, value, onChange, options, placeholder, style }
         onClick={() => setOpen(v => !v)}
         style={{
           width: '100%',
-          height: '30px',
+          height: '34px',
           padding: '0 10px',
           marginTop: '3px',
           borderRadius: '0px',
           border: '1px solid #E5E7EB',
-          fontSize: '11px',
+          fontSize: '9.5px',
           fontFamily: "Inter, 'Pyidaungsu', sans-serif",
           backgroundColor: '#FFFFFF',
           boxSizing: 'border-box',
@@ -51,7 +51,7 @@ const FormCustomSelect = ({ name, value, onChange, options, placeholder, style }
           cursor: 'pointer',
         }}
       >
-        <span style={{ fontSize: '11px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        <span style={{ fontSize: '9.5px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {selectedLabel}
         </span>
         <ChevronDown size={12} color="#737373" style={{ flexShrink: 0, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 150ms' }} />
@@ -841,11 +841,11 @@ const HouseholdForm = ({ user }) => {
 
   const inputStyle = useMemo(() => ({
     width: '100%',
-    height: '30px',
+    height: '34px',
     padding: '0 10px',
     borderRadius: '0px',
     border: '1px solid #E5E7EB',
-    fontSize: '10.5px',
+    fontSize: '9.5px',
     marginTop: '3px',
     boxSizing: 'border-box',
     fontFamily: "Inter, 'Pyidaungsu', sans-serif",

@@ -281,14 +281,11 @@ const Reports = ({ user }) => {
 
           const { data, error } = await query;
           if (error) throw error;
-          console.log('Ward query:', path.ward, 'Results:', data?.length || 0);
           setDataList(data || []);
           cacheSet(cacheKey, data || []);
         }
         // If user selected a Group: show villages belonging strictly to this group
         else if (path.locationType === 'group') {
-          console.log('Fetching villages for group:', path.group, 'in township:', path.township);
-          
           let query = supabase
             .from('households')
             .select('ward_village_group')
@@ -320,15 +317,12 @@ const Reports = ({ user }) => {
           }
 
           const list = villageList.map(v => ({ id: v, name: v }));
-          console.log('Filtered Group villages result:', list.length, 'villages');
           setDataList(list);
           cacheSet(cacheKey, list);
         }
       }
       else if (level === 5 && path.locationType === 'group' && path.village) {
         // Only reachable if locationType is 'group' and village is selected
-        console.log('Fetching household heads for village:', path.village, 'under group:', path.group);
-        
         let query = supabase
           .from('households')
           .select('id, name, household_no, gender, occupation, date_of_birth')
@@ -774,11 +768,6 @@ const Reports = ({ user }) => {
     return matches;
   });
   
-  // Debug logging
-  useEffect(() => {
-    console.log('Level:', level, 'dataList length:', dataList.length, 'filteredData length:', filteredData.length, 'search:', search);
-  }, [level, dataList, filteredData, search]);
-
   const thStyle = {
     padding: '12px 16px',
     textAlign: 'left',

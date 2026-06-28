@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Lock, User, Eye, EyeOff, ShieldAlert, ChevronRight, Mail, Loader2, ArrowLeft, CheckCircle2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { getSecureItem, setSecureItem, removeSecureItem } from '../lib/secureStorage';
 import logo from '../assets/fonts/IDTL_logo.png';
 
 const RESEND_COOLDOWN = 60; // seconds before user can resend OTP
@@ -19,6 +20,10 @@ const Login = ({ onLogin }) => {
   const [cooldown, setCooldown] = useState(0);
   const otpRefs = useRef([]);
   const cooldownRef = useRef(null);
+  
+  // In-memory security refs (tamper-proof against DevTools localStorage deletion during session)
+  const memAttemptsRef = useRef(0);
+  const memLockoutRef = useRef(0);
 
   useEffect(() => {
     return () => clearInterval(cooldownRef.current);
@@ -48,7 +53,8 @@ const Login = ({ onLogin }) => {
 
   const checkRateLimit = () => {
     try {
-      const lockoutUntil = parseInt(localStorage.getItem('tps_login_lockout_until') || '0', 10);
+      const storedLockout = getSecureItem('tps_login_lockout_until') || 0;
+      const lockoutUntil = Math.max(storedLockout, memLockoutRef.current);
       if (Date.now() < lockoutUntil) {
         const remainingSec = Math.ceil((lockoutUntil - Date.now()) / 1000);
         const remainingMin = Math.ceil(remainingSec / 60);
@@ -60,11 +66,16 @@ const Login = ({ onLogin }) => {
 
   const recordFailedAttempt = () => {
     try {
-      let attempts = parseInt(localStorage.getItem('tps_login_attempts') || '0', 10) + 1;
-      localStorage.setItem('tps_login_attempts', attempts.toString());
+      const storedAttempts = getSecureItem('tps_login_attempts') || 0;
+      let attempts = Math.max(storedAttempts, memAttemptsRef.current) + 1;
+      
+      memAttemptsRef.current = attempts;
+      setSecureItem('tps_login_attempts', attempts);
+
       if (attempts >= MAX_ATTEMPTS) {
         const lockoutUntil = Date.now() + LOCKOUT_MS;
-        localStorage.setItem('tps_login_lockout_until', lockoutUntil.toString());
+        memLockoutRef.current = lockoutUntil;
+        setSecureItem('tps_login_lockout_until', lockoutUntil);
         return `အကြိမ်ပေါင်းများစွာ မှားယွင်းသောကြောင့် ၅ မိနစ် ခေတ္တခဏ ပိတ်ထားပါသည်။ (Too many failed attempts. Locked for 5 minutes).`;
       }
       return `အသုံးပြုသူအမည် သို့မဟုတ် လျှို့ဝှက်နံပါတ် မှားယွင်းနေပါသည်။ (ကျန်ရှိသော အကြိမ်အရေအတွက်: ${MAX_ATTEMPTS - attempts} ကြိမ်)`;
@@ -75,8 +86,10 @@ const Login = ({ onLogin }) => {
 
   const clearFailedAttempts = () => {
     try {
-      localStorage.removeItem('tps_login_attempts');
-      localStorage.removeItem('tps_login_lockout_until');
+      memAttemptsRef.current = 0;
+      memLockoutRef.current = 0;
+      removeSecureItem('tps_login_attempts');
+      removeSecureItem('tps_login_lockout_until');
     } catch (_) {}
   };
 

@@ -190,6 +190,12 @@ const EditHouseholdModal = ({ household, isOpen, onClose, onUpdateSuccess }) => 
       date_of_birth: finalDob
     };
 
+    if (!id) {
+      setError("ဒေတာဘေ့စ် ID မတွေ့ရှိပါ (Database ID is missing. Cannot update offline record.)");
+      setLoading(false);
+      return;
+    }
+
     const { error: supabaseError } = await supabase
       .from('households')
       .update(updateData)

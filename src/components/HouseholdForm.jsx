@@ -777,20 +777,24 @@ const HouseholdForm = ({ user }) => {
 
     try {
       let savedLocally = false;
+      let insertedRow = null;
 
       if (!navigator.onLine) {
         // Device is offline — queue the write
         enqueue({ table: 'households', type: 'insert', payload });
         savedLocally = true;
       } else {
-        const { error: supabaseError } = await supabase
+        const { data, error: supabaseError } = await supabase
           .from('households')
-          .insert([payload]);
+          .insert([payload])
+          .select();
 
         if (supabaseError) {
           // Network error mid-request — queue it
           enqueue({ table: 'households', type: 'insert', payload });
           savedLocally = true;
+        } else if (data && data.length > 0) {
+          insertedRow = data[0];
         }
       }
 
@@ -803,7 +807,7 @@ const HouseholdForm = ({ user }) => {
       setIsCustomRelationship(false);
       setIsCustomReligion(false);
       setDob({ day: '', month: '', year: '' });
-      setSubmittedMembers(prev => [...prev, payload]);
+      setSubmittedMembers(prev => [...prev, insertedRow || payload]);
       fetchFamilyRoster(payload.household_no);
       removeSecureItem(DRAFT_KEY);
       
@@ -1300,7 +1304,7 @@ const HouseholdForm = ({ user }) => {
 
         const combined = [...matchingDb];
         matchingSubmitted.forEach(sm => {
-          if (!combined.some(fm => fm.name === sm.name && (fm.id ? fm.id === sm.id : fm.date_of_birth === sm.date_of_birth))) {
+          if (!combined.some(fm => fm.name === sm.name && ((fm.id && sm.id) ? fm.id === sm.id : fm.date_of_birth === sm.date_of_birth))) {
             combined.push(sm);
           }
         });

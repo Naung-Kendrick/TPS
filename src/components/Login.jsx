@@ -5,7 +5,7 @@ import { getSecureItem, setSecureItem, removeSecureItem } from '../lib/secureSto
 import logo from '../assets/fonts/IDTL_logo.png';
 
 const RESEND_COOLDOWN = 60; // seconds before user can resend OTP
-const SKIP_OTP = true; // Temporarily bypassed as requested by user
+const SKIP_OTP = import.meta.env.DEV && import.meta.env.VITE_SKIP_OTP === 'true'; // ← only skippable in local dev, never in production
 
 const Login = ({ onLogin }) => {
   // Step 1: username+PIN  →  Step 2: email OTP

@@ -49,25 +49,6 @@ const Placeholder = ({ title }) => (
   </div>
 )
 
-const DEV_BYPASS_USER = {
-  id: 'dev-bypass-id',
-  email: 'developer@tps.idtl',
-  role: 'system',
-  access_level: 'central',
-  allowed_districts: [],
-  allowed_townships: [],
-  profile: {
-    id: 'dev-bypass-id',
-    username: 'developer',
-    display_name: 'Developer Bypass Account (Temporary)',
-    role: 'system',
-    access_level: 'central',
-    allowed_districts: [],
-    allowed_townships: [],
-    is_active: true
-  }
-};
-
 function App() {
   const [user, setUser] = useState(null);
   const [sessionLoading, setSessionLoading] = useState(true);
@@ -86,7 +67,7 @@ function App() {
       sessionStorage.clear();
       await supabase.auth.signOut();
     } catch (_) {}
-    setUser(DEV_BYPASS_USER);
+    setUser(null);
   };
 
   const handleLogin = (data) => {
@@ -97,7 +78,6 @@ function App() {
   useEffect(() => {
     let mounted = true;
     const restoreSession = async () => {
-      let success = false;
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user) {
@@ -116,7 +96,6 @@ function App() {
               allowed_districts: profile.allowed_districts || [],
               allowed_townships: profile.allowed_townships || [],
             });
-            success = true;
           } else if (profile?.is_active === false) {
             await supabase.auth.signOut();
           }
@@ -124,12 +103,7 @@ function App() {
       } catch (err) {
         console.error('Session restoration error:', err);
       } finally {
-        if (mounted) {
-          if (!success) {
-            setUser(DEV_BYPASS_USER);
-          }
-          setSessionLoading(false);
-        }
+        if (mounted) setSessionLoading(false);
       }
     };
 

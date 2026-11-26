@@ -213,8 +213,8 @@ const UserManagement = ({ user }) => {
         body: { ...formData, displayName: formData.username },
       });
       if (error) throw error;
-      const emailNote = formData.email ? ' Email OTP will be required at login.' : ' No email set — OTP step will be skipped.';
-      setStatus({ type: 'success', text: `User account created successfully.${emailNote}` });
+      if (data?.error) throw new Error(data.error);
+      setStatus({ type: 'success', text: 'User account created successfully. Email OTP will be required at every login.' });
       setFormData({ username: '', password: '', role: 'field', email: '', access_level: 'central', allowed_districts: [], allowed_townships: [] });
       await loadUsers();
     } catch (err) {
@@ -715,7 +715,7 @@ const UserManagement = ({ user }) => {
               <ul className="space-y-3 text-xs text-gray-600 leading-relaxed">
                 {[
                   'Users are created within the tps.idtl internal domain.',
-                  'PIN codes must be at least 6 characters for field operations.',
+                  'PIN codes must be at least 8 characters for field operations.',
                   'Account access is monitored via the central audit system.',
                   'Role changes must be audited by a System Administrator.',
                 ].map((note, i) => (
@@ -820,7 +820,7 @@ const UserManagement = ({ user }) => {
                         <Key size={14} className="text-gray-400" />
                       </div>
                       <input
-                        type="password" name="password" required
+                        type="password" name="password" required minLength={8}
                         value={formData.password} onChange={handleChange}
                         className="w-full px-3 py-2 bg-white border border-gray-200 focus:outline-none focus:border-gray-900 transition-colors text-sm"
                         placeholder="••••••••"
@@ -830,20 +830,20 @@ const UserManagement = ({ user }) => {
 
                   <div>
                     <label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase tracking-wider">
-                      OTP Email <span className="normal-case font-normal text-gray-400">(optional — for 2FA)</span>
+                      OTP Email <span className="text-red-500">*</span> <span className="normal-case font-normal text-gray-400">(required — for mandatory 2FA)</span>
                     </label>
                     <div className="flex">
                       <div className="bg-gray-100 border border-r-0 border-gray-200 px-3 flex items-center">
                         <Mail size={14} className="text-gray-400" />
                       </div>
                       <input
-                        type="email" name="email"
+                        type="email" name="email" required
                         value={formData.email} onChange={handleChange}
                         className="w-full px-3 py-2 bg-white border border-gray-200 focus:outline-none focus:border-gray-900 transition-colors text-sm"
-                        placeholder="officer@gmail.com (leave blank to skip OTP)"
+                        placeholder="officer@gmail.com"
                       />
                     </div>
-                    <p className="text-[10px] text-gray-400 mt-1">If set, officer must verify a 6-digit email code after PIN login.</p>
+                    <p className="text-[10px] text-gray-400 mt-1">Required: officer must verify a 6-digit email code at every login.</p>
                   </div>
 
                   <div>

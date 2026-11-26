@@ -5,7 +5,20 @@ import { getSecureItem, setSecureItem, removeSecureItem } from '../lib/secureSto
 import logo from '../assets/fonts/IDTL_logo.png';
 
 const RESEND_COOLDOWN = 60; // seconds before user can resend OTP
-const SKIP_OTP = import.meta.env.DEV && import.meta.env.VITE_SKIP_OTP === 'true'; // ← only skippable in local dev, never in production
+
+async function extractEdgeError(fnError, fallback) {
+  let msg = fnError?.message || fallback;
+  try {
+    if (typeof fnError?.context?.json === 'function') {
+      const body = await fnError.context.json();
+      if (body?.error) msg = body.error;
+    } else if (typeof fnError?.context?.text === 'function') {
+      const txt = await fnError.context.text();
+      if (txt) msg = txt;
+    }
+  } catch { }
+  return msg;
+}
 
 const Login = ({ onLogin }) => {
   // Step 1: username+PIN  →  Step 2: email OTP
@@ -105,16 +118,17 @@ const Login = ({ onLogin }) => {
       return;
     }
 
-    if (!formData.username || !formData.pinCode) {
+    const trimmedUsername = formData.username.trim();
+    if (!trimmedUsername || !formData.pinCode) {
       setError('ကျေးဇူးပြု၍ အချက်အလက်အားလုံး ပြည့်စုံစွာ ဖြည့်စွက်ပါ။ (Please fill all fields)');
       setLoading(false);
       return;
     }
 
     try {
-      const finalEmail = formData.username.includes('@')
-        ? formData.username
-        : `${formData.username}@tps.idtl`;
+      const finalEmail = trimmedUsername.includes('@')
+        ? trimmedUsername
+        : `${trimmedUsername.toLowerCase()}@tps.idtl`;
 
       // 1. Verify credentials
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
@@ -140,33 +154,21 @@ const Login = ({ onLogin }) => {
         throw new Error('ဤအကောင့်ကို ပိတ်ပင်ထားပါသည်။ စီမံခန့်ခွဲသူထံ ဆက်သွယ်ပါ။ (Account deactivated — contact your administrator)');
       }
 
-      // 3. Send OTP (skip if SKIP_OTP is enabled)
-      if (SKIP_OTP) {
-        await supabase.from('profiles').update({ last_seen_at: new Date().toISOString() }).eq('id', authData.user.id);
-        onLogin?.({
-          ...authData.user,
-          profile,
-          role: profile.role,
-          access_level: profile.access_level || 'central',
-          allowed_districts: profile.allowed_districts || [],
-          allowed_townships: profile.allowed_townships || [],
-        });
-        return;
-      }
-
+      // 3. Send OTP (mandatory for every login)
+      const accessToken = authData.session?.access_token;
       const { data: otpResult, error: otpFnError } = await supabase.functions.invoke('send-otp', {
         body: { user_id: authData.user.id },
+        ...(accessToken ? { headers: { Authorization: `Bearer ${accessToken}` } } : {}),
       });
       // otpFnError.context has the actual response body on non-2xx
       if (otpFnError) {
-        let msg = 'Failed to send OTP.';
-        try {
-          const body = await otpFnError.context?.json?.();
-          if (body?.error) msg = body.error;
-        } catch { }
-        throw new Error(msg);
+        await supabase.auth.signOut();
+        throw new Error(await extractEdgeError(otpFnError, 'Failed to send OTP.'));
       }
-      if (otpResult?.error) throw new Error(otpResult.error);
+      if (otpResult?.error) {
+        await supabase.auth.signOut();
+        throw new Error(otpResult.error);
+      }
 
       // 4. Move to step 2
       setPendingUser({ authData, profile });
@@ -176,15 +178,16 @@ const Login = ({ onLogin }) => {
 
     } catch (err) {
       console.error('Login error:', err);
+      await supabase.auth.signOut().catch(() => {});
       if (err.message === 'Invalid login credentials') {
         const lockoutMsg = recordFailedAttempt();
         setError(lockoutMsg);
       } else if (err.message === 'Email not confirmed') {
         setError('Error: Turn off "Confirm Email" in Supabase Auth Settings.');
       } else if (err.code === 'PGRST116') {
-        setError(`Profile missing. UUID: ${err.userId}`);
+        setError('Account profile is missing or access is blocked. Contact your administrator.');
       } else {
-        setError(`Error: ${err.message}`);
+        setError(err.message || 'Login failed.');
       }
     } finally {
       setLoading(false);
@@ -225,27 +228,24 @@ const Login = ({ onLogin }) => {
     setError('');
 
     try {
+      const accessToken = pendingUser.authData.session?.access_token;
       const { data: verifyResult, error: verifyFnError } = await supabase.functions.invoke('verify-otp', {
         body: { user_id: pendingUser.authData.user.id, code: token },
+        ...(accessToken ? { headers: { Authorization: `Bearer ${accessToken}` } } : {}),
       });
       if (verifyFnError) {
-        let msg = 'Verification failed.';
-        try {
-          const body = await verifyFnError.context?.json?.();
-          if (body?.error) msg = body.error;
-        } catch { }
-        throw new Error(msg);
+        throw new Error(await extractEdgeError(verifyFnError, 'Verification failed.'));
       }
       if (verifyResult?.error) throw new Error(verifyResult.error);
 
-      // Re-verify profile is_active in case admin deactivated during OTP step
+      // Re-verify profile & fetch latest role/scope in case admin modified account during OTP step
       const { data: latestProfile } = await supabase
         .from('profiles')
-        .select('is_active')
+        .select('id, username, role, is_active, last_seen_at, access_level, allowed_districts, allowed_townships')
         .eq('id', pendingUser.authData.user.id)
         .single();
 
-      if (latestProfile?.is_active === false) {
+      if (!latestProfile || latestProfile.is_active === false) {
         await supabase.auth.signOut();
         throw new Error('ဤအကောင့်ကို ပိတ်ပင်ထားပါသည်။ စီမံခန့်ခွဲသူထံ ဆက်သွယ်ပါ။ (Account deactivated — contact your administrator)');
       }
@@ -255,11 +255,11 @@ const Login = ({ onLogin }) => {
 
       onLogin?.({
         ...pendingUser.authData.user,
-        profile: pendingUser.profile,
-        role: pendingUser.profile.role,
-        access_level: pendingUser.profile.access_level || 'central',
-        allowed_districts: pendingUser.profile.allowed_districts || [],
-        allowed_townships: pendingUser.profile.allowed_townships || [],
+        profile: latestProfile,
+        role: latestProfile.role,
+        access_level: latestProfile.access_level || 'central',
+        allowed_districts: latestProfile.allowed_districts || [],
+        allowed_townships: latestProfile.allowed_townships || [],
       });
     } catch (err) {
       setError(err.message || 'Verification failed. Please try again.');
@@ -272,10 +272,14 @@ const Login = ({ onLogin }) => {
     if (cooldown > 0 || !pendingUser) return;
     setError('');
     try {
+      const accessToken = pendingUser.authData.session?.access_token;
       const { data, error } = await supabase.functions.invoke('send-otp', {
         body: { user_id: pendingUser.authData.user.id },
+        ...(accessToken ? { headers: { Authorization: `Bearer ${accessToken}` } } : {}),
       });
-      if (error) throw new Error(error.message || 'Failed to resend.');
+      if (error) {
+        throw new Error(await extractEdgeError(error, 'Failed to resend.'));
+      }
       if (data?.error) throw new Error(data.error);
       startCooldown();
       setOtp(['', '', '', '', '', '']);
@@ -488,7 +492,7 @@ const Login = ({ onLogin }) => {
             </div>
 
             <div style={{ display: 'flex', gap: '8px' }}>
-              <button type="button" onClick={() => { setStep(1); setOtp(['', '', '', '', '', '']); setError(''); }}
+              <button type="button" onClick={async () => { await supabase.auth.signOut().catch(() => {}); setPendingUser(null); setStep(1); setOtp(['', '', '', '', '', '']); setError(''); }}
                 style={{ ...submitBtn(false), width: 'auto', padding: '1rem 1.25rem', backgroundColor: 'white', color: '#1A1A1A', border: '1px solid #E5E7EB' }}>
                 <ArrowLeft size={16} />
               </button>

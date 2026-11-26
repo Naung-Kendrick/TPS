@@ -39,7 +39,9 @@ function formatLastSeen(ts) {
 
 const NotificationsRequests = ({ user }) => {
   const uRole = user?.role || user?.profile?.role || 'field';
-  const isAdminLevel = uRole === 'system' || uRole === 'master' || uRole === 'admin' || uRole === 'regional';
+  const uLevel = user?.access_level || user?.profile?.access_level || 'central';
+  const isAdminLevel = (uRole === 'system' || uRole === 'master' || uRole === 'admin' || uRole === 'regional') &&
+    uLevel !== 'viewer' && uLevel !== 'sub_township';
 
   const [activeTab, setActiveTab] = useState('alerts');
   const [notifications, setNotifications] = useState([]);

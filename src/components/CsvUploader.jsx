@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import Papa from 'papaparse';
-import * as XLSX from 'xlsx';
+import { parseExcelToHeaderObjects } from '../lib/excelParser';
+import { unsanitizeImportedCell } from '../lib/exportSanitize';
 import { supabase } from '../lib/supabase';
 import { pushNotification, NOTIF_TYPES } from '../lib/notifications';
 import { AlertCircle, X, CheckCircle2, Upload, FileSpreadsheet, Loader2, FileJson, Table } from 'lucide-react';
@@ -25,7 +26,7 @@ const ensureUnicode = (text) => text;
 // ==========================================
 const normalizeWhitespace = (text) => {
   if (text === null || text === undefined) return '';
-  let s = String(text);
+  let s = String(unsanitizeImportedCell(text));
 
   // Strip zero-width characters that look invisible but break equality checks
   s = s.replace(/[\u200B-\u200D\uFEFF]/g, '');
@@ -50,6 +51,25 @@ const normalizeCommaList = (text) => {
     .map(p => normalizeWhitespace(p))
     .filter(p => p !== '');
   return parts.join(', ');
+};
+
+// Convert Arabic digits (0-9) to Myanmar digits (၀-၉)
+const toMyanmarDigits = (val) => {
+  if (val === null || val === undefined || val === '') return '';
+  const map = { '0':'၀','1':'၁','2':'၂','3':'၃','4':'၄','5':'၅','6':'၆','7':'၇','8':'၈','9':'၉' };
+  return String(val).replace(/[0-9]/g, d => map[d]);
+};
+
+// Clean House NO: remove any accidental leading '$' caused by SheetJS misinterpreting
+// Excel Myanmar numeral locale code [$-10000455]0 as currency, and convert digits to Myanmar.
+const cleanHouseNo = (val) => {
+  if (val === null || val === undefined) return '';
+  let s = normalizeWhitespace(String(val));
+  if (/^\$\s*[0-9၀-၉]/.test(s)) {
+    s = s.replace(/^\$\s*/, '');
+    s = toMyanmarDigits(s);
+  }
+  return s;
 };
 
 // ==========================================
@@ -220,7 +240,12 @@ const validateDateOfBirth = (text) => {
   // Check calendar dates
   const dt = new Date(year, month - 1, day);
   if (dt.getFullYear() !== year || dt.getMonth() !== month - 1 || dt.getDate() !== day) {
-    return `မွေးသက္ကရာဇ် "${text}" သည် ပြက္ခဒိန်အရ မှန်ကန်သောရက်စွဲမဟုတ်ပါ (Not a real calendar date)`;
+    const daysInMonth = new Date(year, month, 0).getDate();
+    const mmMonthNames = ['ဇန်နဝါရီ','ဖေဖော်ဝါရီ','မတ်','ဧပြီ','မေ','ဇွန်','ဇူလိုင်','သြဂုတ်','စက်တင်ဘာ','အောက်တိုဘာ','နိုဝင်ဘာ','ဒီဇင်ဘာ'];
+    const enMonthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    const mmDay = arabicToMyanmarDigits(String(day));
+    const mmMax = arabicToMyanmarDigits(String(daysInMonth));
+    return `မွေးသက္ကရာဇ် "${text}" — ${mmMonthNames[month-1]}လတွင် ${mmDay} ရက်မရှိပါ၊ ထိုလတွင် ${mmMax} ရက်သာ ရှိပါသည် (${enMonthNames[month-1]} only has ${daysInMonth} days, not ${day})`;
   }
 
   return null;
@@ -866,7 +891,16 @@ export const playUploadSkippedSound = () => {
 };
 
 // Shared: run validation + Supabase upsert for a flat array of parsed rows
-const processAndUpload = async (formattedData, setValidationErrors, setShowModal, setLoading, setSuccessMsg, onUploadSuccess, fileInputRef, setProgress) => {
+const processAndUpload = async (formattedData, setValidationErrors, setShowModal, setLoading, setSuccessMsg, onUploadSuccess, fileInputRef, setProgress, showUploadConfirm, user = null) => {
+  if (formattedData.length > 50000) {
+    throw new Error('File exceeds maximum allowed 50,000 rows per upload. Please split into smaller files.');
+  }
+
+  const districtFilter = (user?.access_level && user?.access_level !== 'central' && user?.allowed_districts?.length > 0)
+    ? user.allowed_districts : null;
+  const townshipFilter = ((user?.access_level === 'township' || user?.access_level === 'sub_township') && user?.allowed_townships?.length > 0)
+    ? user.allowed_townships : null;
+
   const errorsFound = [];
   
   // Check household-level ID requirements first
@@ -962,6 +996,13 @@ const processAndUpload = async (formattedData, setValidationErrors, setShowModal
       spellingIssues.push(`Ta'ang Land ID No.: ${tlidError}`);
     }
 
+    // Geographic scope enforcement matching account permissions
+    if (townshipFilter && (!parsedRow.township || !townshipFilter.includes(parsedRow.township))) {
+      spellingIssues.push(`မြို့နယ်ခွင့်ပြုချက် မရှိပါ (Unauthorized township "${parsedRow.township || '-'}" for your account)`);
+    } else if (districtFilter && (!parsedRow.district || !districtFilter.includes(parsedRow.district))) {
+      spellingIssues.push(`ခရိုင်ခွင့်ပြုချက် မရှိပါ (Unauthorized district "${parsedRow.district || '-'}" for your account)`);
+    }
+
     if (missingFields.length > 0 || spellingIssues.length > 0) {
       errorsFound.push({
         rowNumber: index + 2,
@@ -977,6 +1018,14 @@ const processAndUpload = async (formattedData, setValidationErrors, setShowModal
     setShowModal(true);
     setLoading(false);
     playUploadFailureSound();
+    if (fileInputRef.current) fileInputRef.current.value = '';
+    return;
+  }
+
+  // ── Confirmation Gate: pause and ask user YES / NO before touching the DB ──
+  const confirmed = await showUploadConfirm(processedData.length);
+  if (!confirmed) {
+    setLoading(false);
     if (fileInputRef.current) fileInputRef.current.value = '';
     return;
   }
@@ -1154,13 +1203,40 @@ const processAndUpload = async (formattedData, setValidationErrors, setShowModal
   if (fileInputRef.current) fileInputRef.current.value = '';
 };
 
-const CsvUploader = ({ onUploadSuccess }) => {
+const CsvUploader = ({ onUploadSuccess, user }) => {
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState({ current: 0, total: 0, stage: '' });
   const [successMsg, setSuccessMsg] = useState(null);
   const [validationErrors, setValidationErrors] = useState([]); // Modal state
   const [showModal, setShowModal] = useState(false);
   const fileInputRef = useRef(null);
+
+  // ── Upload Confirmation Modal state ──
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [confirmRecordCount, setConfirmRecordCount] = useState(0);
+  const confirmResolverRef = useRef(null); // holds the Promise resolve fn
+
+  // Call this to pause execution and wait for user YES/NO.
+  // Returns a Promise<boolean> that resolves when the user clicks a button.
+  const showUploadConfirm = (recordCount) => {
+    setConfirmRecordCount(recordCount);
+    setShowConfirmModal(true);
+    return new Promise((resolve) => {
+      confirmResolverRef.current = resolve;
+    });
+  };
+
+  const handleConfirmYes = () => {
+    setShowConfirmModal(false);
+    if (confirmResolverRef.current) confirmResolverRef.current(true);
+    confirmResolverRef.current = null;
+  };
+
+  const handleConfirmNo = () => {
+    setShowConfirmModal(false);
+    if (confirmResolverRef.current) confirmResolverRef.current(false);
+    confirmResolverRef.current = null;
+  };
 
   const handleJsonUpload = (file) => {
     setLoading(true);
@@ -1217,12 +1293,12 @@ const CsvUploader = ({ onUploadSuccess }) => {
                 nationality: norm(m.nationality),
                 resident_status: norm(m.resident_status),
                 religious: norm(m.religious),
-                house_no: norm(loc.house_no || m.house_no),
+                house_no: norm(cleanHouseNo(loc.house_no || m.house_no)),
                 ward_village_group: normalizeCommaList(norm(loc.ward_village || loc.ward_village_group || m.ward_village_group)),
                 township: autoCorrectTownship(norm(loc.township || m.township)),
                 district: autoCorrectDistrict(norm(loc.district || m.district)),
                 submission_date: normalizeWhitespace(m.submission_date),
-                address: norm(`${loc.house_no || m.house_no || ''}, ${loc.ward_village || m.ward_village_group || ''}, ${loc.township || m.township || ''}, ${loc.district || m.district || ''}`),
+                address: norm(`${cleanHouseNo(loc.house_no || m.house_no) || ''}, ${loc.ward_village || m.ward_village_group || ''}, ${loc.township || m.township || ''}, ${loc.district || m.district || ''}`),
               });
             }
           } else if (hh.name && (hh.household_no || hh.household_id)) {
@@ -1241,12 +1317,12 @@ const CsvUploader = ({ onUploadSuccess }) => {
               nationality: norm(hh.nationality),
               resident_status: norm(hh.resident_status),
               religious: norm(hh.religious),
-              house_no: norm(loc.house_no || hh.house_no),
+              house_no: norm(cleanHouseNo(loc.house_no || hh.house_no)),
               ward_village_group: normalizeCommaList(norm(loc.ward_village || loc.ward_village_group || hh.ward_village_group)),
               township: autoCorrectTownship(norm(loc.township || hh.township)),
               district: autoCorrectDistrict(norm(loc.district || hh.district)),
               submission_date: normalizeWhitespace(hh.submission_date),
-              address: norm(`${loc.house_no || hh.house_no || ''}, ${loc.ward_village || hh.ward_village_group || ''}, ${loc.township || hh.township || ''}, ${loc.district || hh.district || ''}`),
+              address: norm(`${cleanHouseNo(loc.house_no || hh.house_no) || ''}, ${loc.ward_village || hh.ward_village_group || ''}, ${loc.township || hh.township || ''}, ${loc.district || hh.district || ''}`),
             });
           }
         }
@@ -1271,7 +1347,7 @@ const CsvUploader = ({ onUploadSuccess }) => {
 
         await processAndUpload(
           formattedData,
-          setValidationErrors, setShowModal, setLoading, setSuccessMsg, onUploadSuccess, fileInputRef, setProgress
+          setValidationErrors, setShowModal, setLoading, setSuccessMsg, onUploadSuccess, fileInputRef, setProgress, showUploadConfirm, user
         );
       } catch (err) {
         console.error('JSON upload error:', err);
@@ -1370,13 +1446,13 @@ const CsvUploader = ({ onUploadSuccess }) => {
               nationality: ensureUnicode(cell('Nationality')),
               resident_status: ensureUnicode(cell('Resident Status')),
               religious: ensureUnicode(cell('Religious')),
-              house_no: ensureUnicode(cell('House NO.')),
+              house_no: ensureUnicode(cleanHouseNo(cell('House NO.'))),
               ward_village_group: wardValue,
               ward_village_group_type: wardTypes, // Array of types
               township: currentTownship,
               district: currentDistrict,
               submission_date: cell('Submission Date'),
-              address: ensureUnicode(`${cell('House NO.')}, ${wardValue}, ${currentTownship}, ${currentDistrict}`)
+              address: ensureUnicode(`${cleanHouseNo(cell('House NO.'))}, ${wardValue}, ${currentTownship}, ${currentDistrict}`)
             };
 
             // 2. Strict Validation Check (After Forward-Fill)
@@ -1508,10 +1584,10 @@ const CsvUploader = ({ onUploadSuccess }) => {
 
           console.log(`[${sourceLabel}] No errors — proceeding to upload ${formattedData.length} rows.`);
 
-          // 5. Delegate to shared upload processor
+          // 5. Delegate to shared upload processor (with confirmation gate)
           await processAndUpload(
             formattedData,
-            setValidationErrors, setShowModal, setLoading, setSuccessMsg, onUploadSuccess, fileInputRef, setProgress
+            setValidationErrors, setShowModal, setLoading, setSuccessMsg, onUploadSuccess, fileInputRef, setProgress, showUploadConfirm, user
           );
 
     } catch (err) {
@@ -1538,83 +1614,31 @@ const CsvUploader = ({ onUploadSuccess }) => {
     });
   };
 
-  // Helper to crop Excel sheet range to actual populated cells only,
-  // preventing SheetJS from freezing the browser when parsing large empty cells.
-  const cropSheetRange = (worksheet) => {
-    if (!worksheet || !worksheet['!ref']) return;
-    const range = XLSX.utils.decode_range(worksheet['!ref']);
-    let maxRow = range.s.r;
-    for (const key of Object.keys(worksheet)) {
-      if (key.startsWith('!')) continue;
-      const cell = worksheet[key];
-      if (cell && cell.v !== undefined && cell.v !== null && String(cell.v).trim() !== '') {
-        const coord = XLSX.utils.decode_cell(key);
-        if (coord.r > maxRow) {
-          maxRow = coord.r;
-        }
-      }
+  // Excel handler — reads .xlsx via ExcelJS and legacy .xls via lazy SheetJS
+  const handleExcelUpload = async (file) => {
+    try {
+      const rows = await parseExcelToHeaderObjects(file);
+      if (rows.length === 0) throw new Error('Excel file has no data rows.');
+      await processRowsLikeCsv(rows, 'Excel');
+    } catch (err) {
+      console.error('Excel upload error:', err);
+      alert(err.message || 'Failed to parse Excel file.');
+      setLoading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
-    range.e.r = maxRow;
-    worksheet['!ref'] = XLSX.utils.encode_range(range);
-  };
-
-  // Excel handler — reads .xlsx / .xls via SheetJS, converts first sheet
-  // to the same row shape Papa would produce (header-keyed objects), then
-  // routes through the shared processRowsLikeCsv pipeline.
-  const handleExcelUpload = (file) => {
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      try {
-        const data = new Uint8Array(e.target.result);
-        // cellDates:true  → real Excel date cells become JS Date objects (not serial numbers).
-        // cellNF:false    → don't carry over Excel cell formatting strings.
-        const workbook = XLSX.read(data, { type: 'array', cellDates: true });
-        const firstSheetName = workbook.SheetNames[0];
-        if (!firstSheetName) throw new Error('Excel file has no sheets.');
-        const worksheet = workbook.Sheets[firstSheetName];
-
-        // Crop the range to only active populated rows before parsing
-        cropSheetRange(worksheet);
-
-        // raw:false       → values come out as formatted strings (matches CSV behaviour).
-        // defval:''       → missing cells become empty strings (matches PapaParse + header:true).
-        // dateNF:dd.mm.yyyy → all date cells render as "15.11.1985" — matches the format
-        //                    used by HouseholdForm.jsx and householdPrint.js elsewhere
-        //                    in the system, so age calculations and editing keep working.
-        const rawRows = XLSX.utils.sheet_to_json(worksheet, {
-          raw: false,
-          defval: '',
-          dateNF: 'dd.mm.yyyy',
-        });
-
-        // Normalize header whitespace exactly like PapaParse's transformHeader does,
-        // so the same column-name lookups (`row['Household No.']` etc.) work.
-        const rows = rawRows.map(row => {
-          const cleaned = {};
-          for (const key of Object.keys(row)) {
-            const cleanKey = String(key).trim().replace(/\s+/g, ' ');
-            cleaned[cleanKey] = row[key];
-          }
-          return cleaned;
-        });
-
-        if (rows.length === 0) throw new Error('Excel file has no data rows.');
-
-        await processRowsLikeCsv(rows, 'Excel');
-      } catch (err) {
-        console.error('Excel upload error:', err);
-        alert(err.message || 'Failed to parse Excel file.');
-        setLoading(false);
-        if (fileInputRef.current) fileInputRef.current.value = '';
-      }
-    };
-    reader.readAsArrayBuffer(file);
   };
 
   // Single entry point — dispatches to the right parser based on file extension.
+  const MAX_UPLOAD_BYTES = 15 * 1024 * 1024; // 15 MB safety limit
   const handleFileUpload = (event) => {
     const file = event.target.files[0];
     if (!file) return;
+
+    if (file.size > MAX_UPLOAD_BYTES) {
+      alert('File is too large (maximum allowed size is 15 MB). Please split the file into smaller batches.');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
 
     setLoading(true);
     setProgress({ current: 0, total: 0, stage: '' });
@@ -1809,8 +1833,95 @@ const CsvUploader = ({ onUploadSuccess }) => {
         </div>
       )}
 
+      {/* UPLOAD CONFIRMATION MODAL */}
+      {showConfirmModal && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <div className="bg-white w-full flex flex-col border border-[#E5E7EB]" style={{ borderRadius: '0px', maxWidth: '380px' }}>
+
+            {/* Header */}
+            <div className="flex items-center gap-2 px-4 py-3 border-b border-[#E5E7EB]" style={{ backgroundColor: '#FAFAFA' }}>
+              <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#1A1A1A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>
+              <span className="text-xs font-bold uppercase" style={{ color: '#1A1A1A', letterSpacing: '0.08em' }}>Confirm Database Save</span>
+            </div>
+
+            {/* Body */}
+            <div className="px-4 py-4">
+              {/* Compact count row */}
+              <div
+                className="flex items-center justify-between px-4 py-3 mb-3"
+                style={{ backgroundColor: '#FAFAFA', border: '1px solid #E5E7EB' }}
+              >
+                <span className="text-xs font-semibold uppercase" style={{ color: '#737373', letterSpacing: '0.08em' }}>
+                  Records to Save
+                </span>
+                <span
+                  className="font-black"
+                  style={{ fontSize: '1.5rem', color: '#1A1A1A', letterSpacing: '-0.02em', lineHeight: 1, fontFamily: 'JetBrains Mono, monospace' }}
+                >
+                  {confirmRecordCount.toLocaleString()}
+                </span>
+              </div>
+
+              <p className="text-xs" style={{ color: '#737373' }}>
+                All validation checks passed. Confirm saving{' '}
+                <span className="font-bold" style={{ color: '#1A1A1A' }}>
+                  {confirmRecordCount.toLocaleString()} record{confirmRecordCount !== 1 ? 's' : ''}
+                </span>{' '}
+                to the database? Duplicates will be skipped automatically.
+              </p>
+            </div>
+
+            {/* Footer — NO / YES side by side */}
+            <div className="px-4 pb-4 flex gap-2">
+              <button
+                onClick={handleConfirmNo}
+                className="hover:bg-[#F3F4F6] transition-colors"
+                style={{
+                  flex: 1,
+                  padding: '9px 0',
+                  backgroundColor: '#FFFFFF',
+                  color: '#1A1A1A',
+                  fontSize: '11px',
+                  fontWeight: '700',
+                  border: '1px solid #E5E7EB',
+                  borderRadius: '0px',
+                  cursor: 'pointer',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.06em',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                ✕ No, Cancel
+              </button>
+              <button
+                onClick={handleConfirmYes}
+                className="hover:bg-[#737373] transition-colors"
+                style={{
+                  flex: 1.6,
+                  padding: '9px 0',
+                  backgroundColor: '#1A1A1A',
+                  color: '#FFFFFF',
+                  fontSize: '11px',
+                  fontWeight: '700',
+                  border: '1px solid #1A1A1A',
+                  borderRadius: '0px',
+                  cursor: 'pointer',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.06em',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                ✓ Yes, Save to Database
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };
 
 export default CsvUploader;
+

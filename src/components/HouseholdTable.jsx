@@ -1,9 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { sanitizePostgrestOrValue } from '../lib/querySanitize';
 import EditHouseholdModal from './EditHouseholdModal';
 import EmptyState from './EmptyState';
 
-const HouseholdTable = ({ refreshTrigger }) => {
+const HouseholdTable = ({ refreshTrigger, user }) => {
+  const districtFilter = (user?.access_level && user?.access_level !== 'central' && user?.allowed_districts?.length > 0)
+    ? user.allowed_districts : null;
+  const townshipFilter = ((user?.access_level === 'township' || user?.access_level === 'sub_township') && user?.allowed_townships?.length > 0)
+    ? user.allowed_townships : null;
+  const isViewOnly = user?.access_level === 'viewer' || user?.access_level === 'sub_township';
   const [households, setHouseholds] = useState([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
@@ -46,8 +52,17 @@ const HouseholdTable = ({ refreshTrigger }) => {
       .select('*', { count: 'exact' })
       .order('created_at', { ascending: false });
 
-    // Normalize search: strip spaces around hyphens so "ကောင်းတပ် - ၁" matches "ကောင်းတပ်-၁"
-    const normalizedSearch = search.replace(/\s*-\s*/g, '-');
+    if (townshipFilter) query = query.in('township', townshipFilter);
+    else if (districtFilter) query = query.in('district', districtFilter);
+
+    // Normalize search: strip spaces around hyphens and sanitize PostgREST filter syntax
+    const normalizedSearch = sanitizePostgrestOrValue(search.replace(/\s*-\s*/g, '-'));
+    if (!normalizedSearch) {
+      setHouseholds([]);
+      setTotalCount(0);
+      setLoading(false);
+      return;
+    }
     const searchTerm = `%${normalizedSearch}%`;
     query = query.or(`name.ilike.${searchTerm},address.ilike.${searchTerm},household_no.ilike.${searchTerm},taang_land_id_no.ilike.${searchTerm},previous_id_no.ilike.${searchTerm}`);
 
@@ -143,7 +158,7 @@ const HouseholdTable = ({ refreshTrigger }) => {
             <table style={{ borderCollapse: 'collapse', textAlign: 'left', width: 'max-content' }}>
               <thead>
                 <tr style={{ backgroundColor: '#F9FAFB', borderBottom: '1px solid #E5E7EB' }}>
-                  <th style={{ padding: '1rem', color: 'var(--text-secondary)', fontWeight: '600', minWidth: '150px' }}>Actions</th>
+                  {!isViewOnly && <th style={{ padding: '1rem', color: 'var(--text-secondary)', fontWeight: '600', minWidth: '150px' }}>Actions</th>}
                   {columns.map(col => (
                     <th key={col.key} style={{ padding: '1rem', whiteSpace: 'nowrap', minWidth: '120px', color: 'var(--text-secondary)', fontWeight: '600' }}>
                       {col.label}
@@ -163,31 +178,33 @@ const HouseholdTable = ({ refreshTrigger }) => {
                 ) : (
                   households.map((h) => (
                     <tr key={h.id} style={{ borderBottom: '1px solid #F3F4F6', transition: 'background-color 0.2s' }}>
-                      <td style={{ padding: '0.75rem 1rem', whiteSpace: 'nowrap' }}>
-                        <button 
-                          onClick={() => handleEdit(h)} 
-                          style={{ 
-                            marginRight: '8px', 
-                            padding: '6px 12px', 
-                            backgroundColor: 'var(--primary-color)', 
-                            color: 'white', 
-                            fontSize: '0.875rem' 
-                          }}
-                        >
-                          Edit
-                        </button>
-                        <button 
-                          onClick={() => handleDelete(h.id)} 
-                          style={{ 
-                            padding: '6px 12px', 
-                            backgroundColor: '#EF4444', 
-                            color: 'white', 
-                            fontSize: '0.875rem' 
-                          }}
-                        >
-                          Delete
-                        </button>
-                      </td>
+                      {!isViewOnly && (
+                        <td style={{ padding: '0.75rem 1rem', whiteSpace: 'nowrap' }}>
+                          <button 
+                            onClick={() => handleEdit(h)} 
+                            style={{ 
+                              marginRight: '8px', 
+                              padding: '6px 12px', 
+                              backgroundColor: 'var(--primary-color)', 
+                              color: 'white', 
+                              fontSize: '0.875rem' 
+                            }}
+                          >
+                            Edit
+                          </button>
+                          <button 
+                            onClick={() => handleDelete(h.id)} 
+                            style={{ 
+                              padding: '6px 12px', 
+                              backgroundColor: '#EF4444', 
+                              color: 'white', 
+                              fontSize: '0.875rem' 
+                            }}
+                          >
+                            Delete
+                          </button>
+                        </td>
+                      )}
                       {columns.map(col => (
                         <td key={`${h.id}-${col.key}`} style={{ padding: '1rem', whiteSpace: 'nowrap', color: 'var(--text-primary)' }}>
                           {h[col.key] || '-'}

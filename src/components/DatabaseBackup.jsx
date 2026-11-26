@@ -305,6 +305,15 @@ const DatabaseBackup = ({ user }) => {
       setBackupLogs(updatedLogs);
       setSecureItem(BACKUP_LOGS_KEY, updatedLogs);
 
+      try {
+        await supabase.from('audit_logs').insert([{
+          user_id: user?.id || null,
+          action: 'EXPORT_BACKUP',
+          table_name: 'households',
+          details: { format: 'JSON', district: selectedDistrict || 'ALL', township: selectedTownship || 'ALL', households: order.length, members: rows.length, filename },
+        }]);
+      } catch (_) {}
+
     } catch (err) {
       alert('Backup Export Failed: ' + err.message);
     } finally {
@@ -337,6 +346,15 @@ const DatabaseBackup = ({ user }) => {
       const updatedLogs = [newLog, ...backupLogs].slice(0, 30);
       setBackupLogs(updatedLogs);
       setSecureItem(BACKUP_LOGS_KEY, updatedLogs);
+
+      try {
+        await supabase.from('audit_logs').insert([{
+          user_id: user?.id || null,
+          action: 'EXPORT_BACKUP',
+          table_name: 'households',
+          details: { format: 'Excel', district: selectedDistrict || 'ALL', township: selectedTownship || 'ALL', households: newLog.households, members: rows.length, filename },
+        }]);
+      } catch (_) {}
 
     } catch (err) {
       alert('Excel Export Failed: ' + err.message);

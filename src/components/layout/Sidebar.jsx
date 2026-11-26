@@ -107,8 +107,8 @@ const Sidebar = ({ user, onLogout }) => {
   // Role-based + access-level filtering
   const filteredMenuItems = menuItems.filter(item => {
     if (item.id === 'users') return user?.role === 'system' || user?.role === 'master';
-    if (item.id === 'upload') return user?.role === 'system' || user?.role === 'master' || user?.role === 'admin' || user?.role === 'ops';
-    if (item.id === 'central-database') return user?.access_level !== 'viewer' && user?.access_level !== 'sub_township';
+    if (item.id === 'upload') return (user?.role === 'system' || user?.role === 'master' || user?.role === 'admin' || user?.role === 'ops') && user?.access_level !== 'viewer' && user?.access_level !== 'sub_township';
+    if (item.id === 'central-database' || item.id === 'registration') return user?.access_level !== 'viewer' && user?.access_level !== 'sub_township';
     if (item.id === 'backup') return (user?.role === 'system' || user?.role === 'master') && (user?.access_level || user?.profile?.access_level) === 'central';
     return true;
   });

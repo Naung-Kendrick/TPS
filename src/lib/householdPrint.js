@@ -1,8 +1,9 @@
-import * as XLSX from 'xlsx';
 import ExcelJS from 'exceljs';
 import taangFlag from '../assets/taang_flag.jpg';
 import taangLogo from '../assets/fonts/IDTL_logo.png';
 import { buildExportFilename } from './exportFilename';
+import { openPrintPreview } from './printWindowHelper';
+import { sanitizeSpreadsheetCell } from './exportSanitize';
 
 const escVal = (v) => (v === null || v === undefined ? '' : v);
 
@@ -195,7 +196,7 @@ export const exportHouseholdExcel = async (householdNo, members) => {
 
     cells.forEach((c, idx) => {
       const cell = row.getCell(idx + 1);
-      cell.value = c.val;
+      cell.value = sanitizeSpreadsheetCell(c.val);
       cell.font = { name: 'Pyidaungsu', size: 11, bold: c.bold || false };
       cell.fill = {
         type: 'pattern',
@@ -319,7 +320,7 @@ export const printHouseholdPdf = (householdNo, members) => {
             </tr>
             <tr>
               <td style="white-space:nowrap;font-weight:700;padding:3px 6px 2px 0;vertical-align:top">House No.:</td>
-              <td style="border-bottom:1px dotted #000;padding:3px 0 1px 0;vertical-align:top">${toMyanmarNum(first.house_no) || '&nbsp;'}</td>
+              <td style="border-bottom:1px dotted #000;padding:3px 0 1px 0;vertical-align:top">${safeHtml(toMyanmarNum(first.house_no)) || '&nbsp;'}</td>
             </tr>
           </table>
         </td>
@@ -476,35 +477,16 @@ export const printHouseholdPdf = (householdNo, members) => {
   <div class="actions">
     <h1>Household Registration — Print Preview (${totalPages} page${totalPages > 1 ? 's' : ''})</h1>
     <div class="btns">
-      <button class="primary" onclick="window.print()">Print / Save as PDF</button>
-      <button onclick="window.close()">Close</button>
+      <button id="tps-print-btn" class="primary">Print / Save as PDF</button>
+      <button id="tps-close-btn">Close</button>
     </div>
   </div>
 
   ${pagesHtml}
-
-  <script>
-    (function(){
-      var imgs = document.images, loaded = 0;
-      function tryPrint(){ if(++loaded >= imgs.length){ setTimeout(function(){ window.focus(); window.print(); }, 300); } }
-      if(imgs.length === 0){ setTimeout(function(){ window.focus(); window.print(); }, 300); return; }
-      for(var i=0;i<imgs.length;i++){
-        if(imgs[i].complete) tryPrint();
-        else { imgs[i].addEventListener('load', tryPrint); imgs[i].addEventListener('error', tryPrint); }
-      }
-    })();
-  </script>
 </body>
 </html>`;
 
-  const w = window.open('', '_blank', 'width=1100,height=800');
-  if (!w) {
-    alert('Please allow popups to print the household registration.');
-    return;
-  }
-  w.document.open();
-  w.document.write(html);
-  w.document.close();
+  openPrintPreview(html, 'Please allow popups to print the household registration.');
 };
 
 export const exportAllExcel = async (data, activeFilters) => {
@@ -621,7 +603,7 @@ export const exportAllExcel = async (data, activeFilters) => {
 
     cells.forEach((c, idx) => {
       const cell = row.getCell(idx + 1);
-      cell.value = c.val;
+      cell.value = sanitizeSpreadsheetCell(c.val);
       cell.font = { name: 'Pyidaungsu', size: 10, bold: c.bold || false };
       cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } };
       cell.alignment = { horizontal: c.align, vertical: 'middle', wrapText: true };

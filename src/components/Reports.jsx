@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase, verifyOfficerPassword } from '../lib/supabase';
+import { escapeLike } from '../lib/querySanitize';
 import { cacheGet, cacheSet } from '../lib/offlineCache';
 import { SkeletonTable, SkeletonBar } from './Skeleton';
 import { ChevronRight, Search, Map as MapIcon, MapPin, Home, Users, User, ArrowLeft, Loader2, AlertCircle, Printer, FileSpreadsheet, Pencil, Trash2, Check, X, Download, Layers } from 'lucide-react';
@@ -89,7 +90,12 @@ const validateDateOfBirth = (text) => {
   // Check calendar dates
   const dt = new Date(year, month - 1, day);
   if (dt.getFullYear() !== year || dt.getMonth() !== month - 1 || dt.getDate() !== day) {
-    return `မွေးသက္ကရာဇ် "${text}" သည် ပြက္ခဒိန်အရ မှန်ကန်သောရက်စွဲမဟုတ်ပါ (Not a real calendar date)`;
+    const daysInMonth = new Date(year, month, 0).getDate();
+    const mmMonthNames = ['ဇန်နဝါရီ','ဖေဖော်ဝါရီ','မတ်','ဧပြီ','မေ','ဇွန်','ဇူလိုင်','သြဂုတ်','စက်တင်ဘာ','အောက်တိုဘာ','နိုဝင်ဘာ','ဒီဇင်ဘာ'];
+    const enMonthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    const mmDay = String(day).replace(/[0-9]/g, ch => '၀၁၂၃၄၅၆၇၈၉'[parseInt(ch, 10)]);
+    const mmMax = String(daysInMonth).replace(/[0-9]/g, ch => '၀၁၂၃၄၅၆၇၈၉'[parseInt(ch, 10)]);
+    return `မွေးသက္ကရာဇ် "${text}" — ${mmMonthNames[month-1]}လတွင် ${mmDay} ရက်မရှိပါ၊ ထိုလတွင် ${mmMax} ရက်သာ ရှိပါသည် (${enMonthNames[month-1]} only has ${daysInMonth} days, not ${day})`;
   }
 
   return null;
@@ -212,8 +218,8 @@ const Reports = ({ user }) => {
     setError(null);
     setSearch('');
 
-    // Cache key for this navigation state (v5 = group village isolated)
-    const cacheKey = `reports_v5_l${level}_${path.district||''}_${path.township||''}_${path.locationType||''}_${path.ward||''}_${path.group||''}_${path.village||''}_${path.householdNo||''}`;
+    // Cache key isolated per user + navigation state (v6)
+    const cacheKey = `reports_v6_${user?.id || 'anon'}_l${level}_${path.district||''}_${path.township||''}_${path.locationType||''}_${path.ward||''}_${path.group||''}_${path.village||''}_${path.householdNo||''}`;
 
     // Serve cached data immediately (stale-while-revalidate)
     const cached = await cacheGet(cacheKey);
@@ -273,7 +279,7 @@ const Reports = ({ user }) => {
           let query = supabase
             .from('households')
             .select('id, name, household_no, gender, occupation, date_of_birth')
-            .ilike('ward_village_group', '%' + path.ward.trim() + '%')
+            .ilike('ward_village_group', '%' + escapeLike(path.ward.trim()) + '%')
             .ilike('household_relationship', '%ဦးစီး%');
 
           if (path.district) query = query.eq('district', path.district);
@@ -289,7 +295,7 @@ const Reports = ({ user }) => {
           let query = supabase
             .from('households')
             .select('ward_village_group')
-            .ilike('ward_village_group', '%' + path.group.trim() + '%');
+            .ilike('ward_village_group', '%' + escapeLike(path.group.trim()) + '%');
 
           if (path.district) query = query.eq('district', path.district);
           if (path.township) query = query.eq('township', path.township);
@@ -326,12 +332,12 @@ const Reports = ({ user }) => {
         let query = supabase
           .from('households')
           .select('id, name, household_no, gender, occupation, date_of_birth')
-          .ilike('ward_village_group', '%' + path.village.trim() + '%')
+          .ilike('ward_village_group', '%' + escapeLike(path.village.trim()) + '%')
           .ilike('household_relationship', '%ဦးစီး%');
 
         if (path.district) query = query.eq('district', path.district);
         if (path.township) query = query.eq('township', path.township);
-        if (path.group) query = query.ilike('ward_village_group', '%' + path.group.trim() + '%');
+        if (path.group) query = query.ilike('ward_village_group', '%' + escapeLike(path.group.trim()) + '%');
           
         let { data, error } = await query;
         if (error) throw error;
@@ -526,14 +532,16 @@ const Reports = ({ user }) => {
         .order('id', { ascending: true });
 
       if (path.district) query = query.eq('district', path.district);
+      else if (districtFilter) query = query.in('district', districtFilter);
       if (path.township) query = query.eq('township', path.township);
+      else if (townshipFilter) query = query.in('township', townshipFilter);
       if (path.locationType === 'ward' && path.ward) {
-        query = query.ilike('ward_village_group', '%' + path.ward.trim() + '%');
+        query = query.ilike('ward_village_group', '%' + escapeLike(path.ward.trim()) + '%');
       } else if (path.locationType === 'group') {
         if (path.village) {
-          query = query.ilike('ward_village_group', '%' + path.village.trim() + '%');
+          query = query.ilike('ward_village_group', '%' + escapeLike(path.village.trim()) + '%');
         } else if (path.group) {
-          query = query.ilike('ward_village_group', '%' + path.group.trim() + '%');
+          query = query.ilike('ward_village_group', '%' + escapeLike(path.group.trim()) + '%');
         }
       }
 
@@ -576,14 +584,16 @@ const Reports = ({ user }) => {
         .select('*');
 
       if (path.district) query = query.eq('district', path.district);
+      else if (districtFilter) query = query.in('district', districtFilter);
       if (path.township) query = query.eq('township', path.township);
+      else if (townshipFilter) query = query.in('township', townshipFilter);
       if (path.locationType === 'ward' && path.ward) {
-        query = query.ilike('ward_village_group', '%' + path.ward.trim() + '%');
+        query = query.ilike('ward_village_group', '%' + escapeLike(path.ward.trim()) + '%');
       } else if (path.locationType === 'group') {
         if (path.village) {
-          query = query.ilike('ward_village_group', '%' + path.village.trim() + '%');
+          query = query.ilike('ward_village_group', '%' + escapeLike(path.village.trim()) + '%');
         } else if (path.group) {
-          query = query.ilike('ward_village_group', '%' + path.group.trim() + '%');
+          query = query.ilike('ward_village_group', '%' + escapeLike(path.group.trim()) + '%');
         }
       }
 
@@ -642,18 +652,15 @@ const Reports = ({ user }) => {
     setSaving(true);
     setEditPinError('');
     try {
-      // Real Supabase Auth PIN/password verification
+      // Verify officer PIN in isolated ephemeral client (preserves active 2FA session)
       const userEmail = user?.email || (user?.profile?.username ? `${user.profile.username}@tps.idtl` : (user?.username ? (user.username.includes('@') ? user.username : `${user.username}@tps.idtl`) : ''));
-      const { error: authErr } = await supabase.auth.signInWithPassword({
-        email: userEmail,
-        password: editPin.trim(),
-      });
+      const { error: authErr } = await verifyOfficerPassword(userEmail, editPin.trim());
       if (authErr) {
         setEditPinError('လျှို့ဝှက်နံပါတ် မှားယွင်းနေပါသည်။ (Incorrect PIN / password).');
         setSaving(false);
         return;
       }
-      const { id, created_at, ...fields } = editForm;
+      const { id, created_at, updated_at, ...fields } = editForm;
       if (fields.date_of_birth) {
         fields.date_of_birth = normalizeDateOfBirth(fields.date_of_birth);
       }
@@ -725,12 +732,9 @@ const Reports = ({ user }) => {
     setDeleting(true);
     setDeletePinError('');
     try {
-      // Real Supabase Auth PIN/password verification
+      // Verify officer PIN in isolated ephemeral client (preserves active 2FA session)
       const userEmail = user?.email || (user?.profile?.username ? `${user.profile.username}@tps.idtl` : (user?.username ? (user.username.includes('@') ? user.username : `${user.username}@tps.idtl`) : ''));
-      const { error: authErr } = await supabase.auth.signInWithPassword({
-        email: userEmail,
-        password: deletePin.trim(),
-      });
+      const { error: authErr } = await verifyOfficerPassword(userEmail, deletePin.trim());
       if (authErr) {
         setDeletePinError('လျှို့ဝှက်နံပါတ် မှားယွင်းနေပါသည်။ (Incorrect PIN / password).');
         setDeleting(false);

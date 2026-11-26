@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import jsQR from 'jsqr';
 import { supabase } from '../lib/supabase';
 import { pushNotification, NOTIF_TYPES } from '../lib/notifications';
+import { escapeLike } from '../lib/querySanitize';
 import TpsScrollWrapper from './layout/TpsScrollWrapper';
 import {
   ScanLine, Search, X, CheckCircle2, AlertCircle, Loader2,
@@ -10,7 +11,11 @@ import {
   Calendar, Globe, Briefcase, HeartHandshake, Layers, Building, Landmark, Compass, UserCheck
 } from 'lucide-react';
 
-const IDCardScanner = () => {
+const IDCardScanner = ({ user }) => {
+  const districtFilter = (user?.access_level !== 'central' && user?.allowed_districts?.length > 0)
+    ? user.allowed_districts : null;
+  const townshipFilter = ((user?.access_level === 'township' || user?.access_level === 'sub_township') && user?.allowed_townships?.length > 0)
+    ? user.allowed_townships : null;
   const [mode, setMode] = useState('manual');
   const [inputValue, setInputValue] = useState('');
   const [loading, setLoading] = useState(false);
@@ -143,24 +148,28 @@ const IDCardScanner = () => {
     let data = null;
     let dbError = null;
 
-    // Strategy 1: exact match
-    const res1 = await supabase
+    // Strategy 1: exact match (scoped to officer's allowed township/district)
+    let q1 = supabase
       .from('households')
       .select('name, household_no, taang_land_id_no, house_no, ward_village_group, township, district, address, gender, date_of_birth, nationality, occupation, household_relationship')
-      .eq('taang_land_id_no', numericId)
-      .limit(1)
-      .maybeSingle();
+      .eq('taang_land_id_no', numericId);
+    if (townshipFilter) q1 = q1.in('township', townshipFilter);
+    else if (districtFilter) q1 = q1.in('district', districtFilter);
+
+    const res1 = await q1.limit(1).maybeSingle();
 
     if (res1.data) {
       data = res1.data;
     } else {
       // Strategy 2: partial ilike — covers "No - 01003..." stored format
-      const res2 = await supabase
+      let q2 = supabase
         .from('households')
         .select('name, household_no, taang_land_id_no, house_no, ward_village_group, township, district, address, gender, date_of_birth, nationality, occupation, household_relationship')
-        .ilike('taang_land_id_no', `%${numericId}%`)
-        .limit(1)
-        .maybeSingle();
+        .ilike('taang_land_id_no', `%${escapeLike(numericId)}%`);
+      if (townshipFilter) q2 = q2.in('township', townshipFilter);
+      else if (districtFilter) q2 = q2.in('district', districtFilter);
+
+      const res2 = await q2.limit(1).maybeSingle();
 
       data = res2.data;
       dbError = res2.error;
@@ -378,11 +387,13 @@ const IDCardScanner = () => {
     }
     setFamilyModal(true);
     setFamilyLoading(true);
-    const { data } = await supabase
+    let famQuery = supabase
       .from('households')
       .select('*')
-      .eq('household_no', result.household_no)
-      .order('created_at', { ascending: true });
+      .eq('household_no', result.household_no);
+    if (townshipFilter) famQuery = famQuery.in('township', townshipFilter);
+    else if (districtFilter) famQuery = famQuery.in('district', districtFilter);
+    const { data } = await famQuery.order('created_at', { ascending: true });
     // Sort: head first, then spouse, then children
     const order = { 'ဦးစီး': 1, 'ဇနီး': 2, 'ခင်ပွန်း': 2, 'သား': 3, 'သမီး': 3 };
     const sorted = (data || []).sort((a, b) =>

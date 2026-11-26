@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
+import { escapeLike } from '../lib/querySanitize';
 import { Users, MapPin, Globe, Briefcase, Search, Printer, Send, CheckCircle2, ChevronDown } from 'lucide-react';
 import { printDemographicDashboard } from '../lib/statisticsPrint';
 import EmptyState from './EmptyState';
@@ -823,7 +824,7 @@ const DemographicDashboard = ({ user }) => {
         .select('ward_village_group')
         .eq('district', district)
         .eq('township', township)
-        .ilike('ward_village_group', `%${group}%`);
+        .ilike('ward_village_group', `%${escapeLike(group)}%`);
       if (error) throw error;
       const villageSet = new Set();
       (data || []).forEach(row => {
@@ -835,11 +836,13 @@ const DemographicDashboard = ({ user }) => {
     } catch { setFilteredVillages([]); }
   };
 
+  const userCachePrefix = `${CACHE_KEY}_${user?.id || 'anon'}`;
+
   // ─── Main stats fetch ─────────────────────────────────────
   const loadStats = useCallback(async (forceRefresh = false) => {
     setLoading(true);
     setError(null);
-    const cacheKey = `${CACHE_KEY}_${selectedDistrict||'all'}_${selectedTownship||'all'}_${selectedWard||'all'}_${selectedGroup||'all'}_${selectedVillage||'all'}`;
+    const cacheKey = `${userCachePrefix}_${selectedDistrict||'all'}_${selectedTownship||'all'}_${selectedWard||'all'}_${selectedGroup||'all'}_${selectedVillage||'all'}`;
     if (!forceRefresh) {
       const cached = readCache(cacheKey);
       if (cached) { setStatsData(cached); setLoading(false); return; }
@@ -860,7 +863,7 @@ const DemographicDashboard = ({ user }) => {
     } finally {
       setLoading(false);
     }
-  }, [selectedDistrict, selectedTownship, selectedWard, selectedGroup, selectedVillage]);
+  }, [selectedDistrict, selectedTownship, selectedWard, selectedGroup, selectedVillage, userCachePrefix]);
 
   // Initial load
   useEffect(() => { loadDistricts(); loadStats(); }, []);
@@ -950,7 +953,15 @@ const DemographicDashboard = ({ user }) => {
         </div>
         <div className="flex gap-2 w-full sm:w-auto" style={{ marginTop: '4px' }}>
           <button
-            onClick={() => { try { sessionStorage.removeItem(CACHE_KEY); } catch {} loadDistricts(); loadStats(true); }}
+            onClick={() => {
+              try {
+                Object.keys(sessionStorage)
+                  .filter(k => k.startsWith(userCachePrefix) || k === CACHE_KEY)
+                  .forEach(k => sessionStorage.removeItem(k));
+              } catch {}
+              loadDistricts();
+              loadStats(true);
+            }}
             className="flex-1 sm:flex-none flex items-center justify-center gap-1.5"
             style={{ fontSize: '11px', border: '1px solid #E5E7EB', background: 'none', color: '#737373', padding: '6px 14px', cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.05em', flexShrink: 0 }}
           >

@@ -39,17 +39,8 @@ export default defineConfig({
       workbox: {
         // Cache app shell (JS, CSS, fonts, images)
         globPatterns: ['**/*.{js,css,html,ico,png,jpg,svg,ttf,woff,woff2}'],
-        // Runtime caching for Supabase API responses
+        // Runtime caching: fonts only (never cache citizen PII/Supabase REST responses in SW storage)
         runtimeCaching: [
-          {
-            urlPattern: ({ url }) => url.href.includes('supabase.co'),
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'supabase-api-cache',
-              expiration: { maxEntries: 100, maxAgeSeconds: 24 * 60 * 60 },
-              networkTimeoutSeconds: 5,
-            },
-          },
           {
             urlPattern: ({ request }) => request.destination === 'font',
             handler: 'CacheFirst',
@@ -62,7 +53,16 @@ export default defineConfig({
       },
     }),
   ],
-  esbuild: {
-    drop: ['console', 'debugger'],
+  build: {
+    rolldownOptions: {
+      output: {
+        minify: {
+          compress: {
+            dropConsole: true,
+            dropDebugger: true,
+          },
+        },
+      },
+    },
   },
 })

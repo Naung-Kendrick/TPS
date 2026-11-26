@@ -1,6 +1,7 @@
 import React, { useState, useRef, useMemo } from 'react';
-import * as XLSX from 'xlsx';
 import Papa from 'papaparse';
+import { parseExcelToAoA } from '../lib/excelParser';
+import { sanitizeSpreadsheetCell } from '../lib/exportSanitize';
 import {
   AlertCircle, X, CheckCircle2, Upload, FileSpreadsheet,
   Loader2, Download, FileCheck, AlertTriangle, ChevronDown,
@@ -259,6 +260,18 @@ const arabicToMyanmarDigits = (text) => {
   return String(text).replace(/[0-9]/g, ch => '၀၁၂၃၄၅၆၇၈၉'[parseInt(ch, 10)]);
 };
 
+// Clean House NO: remove any accidental leading '$' caused by SheetJS misinterpreting
+// Excel Myanmar numeral locale code [$-10000455]0 as currency, and convert digits to Myanmar.
+const cleanHouseNo = (val) => {
+  if (val === null || val === undefined) return '';
+  let s = String(val).trim();
+  if (/^\$\s*[0-9၀-၉]/.test(s)) {
+    s = s.replace(/^\$\s*/, '');
+    s = arabicToMyanmarDigits(s);
+  }
+  return s;
+};
+
 // Normalizes and zero-pads dates (e.g. ၃.၆.၁၉၉၇ -> ၀၃.၀၆.၁၉၉၇) in Myanmar numerals
 const normalizeDateOfBirth = (text) => {
   if (text === null || text === undefined) return '';
@@ -327,7 +340,12 @@ const validateDateOfBirth = (text) => {
   // Check calendar dates
   const dt = new Date(year, month - 1, day);
   if (dt.getFullYear() !== year || dt.getMonth() !== month - 1 || dt.getDate() !== day) {
-    return `မွေးသက္ကရာဇ် "${text}" သည် ပြက္ခဒိန်အရ မှန်ကန်သောရက်စွဲမဟုတ်ပါ (Not a real calendar date)`;
+    const daysInMonth = new Date(year, month, 0).getDate();
+    const mmMonthNames = ['ဇန်နဝါရီ','ဖေဖော်ဝါရီ','မတ်','ဧပြီ','မေ','ဇွန်','ဇူလိုင်','သြဂုတ်','စက်တင်ဘာ','အောက်တိုဘာ','နိုဝင်ဘာ','ဒီဇင်ဘာ'];
+    const enMonthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    const mmDay = String(day).replace(/[0-9]/g, ch => '၀၁၂၃၄၅၆၇၈၉'[parseInt(ch, 10)]);
+    const mmMax = String(daysInMonth).replace(/[0-9]/g, ch => '၀၁၂၃၄၅၆၇၈၉'[parseInt(ch, 10)]);
+    return `မွေးသက္ကရာဇ် "${text}" — ${mmMonthNames[month-1]}လတွင် ${mmDay} ရက်မရှိပါ၊ ထိုလတွင် ${mmMax} ရက်သာ ရှိပါသည် (${enMonthNames[month-1]} only has ${daysInMonth} days, not ${day})`;
   }
 
   return null;
@@ -350,49 +368,8 @@ const ExcelChecker = () => {
     setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
   };
 
-  // Helper to crop Excel sheet range to actual populated cells only,
-  // preventing SheetJS from freezing the browser when parsing large empty cells.
-  const cropSheetRange = (worksheet) => {
-    if (!worksheet || !worksheet['!ref']) return;
-    const range = XLSX.utils.decode_range(worksheet['!ref']);
-    let maxRow = range.s.r;
-    for (const key of Object.keys(worksheet)) {
-      if (key.startsWith('!')) continue;
-      const cell = worksheet[key];
-      if (cell && cell.v !== undefined && cell.v !== null && String(cell.v).trim() !== '') {
-        const coord = XLSX.utils.decode_cell(key);
-        if (coord.r > maxRow) {
-          maxRow = coord.r;
-        }
-      }
-    }
-    range.e.r = maxRow;
-    worksheet['!ref'] = XLSX.utils.encode_range(range);
-  };
-
-  // Convert Excel file to array of arrays (CSV-like)
-  const excelToJson = (file) => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        try {
-          const data = new Uint8Array(e.target.result);
-          const workbook = XLSX.read(data, { type: 'array', cellText: true, cellDates: true });
-          const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-          
-          // Crop sheet range before parsing empty rows
-          cropSheetRange(firstSheet);
-
-          const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1, defval: '' });
-          resolve(jsonData);
-        } catch (err) {
-          reject(err);
-        }
-      };
-      reader.onerror = reject;
-      reader.readAsArrayBuffer(file);
-    });
-  };
+  // Convert Excel file (.xlsx via ExcelJS, legacy .xls via lazy SheetJS) to array of arrays
+  const excelToJson = (file) => parseExcelToAoA(file);
 
   // Process and validate data
   const processData = (rawData) => {
@@ -460,13 +437,13 @@ const ExcelChecker = () => {
         nationality: ensureUnicode(rowData.nationality || ''),
         resident_status: ensureUnicode(rowData.resident_status || ''),
         religious: ensureUnicode(rowData.religious || ''),
-        house_no: ensureUnicode(rowData.house_no || ''),
+        house_no: ensureUnicode(cleanHouseNo(rowData.house_no || '')),
         ward_village_group: currentWard,
         ward_village_group_type: wardTypes,
         township: currentTownship,
         district: currentDistrict,
         submission_date: rowData.submission_date || '',
-        address: ensureUnicode(`${rowData.house_no || ''}, ${currentWard}, ${currentTownship}, ${currentDistrict}`),
+        address: ensureUnicode(`${cleanHouseNo(rowData.house_no || '')}, ${currentWard}, ${currentTownship}, ${currentDistrict}`),
       };
 
       // Skip completely empty rows
@@ -564,9 +541,16 @@ const ExcelChecker = () => {
   };
 
   // Handle file upload
+  const MAX_UPLOAD_BYTES = 15 * 1024 * 1024; // 15 MB safety limit
   const handleFileUpload = async (event) => {
     const file = event.target.files[0];
     if (!file) return;
+
+    if (file.size > MAX_UPLOAD_BYTES) {
+      alert('File is too large (maximum allowed size is 15 MB).');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
 
     // Check file type
     const validTypes = [
@@ -649,7 +633,7 @@ const ExcelChecker = () => {
       row.township,
       row.district,
       row.submission_date
-    ]);
+    ].map(sanitizeSpreadsheetCell));
 
     const csv = Papa.unparse({
       fields: csvHeaders,
@@ -705,7 +689,8 @@ const ExcelChecker = () => {
       });
     }
 
-    const csv = Papa.unparse(reportLines);
+    const safeReportLines = reportLines.map(line => line.map(sanitizeSpreadsheetCell));
+    const csv = Papa.unparse(safeReportLines);
     const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);

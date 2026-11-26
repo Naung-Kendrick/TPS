@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Pencil, Trash2, ChevronDown } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { enqueue } from '../lib/retryQueue';
+import { escapeLike } from '../lib/querySanitize';
 import { getSecureItem, setSecureItem, removeSecureItem } from '../lib/secureStorage';
 import EditHouseholdModal from './EditHouseholdModal';
 
@@ -337,7 +338,12 @@ const validateDateOfBirth = (text) => {
   // Check calendar dates
   const dt = new Date(year, month - 1, day);
   if (dt.getFullYear() !== year || dt.getMonth() !== month - 1 || dt.getDate() !== day) {
-    return `မွေးသက္ကရာဇ် "${text}" သည် ပြက္ခဒိန်အရ မှန်ကန်သောရက်စွဲမဟုတ်ပါ (Not a real calendar date)`;
+    const daysInMonth = new Date(year, month, 0).getDate();
+    const mmMonthNames = ['ဇန်နဝါရီ','ဖေဖော်ဝါရီ','မတ်','ဧပြီ','မေ','ဇွန်','ဇူလိုင်','သြဂုတ်','စက်တင်ဘာ','အောက်တိုဘာ','နိုဝင်ဘာ','ဒီဇင်ဘာ'];
+    const enMonthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    const mmDay = String(day).replace(/[0-9]/g, ch => '၀၁၂၃၄၅၆၇၈၉'[parseInt(ch, 10)]);
+    const mmMax = String(daysInMonth).replace(/[0-9]/g, ch => '၀၁၂၃၄၅၆၇၈၉'[parseInt(ch, 10)]);
+    return `မွေးသက္ကရာဇ် "${text}" — ${mmMonthNames[month-1]}လတွင် ${mmDay} ရက်မရှိပါ၊ ထိုလတွင် ${mmMax} ရက်သာ ရှိပါသည် (${enMonthNames[month-1]} only has ${daysInMonth} days, not ${day})`;
   }
 
   return null;
@@ -346,6 +352,7 @@ const validateDateOfBirth = (text) => {
 const DISTRICTS = ['နမ့်ခမ်း ခရိုင်', 'နမ့်ဆန် ခရိုင်', 'မန်တုံ ခရိုင်'];
 
 const HouseholdForm = ({ user }) => {
+  const isViewOnly = user?.access_level === 'viewer' || user?.access_level === 'sub_township';
   const districtFilter = (user?.access_level !== 'central' && user?.allowed_districts?.length > 0)
     ? user.allowed_districts : null;
   const townshipFilter = ((user?.access_level === 'township' || user?.access_level === 'sub_township') && user?.allowed_townships?.length > 0)
@@ -446,12 +453,14 @@ const HouseholdForm = ({ user }) => {
       return;
     }
     try {
-      const normalizedHn = normalizeHouseholdNo(householdNo);
-      const { data, error } = await supabase
+      const normalizedHn = escapeLike(normalizeHouseholdNo(householdNo));
+      let query = supabase
         .from('households')
         .select('*')
-        .ilike('household_no', `%${normalizedHn}%`)
-        .order('created_at', { ascending: true });
+        .ilike('household_no', `%${normalizedHn}%`);
+      if (townshipFilter) query = query.in('township', townshipFilter);
+      else if (districtFilter) query = query.in('district', districtFilter);
+      const { data, error } = await query.order('created_at', { ascending: true });
         
       if (!error && data) {
         setFamilyRoster(data);
@@ -460,7 +469,7 @@ const HouseholdForm = ({ user }) => {
     } catch (err) {
       console.error(err);
     }
-  }, []);
+  }, [townshipFilter, districtFilter]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -478,11 +487,13 @@ const HouseholdForm = ({ user }) => {
     setViewFamilyModalOpen(true);
     setViewFamilyLoading(true);
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('households')
         .select('name, household_relationship, gender, date_of_birth')
-        .eq('household_no', householdNo)
-        .order('created_at', { ascending: true });
+        .eq('household_no', householdNo);
+      if (townshipFilter) query = query.in('township', townshipFilter);
+      else if (districtFilter) query = query.in('district', districtFilter);
+      const { data, error } = await query.order('created_at', { ascending: true });
       
       if (data) setViewFamilyData(data);
     } catch (err) {
@@ -695,11 +706,14 @@ const HouseholdForm = ({ user }) => {
     if (!val) return;
     
     try {
-      const normalizedHn = normalizeHouseholdNo(val);
-      const { data, error: fetchError } = await supabase
+      const normalizedHn = escapeLike(normalizeHouseholdNo(val));
+      let query = supabase
         .from('households')
         .select('house_no, ward_village_group, township, district, resident_status, religious, nationality')
-        .ilike('household_no', `%${normalizedHn}%`)
+        .ilike('household_no', `%${normalizedHn}%`);
+      if (townshipFilter) query = query.in('township', townshipFilter);
+      else if (districtFilter) query = query.in('district', districtFilter);
+      const { data, error: fetchError } = await query
         .limit(1)
         .single();
         
@@ -763,6 +777,20 @@ const HouseholdForm = ({ user }) => {
       return;
     }
 
+    if (isViewOnly) {
+      setError('View-only accounts are not permitted to add household records.');
+      return;
+    }
+
+    if (townshipFilter && (!formData.township || !townshipFilter.includes(formData.township.trim()))) {
+      setError(`မြို့နယ်ခွင့်ပြုချက် မရှိပါ (Unauthorized township "${formData.township || '-'}" for your account)`);
+      return;
+    }
+    if (districtFilter && (!formData.district || !districtFilter.includes(formData.district.trim()))) {
+      setError(`ခရိုင်ခွင့်ပြုချက် မရှိပါ (Unauthorized district "${formData.district || '-'}" for your account)`);
+      return;
+    }
+
     setLoading(true);
     setError(null);
     setSuccess(false);
@@ -790,6 +818,15 @@ const HouseholdForm = ({ user }) => {
           .select();
 
         if (supabaseError) {
+          const isPermissionOrValidation =
+            supabaseError.code === '42501' ||
+            supabaseError.code === 'PGRST301' ||
+            supabaseError.status === 401 ||
+            supabaseError.status === 403 ||
+            (supabaseError.code && supabaseError.code.startsWith('23'));
+          if (isPermissionOrValidation) {
+            throw new Error(supabaseError.message || 'Permission denied or invalid region for your account.');
+          }
           // Network error mid-request — queue it
           enqueue({ table: 'households', type: 'insert', payload });
           savedLocally = true;
@@ -1195,6 +1232,15 @@ const HouseholdForm = ({ user }) => {
 
     </div>
   ), [formData, dob, autoFillMessage, isCustomRelationship, isCustomReligion, handleChange, handleDobChange, checkHouseholdExists, inputStyle, labelStyle, groupStyle, days, months, years, toMyanmarNum, wardVillageError]);
+
+  if (isViewOnly) {
+    return (
+      <div style={{ padding: '3rem', textAlign: 'center', color: '#737373' }}>
+        <h2 style={{ color: '#DC2626', fontSize: '18px', fontWeight: '600', marginBottom: '8px' }}>ACCESS DENIED</h2>
+        <p style={{ fontSize: '12px' }}>View-only accounts are not authorized to register or edit household members.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-8 p-6 sm:p-8 xl:p-10 max-w-7xl xl:max-w-[1440px] mx-auto">

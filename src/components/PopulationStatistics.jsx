@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { SkeletonStatGrid, SkeletonBar } from './Skeleton';
 import { supabase } from '../lib/supabase';
+import { escapeLike } from '../lib/querySanitize';
 import { Users, User, Home, Search, BarChart2, Printer, FileSpreadsheet, Send, CheckCircle2, ChevronDown, Loader2 } from 'lucide-react';
 import EmptyState from './EmptyState';
 import { printStatistics, exportStatisticsExcel } from '../lib/statisticsPrint';
@@ -458,7 +459,7 @@ const PopulationStatistics = ({ user }) => {
         .select('ward_village_group')
         .eq('district', district)
         .eq('township', township)
-        .ilike('ward_village_group', `%${group}%`);
+        .ilike('ward_village_group', `%${escapeLike(group)}%`);
       if (error) throw error;
       const villageSet = new Set();
       (data || []).forEach(row => {
@@ -476,6 +477,29 @@ const PopulationStatistics = ({ user }) => {
     }
   };
 
+  const userCacheKey = `tps_stats_cache_v3_${user?.id || 'anon'}`;
+
+  const readUserCache = () => {
+    try {
+      const raw = sessionStorage.getItem(userCacheKey);
+      if (!raw) return null;
+      const { version, timestamp, data } = JSON.parse(raw);
+      if (version !== CACHE_VERSION || Date.now() - timestamp > CACHE_TTL_MS) return null;
+      return data;
+    } catch { return null; }
+  };
+
+  const writeUserCache = (data) => {
+    try {
+      sessionStorage.setItem(userCacheKey, JSON.stringify({ version: CACHE_VERSION, timestamp: Date.now(), data }));
+    } catch {}
+  };
+
+  const clearUserCache = () => {
+    try { sessionStorage.removeItem(userCacheKey); } catch {}
+    clearCache();
+  };
+
   // ─── Main stats fetch via RPC ───────────────────────────
   const loadStats = useCallback(async (forceRefresh = false) => {
     setLoading(true);
@@ -486,7 +510,7 @@ const PopulationStatistics = ({ user }) => {
 
     // Try cache first (skip if force refresh)
     if (!forceRefresh) {
-      const cached = readCache();
+      const cached = readUserCache();
       if (cached && cached.key === cacheKey) {
         setStatsData(cached.data);
         setLoading(false);
@@ -505,13 +529,13 @@ const PopulationStatistics = ({ user }) => {
       if (error) throw error;
 
       setStatsData(data);
-      writeCache({ key: cacheKey, data });
+      writeUserCache({ key: cacheKey, data });
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
-  }, [selectedDistrict, selectedTownship, selectedWard, selectedVillage, selectedGroup]);
+  }, [selectedDistrict, selectedTownship, selectedWard, selectedVillage, selectedGroup, userCacheKey]);
 
   // Initial load: districts and stats
   useEffect(() => {
@@ -710,7 +734,7 @@ const PopulationStatistics = ({ user }) => {
           </p>
         </div>
         <button
-          onClick={() => { clearCache(); loadDistricts(); loadStats(true); }}
+          onClick={() => { clearUserCache(); loadDistricts(); loadStats(true); }}
           className="w-full sm:w-auto flex items-center justify-center gap-1.5"
           style={{ fontSize: '11px', border: '1px solid #E5E7EB', background: 'none', color: '#737373', padding: '6px 14px', cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.05em', flexShrink: 0, marginTop: '4px' }}
           title="Fetch latest data from database"

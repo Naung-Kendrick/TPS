@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { exportHouseholdExcel, printHouseholdPdf } from '../lib/householdPrint';
+import { escapeLike, sanitizePostgrestOrValue } from '../lib/querySanitize';
 import { Search, RotateCcw, AlertCircle, CheckCircle2, X, Loader2, Printer, FileSpreadsheet } from 'lucide-react';
 import EmptyState from './EmptyState';
 import TpsScrollWrapper from './layout/TpsScrollWrapper';
@@ -30,10 +31,11 @@ const getAge = (dobStr) => {
 };
 
 const Verification = ({ user }) => {
-  const districtFilter = (user?.access_level === 'district' && user?.allowed_districts?.length > 0)
+  const districtFilter = (user?.access_level !== 'central' && user?.allowed_districts?.length > 0)
     ? user.allowed_districts : null;
   const townshipFilter = ((user?.access_level === 'township' || user?.access_level === 'sub_township') && user?.allowed_townships?.length > 0)
     ? user.allowed_townships : null;
+  const isViewOnly = user?.access_level === 'viewer' || user?.access_level === 'sub_township';
   const [formData, setFormData] = useState({
     household_no: '',
     name: '',
@@ -130,27 +132,29 @@ const Verification = ({ user }) => {
 
       if (formData.household_no.trim()) {
         const raw = formData.household_no.trim();
-        const normalized = raw.replace(/\s*-\s*/g, '-');       // "ကောင်းတပ်-၁"
-        const spaced    = raw.replace(/\s*-\s*/g, ' - ');      // "ကောင်းတပ် - ၁"
-        if (normalized === spaced) {
-          query = query.ilike('household_no', `%${normalized}%`);
-        } else {
-          query = query.or(`household_no.ilike.%${normalized}%,household_no.ilike.%${spaced}%`);
+        const normalized = sanitizePostgrestOrValue(raw.replace(/\s*-\s*/g, '-'));
+        const spaced    = sanitizePostgrestOrValue(raw.replace(/\s*-\s*/g, ' - '));
+        if (normalized) {
+          if (normalized === spaced) {
+            query = query.ilike('household_no', `%${normalized}%`);
+          } else {
+            query = query.or(`household_no.ilike.%${normalized}%,household_no.ilike.%${spaced}%`);
+          }
         }
       }
-      if (formData.name.trim()) query = query.ilike('name', `%${formData.name.trim()}%`);
-      if (formData.fathers_name.trim()) query = query.ilike('fathers_name', `%${formData.fathers_name.trim()}%`);
-      if (formData.ward.trim()) query = query.ilike('ward_village_group', `%${formData.ward.trim()}%`);
-      if (formData.village.trim()) query = query.ilike('ward_village_group', `%${formData.village.trim()}%`);
-      if (formData.group.trim()) query = query.ilike('ward_village_group', `%${formData.group.trim()}%`);
-      if (!townshipFilter && formData.township.trim()) query = query.ilike('township', `%${formData.township.trim()}%`);
-      if (!districtFilter && !townshipFilter && formData.district.trim()) query = query.ilike('district', `%${formData.district.trim()}%`);
+      if (formData.name.trim()) query = query.ilike('name', `%${escapeLike(formData.name.trim())}%`);
+      if (formData.fathers_name.trim()) query = query.ilike('fathers_name', `%${escapeLike(formData.fathers_name.trim())}%`);
+      if (formData.ward.trim()) query = query.ilike('ward_village_group', `%${escapeLike(formData.ward.trim())}%`);
+      if (formData.village.trim()) query = query.ilike('ward_village_group', `%${escapeLike(formData.village.trim())}%`);
+      if (formData.group.trim()) query = query.ilike('ward_village_group', `%${escapeLike(formData.group.trim())}%`);
+      if (!townshipFilter && formData.township.trim()) query = query.ilike('township', `%${escapeLike(formData.township.trim())}%`);
+      if (!districtFilter && !townshipFilter && formData.district.trim()) query = query.ilike('district', `%${escapeLike(formData.district.trim())}%`);
       
       // Previous ID No. search (4 parts - each optional, searched independently)
-      const prevRegion = formData.previous_id_region.trim();
-      const prevTownship = formData.previous_id_township.trim();
-      const prevType = formData.previous_id_type.trim();
-      const prevSerial = formData.previous_id_serial.trim();
+      const prevRegion = escapeLike(formData.previous_id_region.trim());
+      const prevTownship = escapeLike(formData.previous_id_township.trim());
+      const prevType = escapeLike(formData.previous_id_type.trim());
+      const prevSerial = escapeLike(formData.previous_id_serial.trim());
       if (prevRegion) query = query.ilike('previous_id_no', `%${prevRegion}%`);
       if (prevTownship) query = query.ilike('previous_id_no', `%${prevTownship}%`);
       if (prevType) query = query.ilike('previous_id_no', `%${prevType}%`);
@@ -186,10 +190,13 @@ const Verification = ({ user }) => {
     setFamilyLoading(true);
 
     try {
-      const { data, error } = await supabase
+      let famQuery = supabase
         .from('households')
         .select('*')
         .eq('household_no', householdNo);
+      if (townshipFilter) famQuery = famQuery.in('township', townshipFilter);
+      else if (districtFilter) famQuery = famQuery.in('district', districtFilter);
+      const { data, error } = await famQuery;
 
       if (error) throw error;
 
@@ -625,41 +632,43 @@ const Verification = ({ user }) => {
                                               <span>16 - 60: {familyMembers.filter(m => { const age = getAge(m.date_of_birth); return age !== null && age >= 16 && age <= 60; }).length}</span>
                                               <span>Above 60: {familyMembers.filter(m => { const age = getAge(m.date_of_birth); return age !== null && age > 60; }).length}</span>
                                             </div>
-                                            <div className="px-6 py-3 bg-white border-t border-gray-200 flex flex-wrap items-center justify-end gap-3">
-                                              <span className="text-[11px] text-gray-500 uppercase letter-spacing-0.05 mr-auto">Print / Export Household Registration</span>
-                                              <button
-                                                type="button"
-                                                onClick={() => handlePrintPdf(expandedHouseholdNo, familyMembers)}
-                                                onMouseOver={e => { e.currentTarget.style.backgroundColor = '#FFFFFF'; e.currentTarget.style.color = '#1A1A1A'; }}
-                                                onMouseOut={e => { e.currentTarget.style.backgroundColor = '#1A1A1A'; e.currentTarget.style.color = '#FFFFFF'; }}
-                                                style={{
-                                                  display: 'flex', alignItems: 'center', gap: '6px',
-                                                  padding: '8px 16px', border: '1px solid #1A1A1A', backgroundColor: '#1A1A1A',
-                                                  color: '#FFFFFF', fontWeight: '500', fontSize: '11px',
-                                                  cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.05em',
-                                                  transition: 'background-color 120ms cubic-bezier(0.23,1,0.32,1), color 120ms cubic-bezier(0.23,1,0.32,1)'
-                                                }}
-                                              >
-                                                <Printer size={13} />
-                                                Print PDF
-                                              </button>
-                                              <button
-                                                type="button"
-                                                onClick={() => handleExportExcel(expandedHouseholdNo, familyMembers)}
-                                                onMouseOver={e => { e.currentTarget.style.backgroundColor = '#F9FAFB'; }}
-                                                onMouseOut={e => { e.currentTarget.style.backgroundColor = '#FFFFFF'; }}
-                                                style={{
-                                                  display: 'flex', alignItems: 'center', gap: '6px',
-                                                  padding: '8px 16px', border: '1px solid #1A1A1A', backgroundColor: '#FFFFFF',
-                                                  color: '#1A1A1A', fontWeight: '500', fontSize: '11px',
-                                                  cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.05em',
-                                                  transition: 'background-color 120ms cubic-bezier(0.23,1,0.32,1)'
-                                                }}
-                                              >
-                                                <FileSpreadsheet size={13} />
-                                                Export Excel
-                                              </button>
-                                            </div>
+                                            {!isViewOnly && (
+                                              <div className="px-6 py-3 bg-white border-t border-gray-200 flex flex-wrap items-center justify-end gap-3">
+                                                <span className="text-[11px] text-gray-500 uppercase letter-spacing-0.05 mr-auto">Print / Export Household Registration</span>
+                                                <button
+                                                  type="button"
+                                                  onClick={() => handlePrintPdf(expandedHouseholdNo, familyMembers)}
+                                                  onMouseOver={e => { e.currentTarget.style.backgroundColor = '#FFFFFF'; e.currentTarget.style.color = '#1A1A1A'; }}
+                                                  onMouseOut={e => { e.currentTarget.style.backgroundColor = '#1A1A1A'; e.currentTarget.style.color = '#FFFFFF'; }}
+                                                  style={{
+                                                    display: 'flex', alignItems: 'center', gap: '6px',
+                                                    padding: '8px 16px', border: '1px solid #1A1A1A', backgroundColor: '#1A1A1A',
+                                                    color: '#FFFFFF', fontWeight: '500', fontSize: '11px',
+                                                    cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.05em',
+                                                    transition: 'background-color 120ms cubic-bezier(0.23,1,0.32,1), color 120ms cubic-bezier(0.23,1,0.32,1)'
+                                                  }}
+                                                >
+                                                  <Printer size={13} />
+                                                  Print PDF
+                                                </button>
+                                                <button
+                                                  type="button"
+                                                  onClick={() => handleExportExcel(expandedHouseholdNo, familyMembers)}
+                                                  onMouseOver={e => { e.currentTarget.style.backgroundColor = '#F9FAFB'; }}
+                                                  onMouseOut={e => { e.currentTarget.style.backgroundColor = '#FFFFFF'; }}
+                                                  style={{
+                                                    display: 'flex', alignItems: 'center', gap: '6px',
+                                                    padding: '8px 16px', border: '1px solid #1A1A1A', backgroundColor: '#FFFFFF',
+                                                    color: '#1A1A1A', fontWeight: '500', fontSize: '11px',
+                                                    cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.05em',
+                                                    transition: 'background-color 120ms cubic-bezier(0.23,1,0.32,1)'
+                                                  }}
+                                                >
+                                                  <FileSpreadsheet size={13} />
+                                                  Export Excel
+                                                </button>
+                                              </div>
+                                            )}
                                           </>
                                         )}
                                       </TpsScrollWrapper>

@@ -2,6 +2,8 @@ import { Suspense, lazy, useState, useEffect } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import Layout from './components/layout/Layout'
 import { supabase } from './lib/supabase'
+import { cacheClear } from './lib/offlineCache'
+import { clearAll as clearNotifications } from './lib/notifications'
 import IntroAnimation from './components/IntroAnimation'
 import './App.css'
 
@@ -59,18 +61,30 @@ function App() {
   };
 
   const handleLogout = async () => {
-    // Security: clear all PII data from localStorage on logout
+    // Security: clear all PII data from localStorage, IndexedDB & SW caches on logout & revoke 2FA session
     try {
+      try { await supabase.rpc('revoke_current_2fa_session'); } catch (_) {}
       localStorage.removeItem('tps_retry_queue');
       localStorage.removeItem('tps_household_form_draft');
       localStorage.removeItem('tps_backup_history_logs');
+      clearNotifications();
       sessionStorage.clear();
+      await cacheClear();
+      if (typeof caches !== 'undefined') {
+        const cacheNames = await caches.keys();
+        await Promise.all(
+          cacheNames
+            .filter(name => name.includes('supabase'))
+            .map(name => caches.delete(name))
+        );
+      }
       await supabase.auth.signOut();
     } catch (_) {}
     setUser(null);
   };
 
   const handleLogin = (data) => {
+    cacheClear().catch(() => {});
     setUser(data);
   };
 
@@ -81,9 +95,16 @@ function App() {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user) {
+          // Enforce server-verified Email OTP 2FA before restoring any session
+          const { data: is2faVerified, error: otpErr } = await supabase.rpc('is_2fa_verified');
+          if (otpErr || is2faVerified !== true) {
+            await supabase.auth.signOut();
+            return;
+          }
+
           const { data: profile } = await supabase
             .from('profiles')
-            .select('id, role, is_active, last_seen_at, access_level, allowed_districts, allowed_townships')
+            .select('id, username, role, is_active, last_seen_at, access_level, allowed_districts, allowed_townships')
             .eq('id', session.user.id)
             .single();
 
@@ -96,7 +117,7 @@ function App() {
               allowed_districts: profile.allowed_districts || [],
               allowed_townships: profile.allowed_townships || [],
             });
-          } else if (profile?.is_active === false) {
+          } else {
             await supabase.auth.signOut();
           }
         }
@@ -198,8 +219,12 @@ function App() {
       <Route path="/" element={<Layout user={user} onLogout={handleLogout} />}>
         <Route index element={<Navigate to="/verification" replace />} />
         <Route path="verification" element={<Suspense fallback={<PageFallback />}><Verification user={user} /></Suspense>} />
-        <Route path="upload" element={<Suspense fallback={<PageFallback />}><UploadPage user={user} /></Suspense>} />
-        <Route path="scanner" element={<Suspense fallback={<PageFallback />}><IDCardScanner /></Suspense>} />
+        <Route path="upload" element={
+          ((user?.role === 'system' || user?.role === 'master' || user?.role === 'admin' || user?.role === 'ops') && user?.access_level !== 'viewer' && user?.access_level !== 'sub_township')
+            ? <Suspense fallback={<PageFallback />}><UploadPage user={user} /></Suspense>
+            : <Navigate to="/verification" replace />
+        } />
+        <Route path="scanner" element={<Suspense fallback={<PageFallback />}><IDCardScanner user={user} /></Suspense>} />
         <Route path="central-database" element={
           (user?.access_level === 'viewer' || user?.access_level === 'sub_township')
             ? <Navigate to="/verification" replace />
@@ -207,7 +232,11 @@ function App() {
         } />
         <Route path="statistics" element={<Suspense fallback={<PageFallback />}><PopulationStatistics user={user} /></Suspense>} />
         <Route path="demographics" element={<Suspense fallback={<PageFallback />}><DemographicDashboard user={user} /></Suspense>} />
-        <Route path="registration" element={<Suspense fallback={<PageFallback />}><HouseholdForm user={user} /></Suspense>} />
+        <Route path="registration" element={
+          (user?.access_level === 'viewer' || user?.access_level === 'sub_township')
+            ? <Navigate to="/verification" replace />
+            : <Suspense fallback={<PageFallback />}><HouseholdForm user={user} /></Suspense>
+        } />
         <Route path="users" element={
           (user?.role === 'system' || user?.role === 'master')
             ? <Suspense fallback={<PageFallback />}><UserManagement user={user} /></Suspense>

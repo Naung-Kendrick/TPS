@@ -1,6 +1,8 @@
 import ExcelJS from 'exceljs';
 import taangFlag from '../assets/taang_flag.jpg';
 import taangLogo from '../assets/fonts/IDTL_logo.png';
+import { openPrintPreview } from './printWindowHelper';
+import { sanitizeSpreadsheetCell } from './exportSanitize';
 
 const safeHtml = (v) => {
   if (v === null || v === undefined || v === '') return '';
@@ -259,7 +261,7 @@ export const exportStatisticsExcel = async ({
 
       rowCells.forEach((c, cIdx) => {
         const cell = row.getCell(cIdx + 1);
-        cell.value = c.val;
+        cell.value = sanitizeSpreadsheetCell(c.val);
         cell.font = { name: 'Pyidaungsu', size: 10, bold: c.bold || false };
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } };
         cell.alignment = { horizontal: c.align, vertical: 'middle', wrapText: true };
@@ -389,7 +391,7 @@ export const exportStatisticsExcel = async ({
 
       rowCells.forEach((c, cIdx) => {
         const cell = row.getCell(cIdx + 1);
-        cell.value = c.val;
+        cell.value = sanitizeSpreadsheetCell(c.val);
         cell.font = { name: 'Pyidaungsu', size: 10, bold: c.bold || false };
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } };
         cell.alignment = { horizontal: c.align, vertical: 'middle', wrapText: true };
@@ -948,8 +950,8 @@ export const printStatistics = ({
   <div class="toolbar">
     <h1>Population Statistics — Print Preview</h1>
     <div class="btns">
-      <button class="primary" onclick="window.print()">Print / Save as PDF</button>
-      <button onclick="window.close()">Close</button>
+      <button id="tps-print-btn" class="primary">Print / Save as PDF</button>
+      <button id="tps-close-btn">Close</button>
     </div>
   </div>
 
@@ -980,26 +982,10 @@ export const printStatistics = ({
       <span>Printed: ${safeHtml(dateStr)}</span>
     </div>
   </div>
-
-  <script>
-    (function(){
-      var imgs = document.images, loaded = 0;
-      function tryPrint(){ if(++loaded >= imgs.length){ setTimeout(function(){ window.focus(); window.print(); }, 300); } }
-      if(imgs.length === 0){ setTimeout(function(){ window.focus(); window.print(); }, 300); return; }
-      for(var i=0;i<imgs.length;i++){
-        if(imgs[i].complete) tryPrint();
-        else { imgs[i].addEventListener('load', tryPrint); imgs[i].addEventListener('error', tryPrint); }
-      }
-    })();
-  </script>
 </body>
 </html>`;
 
-  const w = window.open('', '_blank', 'width=1300,height=860');
-  if (!w) { alert('Please allow popups to print the statistics report.'); return; }
-  w.document.open();
-  w.document.write(html);
-  w.document.close();
+  openPrintPreview(html, 'Please allow popups to print the statistics report.');
 };
 
 
@@ -1286,8 +1272,8 @@ export const printDemographicDashboard = ({
   <div class="toolbar">
     <h1>Demographic Dashboard — Print Preview</h1>
     <div class="btns">
-      <button class="primary" onclick="window.print()">Print / Save as PDF</button>
-      <button onclick="window.close()">Close</button>
+      <button id="tps-print-btn" class="primary">Print / Save as PDF</button>
+      <button id="tps-close-btn">Close</button>
     </div>
   </div>
 
@@ -1415,24 +1401,8 @@ export const printDemographicDashboard = ({
       <span>Printed: ${safeHtml(dateStr)}</span>
     </div>
   </div>
-
-  <script>
-    (function(){
-      var imgs = document.images, loaded = 0;
-      function tryPrint(){ if(++loaded >= imgs.length){ setTimeout(function(){ window.focus(); window.print(); }, 300); } }
-      if(imgs.length === 0){ setTimeout(function(){ window.focus(); window.print(); }, 300); return; }
-      for(var i=0;i<imgs.length;i++){
-        if(imgs[i].complete) tryPrint();
-        else { imgs[i].addEventListener('load', tryPrint); imgs[i].addEventListener('error', tryPrint); }
-      }
-    })();
-  </script>
 </body>
 </html>`;
 
-  const w = window.open('', '_blank', 'width=1300,height=860');
-  if (!w) { alert('Please allow popups to print the demographic dashboard report.'); return; }
-  w.document.open();
-  w.document.write(html);
-  w.document.close();
+  openPrintPreview(html, 'Please allow popups to print the demographic dashboard report.');
 };

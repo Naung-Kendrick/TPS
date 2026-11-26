@@ -129,7 +129,12 @@ const validateDateOfBirth = (text) => {
   // Check calendar dates
   const dt = new Date(year, month - 1, day);
   if (dt.getFullYear() !== year || dt.getMonth() !== month - 1 || dt.getDate() !== day) {
-    return `မွေးသက္ကရာဇ် "${text}" သည် ပြက္ခဒိန်အရ မှန်ကန်သောရက်စွဲမဟုတ်ပါ (Not a real calendar date)`;
+    const daysInMonth = new Date(year, month, 0).getDate();
+    const mmMonthNames = ['ဇန်နဝါရီ','ဖေဖော်ဝါရီ','မတ်','ဧပြီ','မေ','ဇွန်','ဇူလိုင်','သြဂုတ်','စက်တင်ဘာ','အောက်တိုဘာ','နိုဝင်ဘာ','ဒီဇင်ဘာ'];
+    const enMonthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    const mmDay = String(day).replace(/[0-9]/g, ch => '၀၁၂၃၄၅၆၇၈၉'[parseInt(ch, 10)]);
+    const mmMax = String(daysInMonth).replace(/[0-9]/g, ch => '၀၁၂၃၄၅၆၇၈၉'[parseInt(ch, 10)]);
+    return `မွေးသက္ကရာဇ် "${text}" — ${mmMonthNames[month-1]}လတွင် ${mmDay} ရက်မရှိပါ၊ ထိုလတွင် ${mmMax} ရက်သာ ရှိပါသည် (${enMonthNames[month-1]} only has ${daysInMonth} days, not ${day})`;
   }
 
   return null;

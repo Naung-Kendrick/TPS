@@ -2,7 +2,7 @@
 const DB_NAME = 'tps_offline_cache';
 const DB_VERSION = 1;
 const STORE = 'cache';
-const TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+const TTL_MS = 15 * 60 * 1000; // 15 minutes — minimize lingering PII on disk
 
 let _db = null;
 

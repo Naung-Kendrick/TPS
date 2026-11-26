@@ -1012,8 +1012,6 @@ export const printDemographicDashboard = ({
   const total  = totalStats.total  || 0;
   const male   = totalStats.male   || 0;
   const female = totalStats.female || 0;
-  const withId = totalStats.withId || 0;
-  const idPct  = total > 0 ? ((withId / total) * 100).toFixed(1) : '0.0';
 
   // ── Age group rows ────────────────────────────────────────────────────────
   const AGE_GROUPS = [

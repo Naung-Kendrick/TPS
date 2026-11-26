@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { SkeletonStatGrid, SkeletonBar } from './Skeleton';
 import { supabase } from '../lib/supabase';
 import { escapeLike } from '../lib/querySanitize';
-import { Users, User, Home, Search, BarChart2, Printer, FileSpreadsheet, Send, CheckCircle2, ChevronDown, Loader2 } from 'lucide-react';
+import { Users, User, Home, Search, BarChart2, Printer, FileSpreadsheet, Send, CheckCircle2, ChevronDown } from 'lucide-react';
 import EmptyState from './EmptyState';
 import { printStatistics, exportStatisticsExcel } from '../lib/statisticsPrint';
 
@@ -19,89 +18,6 @@ const normalizeNationalityDisplay = (nationality) => {
   // Split by + or / and take the first part, then trim
   const firstPart = nationality.split(/[+/]/)[0];
   return firstPart ? firstPart.trim() : nationality;
-};
-
-const parseMyanmarDate = (dateStr) => {
-  if (!dateStr) return null;
-  const myanmarToArabic = { '၀': '0', '၁': '1', '၂': '2', '၃': '3', '၄': '4', '၅': '5', '၆': '6', '၇': '7', '၈': '8', '၉': '9' };
-  const arabicStr = dateStr.split('').map(ch => myanmarToArabic[ch] || ch).join('');
-  const parts = arabicStr.split('.');
-  if (parts.length === 3) {
-    const day = parseInt(parts[0]);
-    const month = parseInt(parts[1]);
-    const year = parseInt(parts[2]);
-    if (!isNaN(day) && !isNaN(month) && !isNaN(year)) {
-      return new Date(year, month - 1, day);
-    }
-  }
-  const dashParts = arabicStr.split('-');
-  if (dashParts.length === 3) {
-    const day = parseInt(dashParts[0]);
-    const year = parseInt(dashParts[2]);
-    if (!isNaN(day) && !isNaN(year)) {
-      return new Date(year, 0, day);
-    }
-  }
-  return null;
-};
-
-const calculateAge = (dateStr) => {
-  const dob = parseMyanmarDate(dateStr);
-  if (!dob) return null;
-  const today = new Date();
-  let age = today.getFullYear() - dob.getFullYear();
-  const monthDiff = today.getMonth() - dob.getMonth();
-  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
-    age--;
-  }
-  return age;
-};
-
-// ─── Classify Ward/Village/Group ────────────────────────────
-// Returns: 'ward' | 'village' | 'group' | 'unknown'
-const classifyWardVillageGroup = (value) => {
-  if (!value || typeof value !== 'string') return 'unknown';
-  const str = value.trim();
-  if (str === '') return 'unknown';
-  
-  // Check for Ward (ရပ်ကွက်)
-  if (str.includes('ရပ်ကွက်')) {
-    return 'ward';
-  }
-  
-  // Check for Group (အုပ်စု) - MUST check BEFORE Village
-  // because group names might contain "ရွာ" (e.g., "ကျေးရွာအုပ်စု")
-  if (str.includes('အုပ်စု')) {
-    return 'group';
-  }
-  
-  // Check for Village (ရွာ)
-  if (str.includes('ရွာ')) {
-    return 'village';
-  }
-  
-  return 'unknown';
-};
-
-const splitWardVillageGroupParts = (value) => {
-  if (!value || typeof value !== 'string') return [];
-  return value
-    .split(/[,၊]/)
-    .map(part => part.trim())
-    .filter(Boolean);
-};
-
-const getWardVillageGroupEntries = (value) => (
-  splitWardVillageGroupParts(value)
-    .map(name => ({ name, type: classifyWardVillageGroup(name) }))
-    .filter(entry => entry.type !== 'unknown')
-);
-
-const recordMatchesLocation = (record, selectedName, expectedType) => {
-  if (!selectedName) return true;
-  return getWardVillageGroupEntries(record?.ward_village_group).some(
-    entry => entry.name === selectedName && (!expectedType || entry.type === expectedType)
-  );
 };
 
 // ─── Stat Card ────────────────────────────────────────────
@@ -133,41 +49,11 @@ const StatCard = ({ label, value, icon: Icon, color = '#1A1A1A', textColor }) =>
 );
 
 // ─── Cache helpers ────────────────────────────────────────
-const CACHE_KEY = 'tps_stats_cache_v2_rpc';
 const CACHE_VERSION = 'v2';
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
-const readCache = () => {
-  try {
-    const raw = sessionStorage.getItem(CACHE_KEY);
-    if (!raw) return null;
-    const { version, timestamp, data } = JSON.parse(raw);
-    if (version !== CACHE_VERSION) return null;
-    if (Date.now() - timestamp > CACHE_TTL_MS) return null;
-    return data;
-  } catch {
-    return null;
-  }
-};
-
-const writeCache = (data) => {
-  try {
-    sessionStorage.setItem(CACHE_KEY, JSON.stringify({
-      version: CACHE_VERSION,
-      timestamp: Date.now(),
-      data
-    }));
-  } catch {
-    // sessionStorage full or unavailable — ignore silently
-  }
-};
-
-const clearCache = () => {
-  try { sessionStorage.removeItem(CACHE_KEY); } catch {}
-};
-
 // ─── Custom Responsive Dropdown Selector ─────────────────────
-const CustomLocationSelect = ({ value, onChange, options, placeholder, disabled, isMobile }) => {
+const CustomLocationSelect = ({ value, onChange, options, placeholder, disabled }) => {
   const [open, setOpen] = useState(false);
   const ref = React.useRef(null);
 
@@ -497,7 +383,6 @@ const PopulationStatistics = ({ user }) => {
 
   const clearUserCache = () => {
     try { sessionStorage.removeItem(userCacheKey); } catch {}
-    clearCache();
   };
 
   // ─── Main stats fetch via RPC ───────────────────────────
@@ -650,17 +535,6 @@ const PopulationStatistics = ({ user }) => {
     }, 0);
   };
 
-  const selectStyle = {
-    width: '100%', padding: '6px 28px 6px 10px', borderRadius: '0px',
-    border: '1px solid #E5E7EB', fontSize: '11px', fontFamily: "Inter, 'Pyidaungsu', sans-serif",
-    backgroundColor: '#FFFFFF', boxSizing: 'border-box', marginTop: '4px',
-    color: '#1A1A1A', height: '32px', lineHeight: '1.4',
-    appearance: 'none', WebkitAppearance: 'none', MozAppearance: 'none',
-    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23737373'/%3E%3C/svg%3E")`,
-    backgroundRepeat: 'no-repeat', backgroundPosition: 'right 10px center',
-    cursor: 'pointer',
-  };
-
   const sectionCardStyle = {
     backgroundColor: '#FFFFFF', borderRadius: '0px', border: '1px solid #E5E7EB',
     padding: '24px', marginBottom: '24px',
@@ -760,7 +634,6 @@ const PopulationStatistics = ({ user }) => {
               options={districts}
               placeholder={isMobile ? "--- အားလုံး (All) ---" : "--- အားလုံး (All Districts) ---"}
               disabled={false}
-              isMobile={isMobile}
             />
           </div>
 
@@ -775,7 +648,6 @@ const PopulationStatistics = ({ user }) => {
               options={townships}
               placeholder={isMobile ? "--- အားလုံး (All) ---" : "--- အားလုံး (All Townships) ---"}
               disabled={!selectedDistrict}
-              isMobile={isMobile}
             />
           </div>
 
@@ -790,7 +662,6 @@ const PopulationStatistics = ({ user }) => {
               options={wards}
               placeholder={isMobile ? "--- အားလုံး (All) ---" : "--- အားလုံး (All Wards) ---"}
               disabled={!selectedTownship}
-              isMobile={isMobile}
             />
           </div>
 
@@ -805,7 +676,6 @@ const PopulationStatistics = ({ user }) => {
               options={groups}
               placeholder={isMobile ? "--- အားလုံး (All) ---" : "--- အားလုံး (All Groups) ---"}
               disabled={!selectedTownship || !!selectedWard}
-              isMobile={isMobile}
             />
           </div>
 
@@ -820,7 +690,6 @@ const PopulationStatistics = ({ user }) => {
               options={filteredVillages}
               placeholder={isMobile ? "--- အားလုံး (All) ---" : "--- အားလုံး (All Villages) ---"}
               disabled={!selectedGroup}
-              isMobile={isMobile}
             />
           </div>
         </div>
@@ -993,7 +862,7 @@ const PopulationStatistics = ({ user }) => {
         };
 
         // Helper to render table row
-        const renderTableRow = (w, i, pageNum, stats) => (
+        const renderTableRow = (w, i, pageNum) => (
           <tr key={w.name} style={{ backgroundColor: '#FFFFFF' }}>
             <td style={tdMonoS}>{toMyanmarNum((pageNum - 1) * PAGE_SIZE + i + 1)}</td>
             <td style={{ ...tdS, textAlign: 'left', fontWeight: '500', whiteSpace: 'normal', wordBreak: 'break-word', maxWidth: '180px' }}>{w.name}</td>
@@ -1145,7 +1014,7 @@ const PopulationStatistics = ({ user }) => {
                     </tr>
                   </thead>
                   <tbody>
-                    {pagedStats.map((w, i) => renderTableRow(w, i, pageNum, statsArray))}
+                    {pagedStats.map((w, i) => renderTableRow(w, i, pageNum))}
                     <tr>
                       <td style={tdBold}></td>
                       <td style={{ ...tdS, textAlign: 'left', fontWeight: '600', backgroundColor: '#FAFAFA' }}>စုစုပေါင်း</td>

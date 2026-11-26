@@ -1,22 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { Users, UserPlus, LineChart, PieChart, FileText, Settings, Upload, ScanLine, Menu, X, MoreHorizontal, LogOut, CircleUserRound, UserCheck, Database, HardDrive } from 'lucide-react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { Users, UserPlus, LineChart, PieChart, Upload, ScanLine, MoreHorizontal, LogOut, CircleUserRound, UserCheck, Database, HardDrive, Bell } from 'lucide-react';
 import logo from '../../assets/fonts/IDTL_logo.png';
 import { getProfileType } from '../../lib/roleHelper';
 import { getUnreadCount } from '../../lib/notifications';
-import { Bell } from 'lucide-react';
 
 const Sidebar = ({ user, onLogout }) => {
-  const [open, setOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [navigatingTo, setNavigatingTo] = useState(null);
   const location = useLocation();
   const navigate = useNavigate();
   const moreSheetRef = useRef(null);
-  const touchStartX = useRef(null);
-  const touchStartY = useRef(null);
   const desktopSidebarRef = useRef(null);
-  const mobileDrawerRef = useRef(null);
 
   // 0.2s delay before navigating to any page
   const handleNav = (path, closeFn) => {
@@ -41,44 +36,15 @@ const Sidebar = ({ user, onLogout }) => {
 
 
 
-  // Close drawer/more on route change (mobile)
-  useEffect(() => { setOpen(false); setMoreOpen(false); }, [location.pathname]);
+  // Close more sheet on route change (mobile)
+  useEffect(() => { setMoreOpen(false); }, [location.pathname]);
 
-  // Close drawer on wide screen resize
+  // Close more sheet on wide screen resize
   useEffect(() => {
-    const handler = () => { if (window.innerWidth >= 768) { setOpen(false); setMoreOpen(false); } };
+    const handler = () => { if (window.innerWidth >= 768) { setMoreOpen(false); } };
     window.addEventListener('resize', handler);
     return () => window.removeEventListener('resize', handler);
   }, []);
-
-  // Swipe gestures: swipe left to close drawer; swipe right from left edge to open
-  useEffect(() => {
-    const onTouchStart = (e) => {
-      touchStartX.current = e.touches[0].clientX;
-      touchStartY.current = e.touches[0].clientY;
-    };
-    const onTouchEnd = (e) => {
-      if (touchStartX.current === null) return;
-      const dx = e.changedTouches[0].clientX - touchStartX.current;
-      const dy = Math.abs(e.changedTouches[0].clientY - touchStartY.current);
-      // Only treat as horizontal swipe if horizontal movement dominates
-      if (dy > Math.abs(dx) * 0.8) { touchStartX.current = null; return; }
-      if (open && dx < -50) {
-        // Swipe left anywhere → close drawer
-        setOpen(false);
-      } else if (!open && dx > 50 && touchStartX.current < 30) {
-        // Swipe right from left edge (within 30px) → open drawer
-        setOpen(true);
-      }
-      touchStartX.current = null;
-    };
-    document.addEventListener('touchstart', onTouchStart, { passive: true });
-    document.addEventListener('touchend', onTouchEnd, { passive: true });
-    return () => {
-      document.removeEventListener('touchstart', onTouchStart);
-      document.removeEventListener('touchend', onTouchEnd);
-    };
-  }, [open]);
 
   // Close "More" sheet when tapping outside
   useEffect(() => {
@@ -230,7 +196,7 @@ const Sidebar = ({ user, onLogout }) => {
     );
   };
 
-  const renderSidebarContent = (isMobileDrawer = false, scrollRef = null) => (
+  const renderSidebarContent = (scrollRef = null) => (
     <div ref={scrollRef} style={{
       width: '240px', flexShrink: 0, backgroundColor: '#FFFFFF',
       borderRight: '1px solid #E5E7EB', display: 'flex', flexDirection: 'column',
@@ -268,13 +234,6 @@ const Sidebar = ({ user, onLogout }) => {
             <div style={{ fontSize: '14px', fontWeight: '800', color: '#1A1A1A', letterSpacing: '0.08em', textTransform: 'uppercase', lineHeight: 1 }}>TPS</div>
             <div style={{ fontSize: '9.5px', color: '#1A1A1A', fontWeight: '500', marginTop: '3px', lineHeight: 1.3 }}>Ta'ang Population{' '}System</div>
           </div>
-          {/* Close button — mobile only */}
-          <button onClick={() => setOpen(false)} style={{
-            display: 'none', background: 'none', border: 'none', cursor: 'pointer', padding: '4px',
-            color: '#737373', flexShrink: 0,
-          }} className="sidebar-close-btn">
-            <X size={18} />
-          </button>
         </div>
 
         {/* Divider + system badge */}
@@ -385,27 +344,7 @@ const Sidebar = ({ user, onLogout }) => {
 
       {/* ── Desktop sidebar ── */}
       <div className="desktop-sidebar" style={{ position: 'sticky', top: 0, height: '100vh', flexShrink: 0 }}>
-        {renderSidebarContent(false, desktopSidebarRef)}
-      </div>
-
-      {/* ── Mobile drawer overlay ── */}
-      {open && (
-        <div
-          onClick={() => setOpen(false)}
-          style={{
-            display: 'none', position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.4)', zIndex: 1000,
-          }}
-          className="mobile-overlay"
-        />
-      )}
-
-      {/* ── Mobile drawer ── */}
-      <div className="mobile-drawer" style={{
-        display: 'none', position: 'fixed', top: 0, left: 0, bottom: 0, zIndex: 1001,
-        transform: open ? 'translateX(0)' : 'translateX(-100%)',
-        transition: 'transform 0.25s ease',
-      }}>
-        {renderSidebarContent(true, mobileDrawerRef)}
+        {renderSidebarContent(desktopSidebarRef)}
       </div>
 
       {/* ── Bottom Navigation Bar (mobile only) ── */}
@@ -541,17 +480,12 @@ const Sidebar = ({ user, onLogout }) => {
         @media (min-width: 768px) {
           .mobile-topbar { display: none !important; }
           .desktop-sidebar { display: block !important; }
-          .mobile-drawer { display: none !important; }
-          .mobile-overlay { display: none !important; }
           .bottom-nav { display: none !important; }
           .bottom-nav-overlay { display: none !important; }
         }
         @media (max-width: 767px) {
           .mobile-topbar { display: flex !important; }
           .desktop-sidebar { display: none !important; }
-          .mobile-drawer { display: none !important; }
-          .mobile-overlay { display: none !important; }
-          .sidebar-close-btn { display: flex !important; }
           .bottom-nav { display: flex !important; }
         }
       `}</style>

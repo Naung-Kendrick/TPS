@@ -51,7 +51,7 @@ export const SkeletonTable = ({ rows = 6, cols = 5 }) => (
 );
 
 // A stat card skeleton
-export const SkeletonCard = ({ style = {} }) => (
+const SkeletonCard = ({ style = {} }) => (
   <>
     <style>{pulse}</style>
     <div style={{ border: '1px solid #E5E7EB', padding: '20px', ...style }}>

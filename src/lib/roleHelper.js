@@ -7,7 +7,7 @@ export const ROLE_LABELS = {
   field:    { label: 'Field Staff',           color: '#059669', bg: '#ECFDF5', border: '#A7F3D0' },
 };
 
-export const ACCESS_LABELS = {
+const ACCESS_LABELS = {
   central:      { label: 'Central',      color: '#1F2937', bg: '#F3F4F6', border: '#E5E7EB' },
   district:     { label: 'District',     color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE' },
   township:     { label: 'Township',     color: '#4F46E5', bg: '#EEF2FF', border: '#C7D2FE' },

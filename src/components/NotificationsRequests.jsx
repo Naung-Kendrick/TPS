@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import {
   Bell, Trash2, CheckCircle2, AlertTriangle, AlertCircle, Loader2, RefreshCw,
-  Wifi, WifiOff, Upload, Info, FileText, Check, ShieldAlert
+  Wifi, WifiOff, Upload, Info, Check, ShieldAlert
 } from 'lucide-react';
 import {
   getNotifications,

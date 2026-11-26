@@ -390,13 +390,9 @@ const HouseholdForm = ({ user }) => {
   const [isCustomRelationship, setIsCustomRelationship] = useState(false);
   const [isCustomReligion, setIsCustomReligion] = useState(false);
   
-  const [totalFamilyMembers, setTotalFamilyMembers] = useState(0);
   const [familyRoster, setFamilyRoster] = useState([]);
   const [editingMember, setEditingMember] = useState(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [viewFamilyModalOpen, setViewFamilyModalOpen] = useState(false);
-  const [viewFamilyData, setViewFamilyData] = useState([]);
-  const [viewFamilyLoading, setViewFamilyLoading] = useState(false);
 
   const [dob, setDob] = useState({ day: '', month: '', year: '' });
   const [wardVillageError, setWardVillageError] = useState('');
@@ -449,7 +445,6 @@ const HouseholdForm = ({ user }) => {
   const fetchFamilyRoster = useCallback(async (householdNo) => {
     if (!householdNo) {
       setFamilyRoster([]);
-      setTotalFamilyMembers(0);
       return;
     }
     try {
@@ -464,7 +459,6 @@ const HouseholdForm = ({ user }) => {
         
       if (!error && data) {
         setFamilyRoster(data);
-        setTotalFamilyMembers(data.length);
       }
     } catch (err) {
       console.error(err);
@@ -477,31 +471,10 @@ const HouseholdForm = ({ user }) => {
         fetchFamilyRoster(formData.household_no);
       } else {
         setFamilyRoster([]);
-        setTotalFamilyMembers(0);
       }
     }, 500);
     return () => clearTimeout(timer);
   }, [formData.household_no, fetchFamilyRoster]);
-
-  const handleViewFamily = async (householdNo) => {
-    setViewFamilyModalOpen(true);
-    setViewFamilyLoading(true);
-    try {
-      let query = supabase
-        .from('households')
-        .select('name, household_relationship, gender, date_of_birth')
-        .eq('household_no', householdNo);
-      if (townshipFilter) query = query.in('township', townshipFilter);
-      else if (districtFilter) query = query.in('district', districtFilter);
-      const { data, error } = await query.order('created_at', { ascending: true });
-      
-      if (data) setViewFamilyData(data);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setViewFamilyLoading(false);
-    }
-  };
 
   // Auto-correct Township: ensure space before "မြို့နယ်" suffix
   const autoCorrectTownship = (value) => {
@@ -871,7 +844,6 @@ const HouseholdForm = ({ user }) => {
           house_no: '', ward_village_group: '', township: '', district: '',
           submission_date: ''
         });
-        setFormOpen(false);
       }
     } catch (err) {
       setError(err.message || 'An error occurred while saving the data.');
@@ -913,27 +885,6 @@ const HouseholdForm = ({ user }) => {
     marginBottom: '4px',
   }), []);
 
-  const thStyle = {
-    padding: '12px 8px',
-    textAlign: 'left',
-    fontSize: '10px',
-    fontWeight: '600',
-    color: '#737373',
-    textTransform: 'uppercase',
-    letterSpacing: '0.05em',
-    borderBottom: '1px solid #E5E7EB',
-    backgroundColor: '#FAFAFA',
-  };
-
-  const tdStyle = {
-    padding: '10px 8px',
-    fontSize: '12px',
-    color: '#1A1A1A',
-    borderBottom: '1px solid #E5E7EB',
-  };
-
-  const tdMonoS = { ...tdStyle, fontFamily: 'var(--font-mono)' };
-
   const rosterThStyle = {
     padding: '10px 12px',
     textAlign: 'left',
@@ -967,11 +918,6 @@ const HouseholdForm = ({ user }) => {
       alert('Error deleting: ' + err.message);
     }
   };
-
-  const [formOpen, setFormOpen] = useState(false);
-
-  const openForm = () => { setSuccess(false); setError(null); setFormOpen(true); };
-  const closeForm = () => setFormOpen(false);
 
   const clearForNewHousehold = useCallback(() => {
     setFormData({
@@ -1473,45 +1419,6 @@ const HouseholdForm = ({ user }) => {
         />
       )}
 
-      {/* View Family Modal */}
-      {viewFamilyModalOpen && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(255,255,255,0.9)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '16px' }}>
-          <div style={{ backgroundColor: '#FFFFFF', padding: '32px', border: '1px solid #E5E7EB', width: '100%', maxWidth: '600px', maxHeight: '80vh', overflowY: 'auto' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', borderBottom: '1px solid #E5E7EB', paddingBottom: '12px' }}>
-              <div>
-                <h3 style={{ margin: '0 0 4px 0', color: '#1A1A1A', fontSize: '14px', fontWeight: '600', textTransform: 'uppercase' }}>FAMILY MEMBERS</h3>
-                <p style={{ margin: 0, color: '#737373', fontSize: '12px' }}>အိမ်ထောင်စုစာရင်းအမှတ်ရှိ မိသားစုဝင်အားလုံး</p>
-              </div>
-              <button onClick={() => setViewFamilyModalOpen(false)} type="button" style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#1A1A1A' }}>&times;</button>
-            </div>
-            
-            {viewFamilyLoading ? (
-              <div style={{ padding: '16px', textAlign: 'center', color: '#737373', fontSize: '12px' }}>LOADING...</div>
-            ) : viewFamilyData.length === 0 ? (
-              <div style={{ padding: '16px', textAlign: 'center', color: '#737373', fontSize: '12px' }}>NO MEMBERS FOUND</div>
-            ) : (
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr style={{ backgroundColor: '#FAFAFA' }}>
-                    <th style={{ padding: '10px', textAlign: 'left', color: '#737373', fontSize: '10px', fontWeight: '600', borderBottom: '1px solid #E5E7EB', textTransform: 'uppercase' }}>အမည် (NAME)</th>
-                    <th style={{ padding: '10px', textAlign: 'left', color: '#737373', fontSize: '10px', fontWeight: '600', borderBottom: '1px solid #E5E7EB', textTransform: 'uppercase' }}>တော်စပ်ပုံ (REL)</th>
-                    <th style={{ padding: '10px', textAlign: 'left', color: '#737373', fontSize: '10px', fontWeight: '600', borderBottom: '1px solid #E5E7EB', textTransform: 'uppercase' }}>ကျား/မ (GENDER)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {viewFamilyData.map((member, i) => (
-                    <tr key={i} style={{ borderBottom: '1px solid #E5E7EB' }}>
-                      <td style={{ padding: '10px', fontWeight: '500', color: '#1A1A1A', fontSize: '12px' }}>{member.name}</td>
-                      <td style={{ padding: '10px', color: '#737373', fontSize: '12px' }}>{member.household_relationship}</td>
-                      <td style={{ padding: '10px', color: '#737373', fontSize: '12px' }}>{member.gender}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 };

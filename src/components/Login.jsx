@@ -52,13 +52,7 @@ const Login = ({ onLogin }) => {
     }, 1000);
   };
 
-  const maskEmail = (email) => {
-    if (!email) return '';
-    const [user, domain] = email.split('@');
-    if (!domain) return email;
-    const visible = user.slice(0, 2);
-    return `${visible}${'*'.repeat(Math.max(user.length - 2, 2))}@${domain}`;
-  };
+  // Rate limiting helpers
 
   // ── Step 1: Verify username + PIN, then send OTP ──────────────────────────
   const MAX_ATTEMPTS = 5;

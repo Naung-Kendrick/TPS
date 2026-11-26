@@ -22,7 +22,6 @@
 
     /* Tables scroll horizontally on small screens */
     table { width: 100%; }
-    .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 
     @media (max-width: 767px) {
       /* Page containers */
@@ -30,47 +29,15 @@
 
       /* Reduce page-level padding on mobile */
       [style*="padding: 32px"] { padding: 16px !important; }
-      [style*="padding: '32px'"] { padding: 16px !important; }
 
       /* Stat cards stack */
       [style*="grid-template-columns: repeat(4"] {
         grid-template-columns: repeat(2, 1fr) !important;
       }
-      [style*="repeat(auto-fill, minmax(300px"] {
-        grid-template-columns: 1fr !important;
-      }
-      [style*="repeat(auto-fill, minmax(400px"] {
-        grid-template-columns: 1fr !important;
-      }
-
-      /* Modal full-screen on mobile */
-      [style*="maxWidth: '860px'"],
-      [style*="maxWidth: '1080px'"] {
-        max-width: 100% !important;
-        margin: 0 !important;
-        max-height: 100vh !important;
-        border-radius: 0 !important;
-      }
 
       /* Inputs compact text size across all responsive screens */
       input, select, textarea {
         font-size: 11px !important;
-      }
-    }
-
-    @media (min-width: 768px) {
-      .scanner-page {
-        padding: 32px 32px !important;
-      }
-    }
-
-    @media (max-width: 480px) {
-      /* Single column on very small phones */
-      [style*="grid-template-columns: repeat(2"] {
-        grid-template-columns: 1fr !important;
-      }
-      [style*="gridTemplateColumns: 'repeat(3"] {
-        grid-template-columns: 1fr !important;
       }
     }
   </style>

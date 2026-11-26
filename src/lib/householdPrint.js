@@ -5,8 +5,6 @@ import { buildExportFilename } from './exportFilename';
 import { openPrintPreview } from './printWindowHelper';
 import { sanitizeSpreadsheetCell } from './exportSanitize';
 
-const escVal = (v) => (v === null || v === undefined ? '' : v);
-
 const toMyanmarNum = (v) => {
   if (v === null || v === undefined || v === '') return '';
   const map = { '0':'၀','1':'၁','2':'၂','3':'၃','4':'၄','5':'၅','6':'၆','7':'၇','8':'၈','9':'၉' };

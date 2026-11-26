@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { Download, FileSpreadsheet, HardDrive, Clock, CheckCircle2, RefreshCw, Filter, ShieldCheck, ChevronDown } from 'lucide-react';
-import { deepEnsureUnicode } from './CsvUploader';
 import { exportAllExcel } from '../lib/householdPrint';
 import { getSecureItem, setSecureItem } from '../lib/secureStorage';
 
@@ -279,9 +278,8 @@ const DatabaseBackup = ({ user }) => {
         })
       };
 
-      const finalPayload = deepEnsureUnicode(nestedData);
       const filename = generateBackupFilename('json');
-      const blob = new Blob([JSON.stringify(finalPayload, null, 2)], { type: 'application/json' });
+      const blob = new Blob([JSON.stringify(nestedData, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;

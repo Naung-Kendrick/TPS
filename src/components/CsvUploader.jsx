@@ -6,9 +6,6 @@ import { supabase } from '../lib/supabase';
 import { pushNotification, NOTIF_TYPES } from '../lib/notifications';
 import { AlertCircle, X, CheckCircle2, Upload, FileSpreadsheet, Loader2, FileJson, Table } from 'lucide-react';
 
-// Text normalization placeholder - no Zawgyi conversion (removed per request)
-const ensureUnicode = (text) => text;
-
 // ==========================================
 // WHITESPACE NORMALIZATION
 // Match the DB's stored format regardless of how the user typed it.
@@ -485,10 +482,6 @@ const validateDiacriticOrdering = (syllable) => {
   return null;
 };
 
-// Recursively walk any object/array (no conversion - just pass through)
-// Exported for backward compatibility with other components
-export const deepEnsureUnicode = (value) => value;
-
 // Myanmar text quality validator — detects garbled/misspelled Myanmar text
 const validateMyanmarText = (text, fieldKey = null) => {
   if (!text || typeof text !== 'string') return null;
@@ -809,16 +802,8 @@ const validateWardVillageGroup = (value) => {
   return null; // Valid
 };
 
-// Validate household-level ID requirements
-// Note: Neither Ta'ang Land ID nor Previous ID (NRC) is required.
-// Some households may not have applied for IDs yet.
-const validateHouseholdIDRequirements = (data) => {
-  // No ID requirements enforced - allows households without any IDs
-  return [];
-};
-
 // Audio chime notifications for upload success and validation errors using Web Audio API
-export const playUploadSuccessSound = () => {
+const playUploadSuccessSound = () => {
   try {
     const AudioCtx = window.AudioContext || window.webkitAudioContext;
     if (!AudioCtx) return;
@@ -842,7 +827,7 @@ export const playUploadSuccessSound = () => {
   }
 };
 
-export const playUploadFailureSound = () => {
+const playUploadFailureSound = () => {
   try {
     const AudioCtx = window.AudioContext || window.webkitAudioContext;
     if (!AudioCtx) return;
@@ -866,7 +851,7 @@ export const playUploadFailureSound = () => {
   }
 };
 
-export const playUploadSkippedSound = () => {
+const playUploadSkippedSound = () => {
   try {
     const AudioCtx = window.AudioContext || window.webkitAudioContext;
     if (!AudioCtx) return;
@@ -902,19 +887,6 @@ const processAndUpload = async (formattedData, setValidationErrors, setShowModal
     ? user.allowed_townships : null;
 
   const errorsFound = [];
-  
-  // Check household-level ID requirements first
-  const householdIDErrors = validateHouseholdIDRequirements(formattedData);
-  if (householdIDErrors.length > 0) {
-    householdIDErrors.forEach(err => {
-      errorsFound.push({
-        rowNumber: err.rowNumbers.join(', ') + '...',
-        name: `Household: ${err.householdNo}`,
-        missingFields: null,
-        spellingIssues: [`${err.issue}: ${err.detail}`]
-      });
-    });
-  }
 
   // Process each row and add ward_village_group_type as array
   const processedData = [];
@@ -1246,9 +1218,7 @@ const CsvUploader = ({ onUploadSuccess, user }) => {
     const reader = new FileReader();
     reader.onload = async (e) => {
       try {
-        const rawParsed = JSON.parse(e.target.result);
-        // Recursively convert every Myanmar string to Unicode before processing
-        const parsed = deepEnsureUnicode(rawParsed);
+        const parsed = JSON.parse(e.target.result);
         
         let households = [];
         if (Array.isArray(parsed)) {
@@ -1263,8 +1233,8 @@ const CsvUploader = ({ onUploadSuccess, user }) => {
           households = [parsed];
         }
 
-        // Helper: normalize whitespace + ensure Unicode in one step.
-        const norm = (v) => normalizeWhitespace(ensureUnicode(v || ''));
+        // Helper: normalize whitespace in one step.
+        const norm = (v) => normalizeWhitespace(v || '');
 
         const formattedData = [];
         for (const hh of households) {
@@ -1288,7 +1258,7 @@ const CsvUploader = ({ onUploadSuccess, user }) => {
                 mothers_name: norm(m.mothers_name || m.mother_name),
                 household_relationship: norm(m.relationship || m.household_relationship),
                 occupation: norm(m.occupation),
-                previous_id_no: normalizePreviousId(ensureUnicode(m.previous_id_no || m.nrc || '')),
+                previous_id_no: normalizePreviousId(m.previous_id_no || m.nrc || ''),
                 taang_land_id_no: normalizeTaangLandId(m.taang_land_id_no || ''),
                 nationality: norm(m.nationality),
                 resident_status: norm(m.resident_status),
@@ -1312,7 +1282,7 @@ const CsvUploader = ({ onUploadSuccess, user }) => {
               mothers_name: norm(hh.mothers_name || hh.mother_name),
               household_relationship: norm(hh.relationship || hh.household_relationship),
               occupation: norm(hh.occupation),
-              previous_id_no: normalizePreviousId(ensureUnicode(hh.previous_id_no || hh.nrc || '')),
+              previous_id_no: normalizePreviousId(hh.previous_id_no || hh.nrc || ''),
               taang_land_id_no: normalizeTaangLandId(hh.taang_land_id_no || ''),
               nationality: norm(hh.nationality),
               resident_status: norm(hh.resident_status),
@@ -1328,22 +1298,6 @@ const CsvUploader = ({ onUploadSuccess, user }) => {
         }
 
         if (formattedData.length === 0) throw new Error('JSON file has no member records.');
-
-        // Validate household-level ID requirements for JSON upload
-        const householdIDErrors = validateHouseholdIDRequirements(formattedData);
-        if (householdIDErrors.length > 0) {
-          const householdErrors = householdIDErrors.map(err => ({
-            rowNumber: err.rowNumbers.join(', ') + '...',
-            name: `Household: ${err.householdNo}`,
-            missingFields: null,
-            spellingIssues: [`${err.issue}: ${err.detail}`]
-          }));
-          setValidationErrors(householdErrors);
-          setShowModal(true);
-          setLoading(false);
-          if (fileInputRef.current) fileInputRef.current.value = '';
-          return;
-        }
 
         await processAndUpload(
           formattedData,
@@ -1406,21 +1360,21 @@ const CsvUploader = ({ onUploadSuccess, user }) => {
             const rawDistrict = normalizeWhitespace(row['District']);
 
             // Household Number forward-fill (auto-format spacing around hyphens)
-            if (rawHn !== '') currentHouseholdNo = formatHouseholdNo(ensureUnicode(rawHn));
+            if (rawHn !== '') currentHouseholdNo = formatHouseholdNo(rawHn);
             else if (index === 0 && rawHn === '') currentHouseholdNo = 'UNKNOWN-1';
 
-            // Region forward-fills (auto-correct suffixes + Unicode)
+            // Region forward-fills (auto-correct suffixes)
             if (rawWard !== '')     currentWard     = rawWard;
-            if (rawTownship !== '') currentTownship = autoCorrectTownship(ensureUnicode(rawTownship));
-            if (rawDistrict !== '') currentDistrict = autoCorrectDistrict(ensureUnicode(rawDistrict));
+            if (rawTownship !== '') currentTownship = autoCorrectTownship(rawTownship);
+            if (rawDistrict !== '') currentDistrict = autoCorrectDistrict(rawDistrict);
 
             // Generic cell reader — every field passes through normalizeWhitespace
             // (trims, collapses double spaces, strips zero-width chars, fixes NBSPs).
             const cell = (key) => normalizeWhitespace(row[key]);
 
             // Ward/Village/Group: normalize comma-list separators ("," or "၊" → ", "),
-            // run Unicode + per-segment suffix auto-correction.
-            let wardValue = normalizeCommaList(ensureUnicode(currentWard));
+            // plus per-segment suffix auto-correction.
+            let wardValue = normalizeCommaList(currentWard);
             // Apply suffix auto-correction to each segment separately so that
             // "ကောင်းတပ်ရွာ, အောင်ချမ်းသာအုပ်စု" becomes
             // "ကောင်းတပ် ရွာ, အောင်ချမ်းသာ အုပ်စု".
@@ -1434,25 +1388,25 @@ const CsvUploader = ({ onUploadSuccess, user }) => {
             
             const parsedRow = {
               household_no: currentHouseholdNo,
-              name: ensureUnicode(cell('Name')),
+              name: cell('Name'),
               date_of_birth: normalizeDateOfBirth(cell('Date of birth')),
-              gender: ensureUnicode(cell('Gender')),
-              fathers_name: ensureUnicode(cell("Father's Name")),
-              mothers_name: ensureUnicode(cell("Mother's Name")),
-              household_relationship: ensureUnicode(cell('Household Relationship')),
-              occupation: ensureUnicode(cell('Occupation')),
-              previous_id_no: normalizePreviousId(ensureUnicode(cell('Previous ID No.'))),
+              gender: cell('Gender'),
+              fathers_name: cell("Father's Name"),
+              mothers_name: cell("Mother's Name"),
+              household_relationship: cell('Household Relationship'),
+              occupation: cell('Occupation'),
+              previous_id_no: normalizePreviousId(cell('Previous ID No.')),
               taang_land_id_no: normalizeTaangLandId(cell("Ta'ang Land ID No.")),
-              nationality: ensureUnicode(cell('Nationality')),
-              resident_status: ensureUnicode(cell('Resident Status')),
-              religious: ensureUnicode(cell('Religious')),
-              house_no: ensureUnicode(cleanHouseNo(cell('House NO.'))),
+              nationality: cell('Nationality'),
+              resident_status: cell('Resident Status'),
+              religious: cell('Religious'),
+              house_no: cleanHouseNo(cell('House NO.')),
               ward_village_group: wardValue,
               ward_village_group_type: wardTypes, // Array of types
               township: currentTownship,
               district: currentDistrict,
               submission_date: cell('Submission Date'),
-              address: ensureUnicode(`${cleanHouseNo(cell('House NO.'))}, ${wardValue}, ${currentTownship}, ${currentDistrict}`)
+              address: `${cleanHouseNo(cell('House NO.'))}, ${wardValue}, ${currentTownship}, ${currentDistrict}`
             };
 
             // 2. Strict Validation Check (After Forward-Fill)
@@ -1558,19 +1512,6 @@ const CsvUploader = ({ onUploadSuccess, user }) => {
         }
 
         console.log(`[${sourceLabel}] Validation complete. ${formattedData.length} rows formatted, ${errorsFound.length} errors found so far.`);
-
-          // 4. Validate household-level ID requirements
-          setProgress({ current: 0, total: 0, stage: 'Validating household IDs...' });
-          const householdIDErrors = validateHouseholdIDRequirements(formattedData);
-          if (householdIDErrors.length > 0) {
-            const householdErrors = householdIDErrors.map(err => ({
-              rowNumber: err.rowNumbers.join(', ') + '...',
-              name: `Household: ${err.householdNo}`,
-              missingFields: null,
-              spellingIssues: [`${err.issue}: ${err.detail}`]
-            }));
-            errorsFound.push(...householdErrors);
-          }
 
           if (errorsFound.length > 0) {
             console.log(`[${sourceLabel}] ${errorsFound.length} validation errors — showing modal.`);

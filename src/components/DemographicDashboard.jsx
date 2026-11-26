@@ -4,13 +4,6 @@ import { escapeLike } from '../lib/querySanitize';
 import { Users, MapPin, Globe, Briefcase, Search, Printer, Send, CheckCircle2, ChevronDown } from 'lucide-react';
 import { printDemographicDashboard } from '../lib/statisticsPrint';
 import EmptyState from './EmptyState';
-import { SkeletonBar } from './Skeleton';
-
-const toMyanmarNum = (num) => {
-  if (num === null || num === undefined) return '';
-  const myanmarNumbers = ['၀', '၁', '၂', '၃', '၄', '၅', '၆', '၇', '၈', '၉'];
-  return num.toString().split('').map(digit => myanmarNumbers[parseInt(digit)] || digit).join('');
-};
 
 // Normalize mixed nationalities for display (e.g., 'ဗမာ+ရှမ်း' → 'ဗမာ')
 // Database keeps original, UI shows only first nationality
@@ -19,70 +12,6 @@ const normalizeNationalityDisplay = (nationality) => {
   // Split by + or / and take the first part, then trim
   const firstPart = nationality.split(/[+/]/)[0];
   return firstPart ? firstPart.trim() : nationality;
-};
-
-// ─── Stat Bar Row (label + bar + count + pct) ──────────────
-const StatBar = ({ label, count, total, color, barHeight = 18 }) => {
-  const pct = total > 0 ? (count / total) * 100 : 0;
-  return (
-    <div style={{ marginBottom: '14px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '5px' }}>
-        <span style={{ fontSize: '11px', fontWeight: '500', color: '#1A1A1A' }}>{label || '—'}</span>
-        <span style={{ fontSize: '11px', color: '#737373', fontFamily: 'var(--font-mono)', letterSpacing: '0.02em' }}>
-          {count.toLocaleString()} <span style={{ color: '#B0B0B0' }}>({pct.toFixed(1)}%)</span>
-        </span>
-      </div>
-      <div style={{ height: `${barHeight}px`, backgroundColor: '#F3F4F6', overflow: 'hidden', position: 'relative' }}>
-        <div style={{
-          height: '100%', backgroundColor: color,
-          width: `${Math.max(pct, pct > 0 ? 0.5 : 0)}%`,
-          transition: 'width 0.6s ease-out',
-        }} />
-      </div>
-    </div>
-  );
-};
-
-// ─── Tile Grid (compact category tiles) ────────────────────
-const TileGrid = ({ data, color = '#2E7D32' }) => {
-  if (!data || data.length === 0) return (
-    <div style={{ padding: '16px 0', color: '#9CA3AF', textAlign: 'center', fontSize: '12px' }}>
-      အချက်အလက်မရှိပါ
-    </div>
-  );
-  const total = data.reduce((s, d) => s + d.count, 0) || 1;
-  const max   = Math.max(...data.map(d => d.count), 1);
-  const [rr, gg, bb] = [parseInt(color.slice(1,3),16), parseInt(color.slice(3,5),16), parseInt(color.slice(5,7),16)];
-
-  return (
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'stretch' }}>
-      {data.map((item) => {
-        const pct       = (item.count / total) * 100;
-        const intensity = 0.12 + (item.count / max) * 0.8;
-        const bg        = `rgba(${rr},${gg},${bb},${(intensity * 0.18).toFixed(2)})`;
-        const border    = `rgba(${rr},${gg},${bb},${(intensity * 0.45).toFixed(2)})`;
-        const labelClr  = `rgba(${rr},${gg},${bb},${Math.min(intensity + 0.1, 1).toFixed(2)})`;
-        const w         = Math.max(pct, 5).toFixed(1);
-        return (
-          <div key={item.label} style={{
-            flexBasis: `calc(${w}% - 6px)`, flexGrow: 0, flexShrink: 0, minWidth: '64px',
-            padding: '10px 12px', backgroundColor: bg,
-            border: `1px solid ${border}`,
-            display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '4px',
-            minHeight: '80px',
-          }}>
-            <span style={{ fontSize: '10px', fontWeight: '600', color: labelClr, lineHeight: 1.3, wordBreak: 'break-word' }}>
-              {item.label || '—'}
-            </span>
-            <span style={{ fontSize: '18px', fontWeight: '700', color: '#1A1A1A', fontFamily: 'var(--font-mono)', lineHeight: 1 }}>
-              {item.count.toLocaleString()}
-            </span>
-            <span style={{ fontSize: '10px', color: '#9CA3AF', lineHeight: 1 }}>{pct.toFixed(1)}%</span>
-          </div>
-        );
-      })}
-    </div>
-  );
 };
 
 // ─── Circle Stat Chart (premium multi-segment circular donut chart) ───
@@ -573,7 +502,7 @@ const sectionTitleStyle = {
 };
 
 // ─── Custom Responsive Dropdown Selector ─────────────────────
-const CustomLocationSelect = ({ value, onChange, options, placeholder, disabled, isMobile }) => {
+const CustomLocationSelect = ({ value, onChange, options, placeholder, disabled }) => {
   const [open, setOpen] = useState(false);
   const ref = React.useRef(null);
 
@@ -927,17 +856,6 @@ const DemographicDashboard = ({ user }) => {
     label: o, count: totalStats.occCounts?.[o] || 0,
   })).sort((a, b) => b.count - a.count);
 
-  const selectStyle = {
-    width: '100%', padding: '6px 28px 6px 10px', borderRadius: '0px',
-    border: '1px solid #E5E7EB', fontSize: '11px', fontFamily: "Inter, 'Pyidaungsu', sans-serif",
-    backgroundColor: '#FFFFFF', boxSizing: 'border-box', marginTop: '4px',
-    color: '#1A1A1A', height: '32px', lineHeight: '1.4',
-    appearance: 'none', WebkitAppearance: 'none', MozAppearance: 'none',
-    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23737373'/%3E%3C/svg%3E")`,
-    backgroundRepeat: 'no-repeat', backgroundPosition: 'right 10px center',
-    cursor: 'pointer',
-  };
-
   return (
     <div className="flex flex-col gap-8 p-6 sm:p-8 xl:p-10 max-w-7xl xl:max-w-[1440px] mx-auto">
 
@@ -988,7 +906,6 @@ const DemographicDashboard = ({ user }) => {
               options={districts}
               placeholder={isMobile ? "--- အားလုံး (All) ---" : "--- အားလုံး (All Districts) ---"}
               disabled={false}
-              isMobile={isMobile}
             />
           </div>
 
@@ -1003,7 +920,6 @@ const DemographicDashboard = ({ user }) => {
               options={townships}
               placeholder={isMobile ? "--- အားလုံး (All) ---" : "--- အားလုံး (All Townships) ---"}
               disabled={!selectedDistrict}
-              isMobile={isMobile}
             />
           </div>
 
@@ -1018,7 +934,6 @@ const DemographicDashboard = ({ user }) => {
               options={wards}
               placeholder={isMobile ? "--- အားလုံး (All) ---" : "--- အားလုံး (All Wards) ---"}
               disabled={!selectedTownship}
-              isMobile={isMobile}
             />
           </div>
 
@@ -1033,7 +948,6 @@ const DemographicDashboard = ({ user }) => {
               options={groups}
               placeholder={isMobile ? "--- အားလုံး (All) ---" : "--- အားလုံး (All Groups) ---"}
               disabled={!selectedTownship || !!selectedWard}
-              isMobile={isMobile}
             />
           </div>
 
@@ -1048,7 +962,6 @@ const DemographicDashboard = ({ user }) => {
               options={filteredVillages}
               placeholder={isMobile ? "--- အားလုံး (All) ---" : "--- အားလုံး (All Villages) ---"}
               disabled={!selectedGroup}
-              isMobile={isMobile}
             />
           </div>
 

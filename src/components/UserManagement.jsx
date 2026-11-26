@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import {
-  UserPlus, Shield, User, Key, Hash, Loader2, CheckCircle2, AlertTriangle, X,
+  UserPlus, Shield, User, Key, Loader2, CheckCircle2, AlertTriangle, X,
   Users, Circle, ToggleLeft, ToggleRight, UserCheck, UserX, Activity, ChevronDown, Mail,
-  RefreshCw, MapPin, Pencil, Save
+  RefreshCw, Pencil, Save
 } from 'lucide-react';
 import { getProfileType, ROLE_LABELS } from '../lib/roleHelper';
 
@@ -56,7 +56,6 @@ const UserManagement = ({ user }) => {
   const townshipsLoadedRef = useRef(false);
 
   const canToggleUsers = user?.role === 'system' || user?.role === 'master';
-  const isAdminLevel   = user?.access_level === 'central' || user?.access_level === 'district' || user?.access_level === 'township';
 
   if (user?.role !== 'system' && user?.role !== 'master') {
     return (

@@ -5,7 +5,6 @@ import { supabase } from './lib/supabase'
 import { cacheClear } from './lib/offlineCache'
 import { clearAll as clearNotifications } from './lib/notifications'
 import IntroAnimation from './components/IntroAnimation'
-import './App.css'
 
 // Route-level code splitting — each page is a separate JS chunk
 const CsvUploader        = lazy(() => import('./components/CsvUploader'))
@@ -41,13 +40,6 @@ const UploadPage = ({ user }) => (
       <p style={{ margin: 0, color: '#737373', fontSize: '11px', fontWeight: '500', fontFamily: "'Inter', sans-serif", textTransform: 'uppercase', letterSpacing: '0.05em' }}>Bulk import household records from Excel, CSV, or JSON files.</p>
     </div>
     <CsvUploader user={user} />
-  </div>
-)
-
-const Placeholder = ({ title }) => (
-  <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
-    <h2 style={{ color: 'var(--primary-color)' }}>{title} Module</h2>
-    <p>This section is currently under development.</p>
   </div>
 )
 

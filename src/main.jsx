@@ -32,10 +32,6 @@ window.addEventListener('online', () => {
   });
 });
 
-window.addEventListener('offline', () => {
-  // Offline notification disabled per user request
-});
-
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <BrowserRouter>

@@ -6,8 +6,8 @@ import { escapeLike } from '../lib/querySanitize';
 import TpsScrollWrapper from './layout/TpsScrollWrapper';
 import {
   ScanLine, Search, X, CheckCircle2, AlertCircle, Loader2,
-  User, Home, MapPin, CreditCard, Hash, Camera, Keyboard,
-  ZoomIn, Users, Zap, RotateCcw, Target, ShieldCheck,
+  User, Home, CreditCard, Hash, Camera, Keyboard,
+  Users, Zap, RotateCcw,
   Calendar, Globe, Briefcase, HeartHandshake, Layers, Building, Landmark, Compass, UserCheck
 } from 'lucide-react';
 
@@ -23,7 +23,6 @@ const IDCardScanner = ({ user }) => {
   const [error, setError] = useState(null);
   const [scanning, setScanning] = useState(false);
   const [zoom, setZoom] = useState(1);
-  const [zoomRange, setZoomRange] = useState({ min: 1, max: 1 });
   const [scanFlash, setScanFlash] = useState(false);
   const [familyModal, setFamilyModal] = useState(false);
   const [familyMembers, setFamilyMembers] = useState([]);
@@ -218,7 +217,6 @@ const IDCardScanner = ({ user }) => {
     setTorchOn(false);
     setHasTorch(false);
     setZoom(1);
-    setZoomRange({ min: 1, max: 4 });
   }, []);
 
   const startCameraWithMode = async (modeToUse) => {
@@ -239,8 +237,7 @@ const IDCardScanner = ({ user }) => {
         if (caps.torch) setHasTorch(true);
       } catch (_) {}
 
-      // Always allow CSS zoom 1–4x; also enable hardware zoom if supported
-      setZoomRange({ min: 1, max: 4 });
+      // Allow CSS zoom 1–4x
       setZoom(1);
 
       if (videoRef.current) {

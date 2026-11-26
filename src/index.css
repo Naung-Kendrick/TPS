@@ -15,51 +15,24 @@
 :root {
   /* ── Custom Easing Curves (Emil Kowalski) ─────────────── */
   --ease-out:     cubic-bezier(0.23, 1, 0.32, 1);      /* Strong ease-out for UI interactions */
-  --ease-in-out:  cubic-bezier(0.77, 0, 0.175, 1);     /* Strong ease-in-out for on-screen movement */
-  --ease-panel:   cubic-bezier(0.32, 0.72, 0, 1);      /* iOS-like panel/drawer curve */
 
   /* ── Architect Core Palette ───────────────────────────── */
   --n-bg:          #FFFFFF;
-  --n-sidebar:     #FAFAFA;
   --n-text:        #1A1A1A;
   --n-text-2:      #737373;
   --n-border:      #E5E7EB; /* Light gray as requested */
-  --n-hover:       #F3F4F6;
-  --n-active:      #E5E7EB;
-  --n-accent:      #000000; /* Minimalist black accent */
-  --n-accent-bg:   #F3F4F6;
 
-  /* ── Aliases: keep backward-compat with all existing files ── */
-  --primary-color:    var(--n-accent);
-  --secondary-color:  var(--n-text-2);
-  --tertiary-color:   var(--n-text);
-  --neutral-color:    var(--n-text-2);
-  --bg-color:         var(--n-bg);
-  --card-bg:          var(--n-bg);
+  /* ── Aliases: keep backward-compat with existing styles ── */
+  --primary-color:    #000000;
   --text-primary:     var(--n-text);
   --text-secondary:   var(--n-text-2);
-  --color-forest:     var(--n-text);
-  --color-sage:       var(--n-border);
-  --color-sage-light: var(--n-bg);
-  --color-brown-dark: var(--n-text);
-  --color-brown-med:  var(--n-text-2);
-  --color-warm-bg:    var(--n-bg);
-  --color-white:      var(--n-bg);
-  --color-border:     var(--n-border);
 
   /* ── Typography ───────────────────────────────────────── */
   --font-headline: 'Inter', 'Pyidaungsu', system-ui, sans-serif;
-  --font-body:     'Inter', 'Pyidaungsu', system-ui, sans-serif;
-  --font-label:    'Inter', 'Pyidaungsu', system-ui, sans-serif;
   --font-mono:     'JetBrains Mono', monospace; /* For data values */
 
   /* ── Geometry ─────────────────────────────────────────── */
   --radius:    0px; /* Sharp corners for architect look */
-  --radius-sm: 0px;
-  --shadow:    none; /* No shadows as requested */
-  --shadow-sm: none;
-  --shadow-md: none;
-  --shadow-lg: none;
 
   font-family: 'Inter', 'Pyidaungsu', system-ui, sans-serif;
   font-size: 13px; /* Slightly smaller for technical look */
@@ -150,20 +123,14 @@ table {
 
 @media (min-width: 1024px) {
   .tps-grid-4 { grid-template-columns: repeat(4, 1fr); }
-  .tps-grid-3 { grid-template-columns: repeat(3, 1fr); }
-  .tps-grid-2 { grid-template-columns: repeat(2, 1fr); }
 }
 
 @media (min-width: 768px) and (max-width: 1023px) {
   .tps-grid-4 { grid-template-columns: repeat(2, 1fr); }
-  .tps-grid-3 { grid-template-columns: repeat(2, 1fr); }
-  .tps-grid-2 { grid-template-columns: repeat(2, 1fr); }
 }
 
 @media (max-width: 767px) {
   .tps-grid-4 { grid-template-columns: repeat(2, 1fr); }
-  .tps-grid-3 { grid-template-columns: repeat(1, 1fr); }
-  .tps-grid-2 { grid-template-columns: repeat(2, 1fr); }
 }
 
 /* ── Buttons ──────────────────────────────────────────── */
@@ -180,26 +147,6 @@ button {
               color 120ms var(--ease-out),
               border-color 120ms var(--ease-out),
               transform 100ms var(--ease-out);
-}
-
-.btn-primary {
-  background-color: var(--n-text);
-  color: #FFFFFF;
-}
-@media (hover: hover) and (pointer: fine) {
-  .btn-primary:hover {
-    background-color: #FFFFFF;
-    color: var(--n-text);
-  }
-}
-
-.btn-secondary {
-  background-color: #FFFFFF;
-  color: var(--n-text);
-  border-color: var(--n-border);
-}
-@media (hover: hover) and (pointer: fine) {
-  .btn-secondary:hover { background-color: var(--n-hover); }
 }
 
 /* ── Inputs ───────────────────────────────────────────── */
@@ -288,16 +235,7 @@ button:active {
   animation: tps-line-progress 1s ease-in-out infinite;
 }
 
-/* 6. Stagger for list items entering together */
-.tps-stagger > *    { opacity: 0; transform: translateY(6px); animation: tps-page-in 200ms var(--ease-out) both; }
-.tps-stagger > *:nth-child(1) { animation-delay: 0ms; }
-.tps-stagger > *:nth-child(2) { animation-delay: 40ms; }
-.tps-stagger > *:nth-child(3) { animation-delay: 80ms; }
-.tps-stagger > *:nth-child(4) { animation-delay: 120ms; }
-.tps-stagger > *:nth-child(5) { animation-delay: 160ms; }
-.tps-stagger > *:nth-child(n+6) { animation-delay: 200ms; }
-
-/* 7. Reduced motion — keep opacity/color, remove movement */
+/* 6. Reduced motion — keep opacity/color, remove movement */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

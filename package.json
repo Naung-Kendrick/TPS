@@ -1,16 +1,10 @@
 {
   "dependencies": {
     "@supabase/supabase-js": "^2.105.3",
-    "@zxing/browser": "^0.2.0",
-    "@zxing/library": "^0.22.0",
     "exceljs": "^4.4.0",
-    "html5-qrcode": "^2.3.8",
     "jsqr": "^1.4.0",
-    "jszip": "^3.10.1",
-    "knayi-myscript": "^2.8.3",
     "lucide-react": "^1.14.0",
     "papaparse": "^5.5.3",
-    "qrcode": "^1.5.4",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
     "react-router-dom": "^7.15.0",

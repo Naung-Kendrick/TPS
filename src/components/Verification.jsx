@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { exportHouseholdExcel, printHouseholdPdf } from '../lib/householdPrint';
 import { escapeLike, sanitizePostgrestOrValue } from '../lib/querySanitize';
-import { Search, RotateCcw, AlertCircle, CheckCircle2, X, Loader2, Printer, FileSpreadsheet } from 'lucide-react';
+import { Search, RotateCcw, CheckCircle2, X, Loader2, Printer, FileSpreadsheet } from 'lucide-react';
 import EmptyState from './EmptyState';
 import TpsScrollWrapper from './layout/TpsScrollWrapper';
 
@@ -79,13 +79,6 @@ const Verification = ({ user }) => {
         ? <mark key={i} style={{ backgroundColor: '#DBEAFE', color: '#1D4ED8', fontWeight: '700', padding: '0 2px', borderRadius: '2px' }}>{part}</mark>
         : part
     );
-  };
-
-  // Normalize household_no for flexible search: strip spaces around hyphens
-  // Matches both "ကောင်းတပ်-၁" and "ကောင်းတပ် - ၁" stored in DB
-  const normalizeHouseholdSearch = (value) => {
-    if (!value) return value;
-    return value.replace(/\s*-\s*/g, '-').trim();
   };
 
   const handleClear = () => {

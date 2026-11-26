@@ -1,13 +1,12 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase, verifyOfficerPassword } from '../lib/supabase';
 import { escapeLike } from '../lib/querySanitize';
 import { cacheGet, cacheSet } from '../lib/offlineCache';
-import { SkeletonTable, SkeletonBar } from './Skeleton';
-import { ChevronRight, Search, Map as MapIcon, MapPin, Home, Users, User, ArrowLeft, Loader2, AlertCircle, Printer, FileSpreadsheet, Pencil, Trash2, Check, X, Download, Layers } from 'lucide-react';
+import { SkeletonTable } from './Skeleton';
+import { ChevronRight, Search, Map as MapIcon, MapPin, Home, Users, User, ArrowLeft, Loader2, Printer, FileSpreadsheet, Pencil, Trash2, Check, X, Download, Layers } from 'lucide-react';
 import EmptyState from './EmptyState';
 import TpsScrollWrapper from './layout/TpsScrollWrapper';
 import { exportHouseholdExcel, printHouseholdPdf, exportAllExcel } from '../lib/householdPrint';
-import { deepEnsureUnicode } from './CsvUploader';
 import { buildExportFilename } from '../lib/exportFilename';
 
 // Convert Myanmar digits (၀-၉) to Arabic digits (0-9) for parsing.
@@ -174,10 +173,6 @@ const Reports = ({ user }) => {
   const [deletePin, setDeletePin] = useState('');
   const [deletePinError, setDeletePinError] = useState('');
   const [deleting, setDeleting] = useState(false);
-  const tableScrollRef = useRef(null);
-  const scroll = (dir) => {
-    if (tableScrollRef.current) tableScrollRef.current.scrollBy({ left: dir * 200, behavior: 'smooth' });
-  };
 
   // Trigger data fetching whenever level or path changes
   useEffect(() => {
@@ -508,7 +503,7 @@ const Reports = ({ user }) => {
 
   const exportHouseholdJson = () => {
     if (!familyMembers.length) return;
-    const nested = deepEnsureUnicode(buildNestedHousehold(path.householdNo, familyMembers));
+    const nested = buildNestedHousehold(path.householdNo, familyMembers);
     const first = familyMembers[0] || {};
     const head = familyMembers.find(m => m.household_relationship === 'ဦးစီး') || first;
     downloadJson(nested, buildExportFilename({
@@ -558,7 +553,7 @@ const Reports = ({ user }) => {
         }
         householdsMap.get(hn).push(row);
       }
-      const nested = deepEnsureUnicode(order.map(hn => buildNestedHousehold(hn, householdsMap.get(hn))));
+      const nested = order.map(hn => buildNestedHousehold(hn, householdsMap.get(hn)));
 
       const sanitize = (str) => String(str || '').trim().replace(/[\/\\:*?"<>|]/g, '').replace(/\s+/g, '_') || null;
       const today = new Date().toISOString().split('T')[0];
@@ -1319,13 +1314,6 @@ const Reports = ({ user }) => {
                   <span className="text-[10px] text-gray-400 uppercase font-mono">{familyMembers.length} member{familyMembers.length !== 1 ? 's' : ''}</span>
                 </div>
 
-                <style>{`
-                  .family-table-scroll::-webkit-scrollbar { height: 12px; background: #F3F4F6; }
-                  .family-table-scroll::-webkit-scrollbar-track { background: #F3F4F6; border-radius: 999px; margin: 0 4px; }
-                  .family-table-scroll::-webkit-scrollbar-thumb { background: #C4C4C4; border-radius: 999px; border: 2px solid #F3F4F6; }
-                  .family-table-scroll::-webkit-scrollbar-thumb:hover { background: #9CA3AF; }
-                  .family-table-scroll { scrollbar-width: auto; scrollbar-color: #C4C4C4 #F3F4F6; }
-                `}</style>
                 <TpsScrollWrapper>
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px', tableLayout: 'auto' }}>
                     <thead>

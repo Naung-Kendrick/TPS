@@ -1,7 +1,6 @@
 import ExcelJS from 'exceljs';
 import taangFlag from '../assets/taang_flag.jpg';
 import taangLogo from '../assets/fonts/IDTL_logo.png';
-import pyidaungsuFont from '../assets/fonts/Pyidaungsu.ttf';
 import { openPrintPreview } from './printWindowHelper';
 import { sanitizeSpreadsheetCell } from './exportSanitize';
 
@@ -493,7 +492,6 @@ export const printStatistics = ({
 }) => {
   const flagUrl  = new URL(taangFlag,  window.location.href).href;
   const logoUrl  = new URL(taangLogo, window.location.href).href;
-  const fontUrl  = new URL(pyidaungsuFont, window.location.href).href;
   const now      = new Date();
   const dateStr  = now.toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: '2-digit' });
 
@@ -801,7 +799,7 @@ export const printStatistics = ({
     @page { size: legal landscape; margin: 3mm; }
     @font-face {
       font-family: 'Pyidaungsu';
-      src: url('${fontUrl}') format('truetype');
+      src: url('/assets/fonts/Pyidaungsu.ttf') format('truetype');
       font-weight: normal;
       font-style: normal;
     }
@@ -1000,7 +998,6 @@ export const printDemographicDashboard = ({
 }) => {
   const flagUrl = new URL(taangFlag,  window.location.href).href;
   const logoUrl = new URL(taangLogo, window.location.href).href;
-  const fontUrl = new URL(pyidaungsuFont, window.location.href).href;
   const now     = new Date();
   const dateStr = now.toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: '2-digit' });
 
@@ -1105,7 +1102,7 @@ export const printDemographicDashboard = ({
     @page { size: legal landscape; margin: 3mm; }
     @font-face {
       font-family: 'Pyidaungsu';
-      src: url('${fontUrl}') format('truetype');
+      src: url('/assets/fonts/Pyidaungsu.ttf') format('truetype');
       font-weight: normal;
       font-style: normal;
     }

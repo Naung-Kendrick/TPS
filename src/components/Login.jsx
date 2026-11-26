@@ -177,7 +177,7 @@ const Login = ({ onLogin }) => {
         const lockoutMsg = recordFailedAttempt();
         setError(lockoutMsg);
       } else if (err.message === 'Email not confirmed') {
-        setError('Error: Turn off "Confirm Email" in Supabase Auth Settings.');
+        setError('Account verification setup is incomplete. Contact your system administrator.');
       } else if (err.code === 'PGRST116') {
         setError('Account profile is missing or access is blocked. Contact your administrator.');
       } else {

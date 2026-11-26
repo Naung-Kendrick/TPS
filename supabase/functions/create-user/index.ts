@@ -1,64 +1,14 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
-
-function checkOriginAndGetCors(req: Request) {
-  const allowedEnv = Deno.env.get('ALLOWED_ORIGIN') ?? ''
-  const requestOrigin = req.headers.get('origin') ?? ''
-  let allowOrigin = '*'
-  let originAllowed = true
-
-  if (allowedEnv.trim() !== '') {
-    const allowedList = allowedEnv.split(',').map((s) => s.trim()).filter(Boolean)
-    const isTpsVercelOrigin = /^https:\/\/tps(?:-zeta|-naung-naungs-projects-f5910407|-git-[a-z0-9-]+-naung-naungs-projects-f5910407|-[a-z0-9]+-naung-naungs-projects-f5910407)\.vercel\.app$/.test(requestOrigin)
-    const matched = allowedList.includes(requestOrigin) || (allowedList.some((o) => o.endsWith('.vercel.app')) && isTpsVercelOrigin)
-    if (requestOrigin && !matched) {
-      originAllowed = false
-    }
-    allowOrigin = matched ? requestOrigin : allowedList[0]
-  }
-
-  return {
-    originAllowed,
-    corsHeaders: {
-      'Access-Control-Allow-Origin': allowOrigin,
-      'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-retry-count, x-region',
-      'Vary': 'Origin',
-    },
-  }
-}
-
-function extractSessionIdFromJwt(jwt: string): string | null {
-  try {
-    const parts = jwt.split('.')
-    if (parts.length !== 3) return null
-    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/')
-    const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=')
-    const payload = JSON.parse(atob(padded))
-    return typeof payload?.session_id === 'string' && payload.session_id ? payload.session_id : null
-  } catch {
-    return null
-  }
-}
+import { checkOriginAndGetCors, enforcePostAndCors, extractSessionIdFromJwt } from "../_shared/security.ts"
 
 const VALID_ROLES = new Set(['field', 'ops', 'regional', 'system'])
 const VALID_ACCESS_LEVELS = new Set(['central', 'district', 'township', 'viewer', 'sub_township'])
 
 serve(async (req) => {
   const { originAllowed, corsHeaders } = checkOriginAndGetCors(req)
-
-  if (req.method === 'OPTIONS') {
-    if (!originAllowed) {
-      return new Response('Forbidden origin', { status: 403, headers: corsHeaders })
-    }
-    return new Response('ok', { headers: corsHeaders })
-  }
-
-  if (!originAllowed) {
-    return new Response(
-      JSON.stringify({ error: 'Forbidden: origin not allowed.' }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 403 }
-    )
-  }
+  const guardResponse = enforcePostAndCors(req, originAllowed, corsHeaders)
+  if (guardResponse) return guardResponse
 
   try {
     const supabaseUrl = Deno.env.get('PROJECT_URL') ?? Deno.env.get('SUPABASE_URL') ?? ''
@@ -98,11 +48,13 @@ serve(async (req) => {
       )
     }
 
+    const twelveHoursAgoIso = new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString()
     const { data: verifiedSession, error: verifiedErr } = await supabaseAdmin
       .from('verified_2fa_sessions')
-      .select('session_id')
+      .select('session_id, verified_at')
       .eq('session_id', sessionId)
       .eq('user_id', caller.id)
+      .gt('verified_at', twelveHoursAgoIso)
       .maybeSingle()
 
     if (verifiedErr || !verifiedSession) {

@@ -74,75 +74,22 @@ const readXlsxWithExcelJs = async (arrayBuffer) => {
   });
 };
 
-// Legacy .xls (Excel 97-2003 binary) fallback — lazy-loaded only when needed
-const MAX_LEGACY_XLS_ROWS = 50000;
 const FORBIDDEN_HEADER_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 
-const readLegacyXlsWithSheetJs = async (arrayBuffer) => {
-  const XLSX = await import('xlsx');
-  const data = new Uint8Array(arrayBuffer);
-  const workbook = XLSX.read(data, { type: 'array', cellText: true, cellDates: true });
-  const firstSheetName = workbook.SheetNames[0];
-  if (!firstSheetName) throw new Error('Excel file has no sheets.');
-  const worksheet = workbook.Sheets[firstSheetName];
-
-  // Crop empty trailing rows and cap at MAX_LEGACY_XLS_ROWS to limit ReDoS/DoS exposure
-  if (worksheet && worksheet['!ref']) {
-    const range = XLSX.utils.decode_range(worksheet['!ref']);
-    let maxRow = range.s.r;
-    for (const key of Object.keys(worksheet)) {
-      if (key.startsWith('!')) continue;
-      const cell = worksheet[key];
-      if (cell && cell.v !== undefined && cell.v !== null && String(cell.v).trim() !== '') {
-        const coord = XLSX.utils.decode_cell(key);
-        if (coord.r > maxRow) maxRow = coord.r;
-      }
-    }
-    if (maxRow > MAX_LEGACY_XLS_ROWS) {
-      throw new Error(`Legacy .xls file exceeds maximum allowed ${MAX_LEGACY_XLS_ROWS.toLocaleString()} rows.`);
-    }
-    range.e.r = maxRow;
-    worksheet['!ref'] = XLSX.utils.encode_range(range);
-  }
-
-  // Fix SheetJS Myanmar numeral locale bug ($393 -> ၃၉၃)
-  if (worksheet) {
-    for (const key of Object.keys(worksheet)) {
-      if (key.startsWith('!')) continue;
-      const cell = worksheet[key];
-      if (!cell) continue;
-      const hasMyanmarLocale = cell.z && (cell.z.includes('0455') || cell.z.includes('455'));
-      const isNumber = cell.t === 'n' && typeof cell.v === 'number';
-      const isDate = cell.t === 'd' || (cell.z && /[dmy]/i.test(cell.z.replace(/\[\$-[^\]]+\]/g, '')));
-      if (isNumber && !isDate) {
-        if (hasMyanmarLocale) {
-          cell.v = toMyanmarDigits(cell.v);
-          cell.w = cell.v;
-          cell.t = 's';
-        } else if (typeof cell.w === 'string' && cell.w.startsWith('$')) {
-          cell.v = toMyanmarDigits(cell.w.replace(/^\$\s*/, ''));
-          cell.w = cell.v;
-          cell.t = 's';
-        }
-      }
-    }
-  }
-
-  return XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '', dateNF: 'dd.mm.yyyy' })
-    .map((row) => row.map((cell) => (cell instanceof Date ? formatUtcDateDdMmYyyy(cell) : String(cell ?? ''))));
-};
-
 /**
- * Parses an uploaded .xlsx or .xls file into an Array of Arrays (rows of strings).
- * Modern .xlsx files are parsed via ExcelJS; legacy .xls files use lazy-loaded SheetJS.
+ * Parses an uploaded .xlsx file into an Array of Arrays (rows of strings) via ExcelJS.
+ * Legacy binary .xls files are rejected instead of using the unpatched `xlsx` package.
  *
  * @param {File} file
  * @returns {Promise<string[][]>}
  */
 export async function parseExcelToAoA(file) {
+  const name = file.name.toLowerCase();
+  if (name.endsWith('.xls') && !name.endsWith('.xlsx')) {
+    throw new Error('Legacy .xls files are not supported for security reasons. Please save the file as .xlsx or .csv and upload again.');
+  }
   const buffer = await file.arrayBuffer();
-  const isLegacyXls = file.name.toLowerCase().endsWith('.xls') && !file.name.toLowerCase().endsWith('.xlsx');
-  return isLegacyXls ? readLegacyXlsWithSheetJs(buffer) : readXlsxWithExcelJs(buffer);
+  return readXlsxWithExcelJs(buffer);
 }
 
 /**

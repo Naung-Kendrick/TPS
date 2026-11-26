@@ -1555,7 +1555,7 @@ const CsvUploader = ({ onUploadSuccess, user }) => {
     });
   };
 
-  // Excel handler — reads .xlsx via ExcelJS and legacy .xls via lazy SheetJS
+  // Excel handler — reads .xlsx via ExcelJS
   const handleExcelUpload = async (file) => {
     try {
       const rows = await parseExcelToHeaderObjects(file);
@@ -1589,13 +1589,17 @@ const CsvUploader = ({ onUploadSuccess, user }) => {
     const name = file.name.toLowerCase();
     if (name.endsWith('.json')) {
       handleJsonUpload(file);
-    } else if (name.endsWith('.xlsx') || name.endsWith('.xls')) {
+    } else if (name.endsWith('.xlsx')) {
       handleExcelUpload(file);
+    } else if (name.endsWith('.xls')) {
+      setLoading(false);
+      alert('Legacy .xls files are not supported for security reasons. Please save the file as .xlsx or .csv and upload again.');
+      if (fileInputRef.current) fileInputRef.current.value = '';
     } else if (name.endsWith('.csv')) {
       handleCsvUpload(file);
     } else {
       setLoading(false);
-      alert('Unsupported file type. Please upload a .csv, .xlsx, .xls, or .json file.');
+      alert('Unsupported file type. Please upload a .csv, .xlsx, or .json file.');
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
@@ -1627,11 +1631,11 @@ const CsvUploader = ({ onUploadSuccess, user }) => {
               <span className="hidden sm:inline">Click to upload or drag and drop</span>
               <span className="inline sm:hidden">Tap to upload file</span>
             </p>
-            <p className="text-xs text-[#737373]">.XLSX, .XLS, .CSV, or .JSON files</p>
+            <p className="text-xs text-[#737373]">.XLSX, .CSV, or .JSON files</p>
           </div>
           <input
             type="file"
-            accept=".csv,.json,.xlsx,.xls"
+            accept=".csv,.json,.xlsx"
             className="hidden"
             onChange={handleFileUpload}
             disabled={loading}

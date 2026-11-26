@@ -1,31 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
-
-function checkOriginAndGetCors(req: Request) {
-  const allowedEnv = Deno.env.get('ALLOWED_ORIGIN') ?? ''
-  const requestOrigin = req.headers.get('origin') ?? ''
-  let allowOrigin = '*'
-  let originAllowed = true
-
-  if (allowedEnv.trim() !== '') {
-    const allowedList = allowedEnv.split(',').map((s) => s.trim()).filter(Boolean)
-    const isTpsVercelOrigin = /^https:\/\/tps(?:-zeta|-naung-naungs-projects-f5910407|-git-[a-z0-9-]+-naung-naungs-projects-f5910407|-[a-z0-9]+-naung-naungs-projects-f5910407)\.vercel\.app$/.test(requestOrigin)
-    const matched = allowedList.includes(requestOrigin) || (allowedList.some((o) => o.endsWith('.vercel.app')) && isTpsVercelOrigin)
-    if (requestOrigin && !matched) {
-      originAllowed = false
-    }
-    allowOrigin = matched ? requestOrigin : allowedList[0]
-  }
-
-  return {
-    originAllowed,
-    corsHeaders: {
-      'Access-Control-Allow-Origin': allowOrigin,
-      'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-retry-count, x-region',
-      'Vary': 'Origin',
-    },
-  }
-}
+import { checkOriginAndGetCors, enforcePostAndCors } from "../_shared/security.ts"
 
 function generateSecureOtp(): string {
   // Rejection sampling in [0, 900000) to avoid modulo bias
@@ -47,20 +22,8 @@ async function hashOtp(userId: string, code: string, secret: string): Promise<st
 
 serve(async (req) => {
   const { originAllowed, corsHeaders } = checkOriginAndGetCors(req)
-
-  if (req.method === 'OPTIONS') {
-    if (!originAllowed) {
-      return new Response('Forbidden origin', { status: 403, headers: corsHeaders })
-    }
-    return new Response('ok', { headers: corsHeaders })
-  }
-
-  if (!originAllowed) {
-    return new Response(
-      JSON.stringify({ error: 'Forbidden: origin not allowed.' }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 403 }
-    )
-  }
+  const guardResponse = enforcePostAndCors(req, originAllowed, corsHeaders)
+  if (guardResponse) return guardResponse
 
   try {
     const supabaseUrl = Deno.env.get('PROJECT_URL') ?? Deno.env.get('SUPABASE_URL') ?? ''
@@ -169,56 +132,76 @@ serve(async (req) => {
 
     if (insertError) throw new Error('Could not generate verification code.')
 
+    const rollbackOtp = async () => {
+      try {
+        await supabaseAdmin
+          .from('otp_codes')
+          .delete()
+          .eq('user_id', userId)
+          .eq('created_at', nowIso)
+      } catch {
+        // Best-effort rollback so failed email delivery does not trigger a 55s cooldown
+      }
+    }
+
     // 5. Send email via Resend
     const resendKey = Deno.env.get('RESEND_API_KEY') ?? ''
     if (!resendKey) {
+      await rollbackOtp()
       throw new Error('Email delivery service is not configured.')
     }
     const fromEmail = Deno.env.get('OTP_FROM_EMAIL') ?? 'noreply@taanglandimmigration.org'
 
-    const emailRes = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${resendKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        from: `TPS System <${fromEmail}>`,
-        to: [profile.email],
-        subject: 'TPS Login Verification Code',
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
-            <div style="background: #1A1A1A; padding: 28px 20px; text-align: center; margin-bottom: 24px;">
-              <h1 style="color: white; margin: 0; font-size: 18px; letter-spacing: 0.1em; font-weight: 700;">TPS AUTHENTICATION</h1>
-              <p style="color: #A3A3A3; margin: 8px 0 0; font-size: 12px;">Immigration Department of Ta'ang Land</p>
+    let emailRes: Response
+    try {
+      emailRes = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${resendKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          from: `TPS System <${fromEmail}>`,
+          to: [profile.email],
+          subject: 'TPS Login Verification Code',
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
+              <div style="background: #1A1A1A; padding: 28px 20px; text-align: center; margin-bottom: 24px;">
+                <h1 style="color: white; margin: 0; font-size: 18px; letter-spacing: 0.1em; font-weight: 700;">TPS AUTHENTICATION</h1>
+                <p style="color: #A3A3A3; margin: 8px 0 0; font-size: 12px;">Immigration Department of Ta'ang Land</p>
+              </div>
+              <p style="color: #4B5563; font-size: 14px; margin-bottom: 8px;">
+                Hello <strong>Immigration Officer</strong>,
+              </p>
+              <p style="color: #4B5563; font-size: 14px; margin-bottom: 24px;">
+                Your one-time login verification code is:
+              </p>
+              <div style="background: #F9FAFB; border: 2px solid #1A1A1A; padding: 24px; text-align: center; margin-bottom: 24px;">
+                <span style="font-family: monospace; font-size: 40px; font-weight: 900; letter-spacing: 0.4em; color: #1A1A1A;">${code}</span>
+              </div>
+              <p style="color: #6B7280; font-size: 12px; margin-bottom: 4px;">
+                ⏱ This code expires in <strong>10 minutes</strong>.
+              </p>
+              <p style="color: #6B7280; font-size: 12px;">
+                If you did not attempt to log in, please contact your administrator immediately.
+              </p>
+              <hr style="border: none; border-top: 1px solid #E5E7EB; margin: 24px 0;" />
+              <p style="color: #9CA3AF; font-size: 10px; text-align: center;">
+                IDTL · Ta'ang Land Immigration Dept. · Confidential System . Powered By Mai Naung Naung & Mai Nay Lin
+              </p>
             </div>
-            <p style="color: #4B5563; font-size: 14px; margin-bottom: 8px;">
-              Hello <strong>Immigration Officer</strong>,
-            </p>
-            <p style="color: #4B5563; font-size: 14px; margin-bottom: 24px;">
-              Your one-time login verification code is:
-            </p>
-            <div style="background: #F9FAFB; border: 2px solid #1A1A1A; padding: 24px; text-align: center; margin-bottom: 24px;">
-              <span style="font-family: monospace; font-size: 40px; font-weight: 900; letter-spacing: 0.4em; color: #1A1A1A;">${code}</span>
-            </div>
-            <p style="color: #6B7280; font-size: 12px; margin-bottom: 4px;">
-              ⏱ This code expires in <strong>10 minutes</strong>.
-            </p>
-            <p style="color: #6B7280; font-size: 12px;">
-              If you did not attempt to log in, please contact your administrator immediately.
-            </p>
-            <hr style="border: none; border-top: 1px solid #E5E7EB; margin: 24px 0;" />
-            <p style="color: #9CA3AF; font-size: 10px; text-align: center;">
-              IDTL · Ta'ang Land Immigration Dept. · Confidential System . Powered By Mai Naung Naung & Mai Nay Lin
-            </p>
-          </div>
-        `,
-      }),
-    })
+          `,
+        }),
+      })
+    } catch (fetchErr) {
+      await rollbackOtp()
+      throw fetchErr
+    }
 
     if (!emailRes.ok) {
       const errBody = await emailRes.text()
       console.error('Resend API error:', errBody)
+      await rollbackOtp()
       throw new Error('Failed to deliver verification email. Please try again.')
     }
 

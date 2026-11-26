@@ -4,7 +4,8 @@ import Layout from './components/layout/Layout'
 import { supabase } from './lib/supabase'
 import { canUploadData } from './lib/roleHelper'
 import { cacheClear } from './lib/offlineCache'
-import { clearAll as clearNotifications } from './lib/notifications'
+import { clearAll as clearNotifications, pushNotification, NOTIF_TYPES } from './lib/notifications'
+import { drainQueue, queueLength } from './lib/retryQueue'
 import IntroAnimation from './components/IntroAnimation'
 
 // Route-level code splitting — each page is a separate JS chunk
@@ -186,6 +187,53 @@ function App() {
       })
       .subscribe();
     return () => supabase.removeChannel(channel);
+  }, [user?.id]);
+
+  // Drain offline write queue only after authentication + 2FA session verification
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const syncPendingQueue = async () => {
+      if (!navigator.onLine || queueLength() === 0) return;
+      const { synced, failed } = await drainQueue();
+      if (synced > 0) {
+        pushNotification({
+          type: NOTIF_TYPES.SYNC,
+          title: 'Offline Records Synced',
+          message: `${synced} record${synced > 1 ? 's' : ''} uploaded successfully.`,
+        });
+      }
+      if (failed > 0) {
+        pushNotification({
+          type: NOTIF_TYPES.WARNING,
+          title: 'Sync Partially Failed',
+          message: `${failed} record${failed > 1 ? 's' : ''} could not be synced. Will retry.`,
+        });
+      }
+    };
+
+    if (navigator.onLine) {
+      syncPendingQueue();
+    } else if (queueLength() > 0) {
+      const q = queueLength();
+      pushNotification({
+        type: NOTIF_TYPES.WARNING,
+        title: 'Offline — Records Pending',
+        message: `${q} record${q > 1 ? 's' : ''} queued for sync when online.`,
+      });
+    }
+
+    const handleOnline = () => {
+      pushNotification({
+        type: NOTIF_TYPES.ONLINE,
+        title: 'Back Online',
+        message: 'Connection restored. Syncing pending records...',
+      });
+      syncPendingQueue();
+    };
+
+    window.addEventListener('online', handleOnline);
+    return () => window.removeEventListener('online', handleOnline);
   }, [user?.id]);
 
   if (sessionLoading) {

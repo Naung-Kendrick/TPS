@@ -119,3 +119,15 @@ export function getProfileType(role, accessLevel) {
     border: '#A7F3D0'
   };
 }
+
+/**
+ * Mirrors bulk-upload authorization: system, master, admin, regional, and ops
+ * officers outside read-only viewer / sub_township access levels.
+ */
+export function canUploadData(user) {
+  const role = user?.role || user?.profile?.role;
+  const accessLevel = user?.access_level || user?.profile?.access_level;
+  const hasUploadRole = ['system', 'master', 'admin', 'regional', 'ops'].includes(role);
+  const isReadOnlyLevel = accessLevel === 'viewer' || accessLevel === 'sub_township';
+  return hasUploadRole && !isReadOnlyLevel;
+}

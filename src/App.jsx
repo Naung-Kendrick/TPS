@@ -2,6 +2,7 @@ import { Suspense, lazy, useState, useEffect } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import Layout from './components/layout/Layout'
 import { supabase } from './lib/supabase'
+import { canUploadData } from './lib/roleHelper'
 import { cacheClear } from './lib/offlineCache'
 import { clearAll as clearNotifications } from './lib/notifications'
 import IntroAnimation from './components/IntroAnimation'
@@ -212,7 +213,7 @@ function App() {
         <Route index element={<Navigate to="/verification" replace />} />
         <Route path="verification" element={<Suspense fallback={<PageFallback />}><Verification user={user} /></Suspense>} />
         <Route path="upload" element={
-          ((user?.role === 'system' || user?.role === 'master' || user?.role === 'admin' || user?.role === 'ops') && user?.access_level !== 'viewer' && user?.access_level !== 'sub_township')
+          canUploadData(user)
             ? <Suspense fallback={<PageFallback />}><UploadPage user={user} /></Suspense>
             : <Navigate to="/verification" replace />
         } />

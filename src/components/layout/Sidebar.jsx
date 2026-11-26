@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Users, UserPlus, LineChart, PieChart, Upload, ScanLine, MoreHorizontal, LogOut, CircleUserRound, UserCheck, Database, HardDrive, Bell } from 'lucide-react';
 import logo from '../../assets/fonts/IDTL_logo.png';
-import { getProfileType } from '../../lib/roleHelper';
+import { getProfileType, canUploadData } from '../../lib/roleHelper';
 import { getUnreadCount } from '../../lib/notifications';
 
 const Sidebar = ({ user, onLogout }) => {
@@ -73,7 +73,7 @@ const Sidebar = ({ user, onLogout }) => {
   // Role-based + access-level filtering
   const filteredMenuItems = menuItems.filter(item => {
     if (item.id === 'users') return user?.role === 'system' || user?.role === 'master';
-    if (item.id === 'upload') return (user?.role === 'system' || user?.role === 'master' || user?.role === 'admin' || user?.role === 'ops') && user?.access_level !== 'viewer' && user?.access_level !== 'sub_township';
+    if (item.id === 'upload') return canUploadData(user);
     if (item.id === 'central-database' || item.id === 'registration') return user?.access_level !== 'viewer' && user?.access_level !== 'sub_township';
     if (item.id === 'backup') return (user?.role === 'system' || user?.role === 'master') && (user?.access_level || user?.profile?.access_level) === 'central';
     return true;

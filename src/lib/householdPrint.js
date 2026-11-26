@@ -18,36 +18,43 @@ const safeHtml = (v) => {
   }[c]));
 };
 
+const MYANMAR_TO_ARABIC = { '၀':'0','၁':'1','၂':'2','၃':'3','၄':'4','၅':'5','၆':'6','၇':'7','၈':'8','၉':'9' };
+
+const parseAge = (dateStr) => {
+  if (!dateStr) return null;
+  const s = String(dateStr).split('').map(c => MYANMAR_TO_ARABIC[c] ?? c).join('');
+  const parts = s.split(/[.\-\/]/);
+  if (parts.length < 3) return null;
+  const [d, m, y] = parts.map(Number);
+  if (isNaN(d) || isNaN(m) || isNaN(y) || y < 1900) return null;
+  const dob = new Date(y, m - 1, d);
+  const today = new Date();
+  let age = today.getFullYear() - dob.getFullYear();
+  if (today < new Date(today.getFullYear(), dob.getMonth(), dob.getDate())) age--;
+  return age;
+};
+
+const isMale   = (g) => { const s = (g || '').trim(); return s === 'ကျား' || s === 'က' || s.toLowerCase() === 'male'; };
+const isFemale = (g) => { const s = (g || '').trim(); return s === 'မ' || s.toLowerCase() === 'female'; };
+
+const summarizeHouseholdMembers = (members) => {
+  const ages = members.map(m => parseAge(m.date_of_birth));
+  return {
+    totalMembers: members.length,
+    maleCount:    members.filter(m => isMale(m.gender)).length,
+    femaleCount:  members.filter(m => isFemale(m.gender)).length,
+    under16:      ages.filter(a => a !== null && a < 16).length,
+    age1660:      ages.filter(a => a !== null && a >= 16 && a <= 60).length,
+    above60:      ages.filter(a => a !== null && a > 60).length,
+  };
+};
+
 export const exportHouseholdExcel = async (householdNo, members) => {
   if (!members || members.length === 0) return;
   const first = members[0] || {};
 
-  // ── Age helpers for summary statistics ──
-  const myanmarToArabic = { '၀':'0','၁':'1','၂':'2','၃':'3','၄':'4','၅':'5','၆':'6','၇':'7','၈':'8','၉':'9' };
-  const parseAge = (dateStr) => {
-    if (!dateStr) return null;
-    const s = String(dateStr).split('').map(c => myanmarToArabic[c] ?? c).join('');
-    const parts = s.split(/[.\-\/]/);
-    if (parts.length < 3) return null;
-    const [d, m, y] = parts.map(Number);
-    if (isNaN(d) || isNaN(m) || isNaN(y) || y < 1900) return null;
-    const dob = new Date(y, m - 1, d);
-    const today = new Date();
-    let age = today.getFullYear() - dob.getFullYear();
-    if (today < new Date(today.getFullYear(), dob.getMonth(), dob.getDate())) age--;
-    return age;
-  };
-
-  const isMale   = (g) => { const s = (g || '').trim(); return s === 'က' || s === 'male' || s.toLowerCase() === 'male'; };
-  const isFemale = (g) => { const s = (g || '').trim(); return s === 'မ' || s === 'female' || s.toLowerCase() === 'female'; };
-
-  const totalMembers = members.length;
-  const maleCount    = members.filter(m => isMale(m.gender)).length;
-  const femaleCount  = members.filter(m => isFemale(m.gender)).length;
-  const ages         = members.map(m => parseAge(m.date_of_birth));
-  const under16      = ages.filter(a => a !== null && a < 16).length;
-  const age1660      = ages.filter(a => a !== null && a >= 16 && a <= 60).length;
-  const above60      = ages.filter(a => a !== null && a > 60).length;
+  // ── Age & gender summary statistics ──
+  const { totalMembers, maleCount, femaleCount, under16, age1660, above60 } = summarizeHouseholdMembers(members);
 
   const head = members.find(m => m.household_relationship === 'ဦးစီး') || first;
   const filename = buildExportFilename({
@@ -241,32 +248,8 @@ export const printHouseholdPdf = (householdNo, members) => {
   if (!members || members.length === 0) return;
   const first = members[0] || {};
 
-  // ── Age helpers ──────────────────────────────────────────────────────────────
-  const myanmarToArabic = { '၀':'0','၁':'1','၂':'2','၃':'3','၄':'4','၅':'5','၆':'6','၇':'7','၈':'8','၉':'9' };
-  const parseAge = (dateStr) => {
-    if (!dateStr) return null;
-    const s = String(dateStr).split('').map(c => myanmarToArabic[c] ?? c).join('');
-    const parts = s.split(/[.\-\/]/);
-    if (parts.length < 3) return null;
-    const [d, m, y] = parts.map(Number);
-    if (isNaN(d) || isNaN(m) || isNaN(y) || y < 1900) return null;
-    const dob = new Date(y, m - 1, d);
-    const today = new Date();
-    let age = today.getFullYear() - dob.getFullYear();
-    if (today < new Date(today.getFullYear(), dob.getMonth(), dob.getDate())) age--;
-    return age;
-  };
-
-  const isMale   = (g) => { const s = (g || '').trim(); return s === 'က' || s === 'male' || s.toLowerCase() === 'male'; };
-  const isFemale = (g) => { const s = (g || '').trim(); return s === 'မ' || s === 'female' || s.toLowerCase() === 'female'; };
-
-  const totalMembers = members.length;
-  const maleCount    = members.filter(m => isMale(m.gender)).length;
-  const femaleCount  = members.filter(m => isFemale(m.gender)).length;
-  const ages         = members.map(m => parseAge(m.date_of_birth));
-  const under16      = ages.filter(a => a !== null && a < 16).length;
-  const age1660      = ages.filter(a => a !== null && a >= 16 && a <= 60).length;
-  const above60      = ages.filter(a => a !== null && a > 60).length;
+  // ── Age & gender summary statistics ──────────────────────────────────────────
+  const { totalMembers, maleCount, femaleCount, under16, age1660, above60 } = summarizeHouseholdMembers(members);
 
   const flagUrl = new URL(taangFlag, window.location.href).href;
   const logoUrl = new URL(taangLogo, window.location.href).href;

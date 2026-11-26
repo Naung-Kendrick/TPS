@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { supabase, verifyOfficerPassword } from '../lib/supabase';
+import { supabase, verifyOfficerPassword, fetchAllRows } from '../lib/supabase';
 import { escapeLike } from '../lib/querySanitize';
 import { cacheGet, cacheSet } from '../lib/offlineCache';
 import { SkeletonTable } from './Skeleton';
@@ -271,37 +271,39 @@ const Reports = ({ user }) => {
       else if (level === 4) {
         // If user selected a Ward: show household heads directly
         if (path.locationType === 'ward') {
-          let query = supabase
-            .from('households')
-            .select('id, name, household_no, gender, occupation, date_of_birth')
-            .ilike('ward_village_group', '%' + escapeLike(path.ward.trim()) + '%')
-            .ilike('household_relationship', '%ဦးစီး%');
+          const data = await fetchAllRows(() => {
+            let query = supabase
+              .from('households')
+              .select('id, name, household_no, gender, occupation, date_of_birth')
+              .ilike('ward_village_group', '%' + escapeLike(path.ward.trim()) + '%')
+              .ilike('household_relationship', '%ဦးစီး%')
+              .order('id', { ascending: true });
 
-          if (path.district) query = query.eq('district', path.district);
-          if (path.township) query = query.eq('township', path.township);
-
-          const { data, error } = await query;
-          if (error) throw error;
-          setDataList(data || []);
-          cacheSet(cacheKey, data || []);
+            if (path.district) query = query.eq('district', path.district);
+            if (path.township) query = query.eq('township', path.township);
+            return query;
+          });
+          setDataList(data);
+          cacheSet(cacheKey, data);
         }
         // If user selected a Group: show villages belonging strictly to this group
         else if (path.locationType === 'group') {
-          let query = supabase
-            .from('households')
-            .select('ward_village_group')
-            .ilike('ward_village_group', '%' + escapeLike(path.group.trim()) + '%');
+          const data = await fetchAllRows(() => {
+            let query = supabase
+              .from('households')
+              .select('ward_village_group')
+              .ilike('ward_village_group', '%' + escapeLike(path.group.trim()) + '%')
+              .order('id', { ascending: true });
 
-          if (path.district) query = query.eq('district', path.district);
-          if (path.township) query = query.eq('township', path.township);
-
-          const { data, error } = await query;
-          if (error) throw error;
+            if (path.district) query = query.eq('district', path.district);
+            if (path.township) query = query.eq('township', path.township);
+            return query;
+          });
 
           const villageSet = new Set();
           const cleanGroup = path.group.trim();
 
-          (data || []).forEach(row => {
+          data.forEach(row => {
             if (!row.ward_village_group) return;
             const parts = row.ward_village_group.split(/[,၊]/).map(p => p.trim()).filter(Boolean);
             parts.forEach(part => {
@@ -324,21 +326,22 @@ const Reports = ({ user }) => {
       }
       else if (level === 5 && path.locationType === 'group' && path.village) {
         // Only reachable if locationType is 'group' and village is selected
-        let query = supabase
-          .from('households')
-          .select('id, name, household_no, gender, occupation, date_of_birth')
-          .ilike('ward_village_group', '%' + escapeLike(path.village.trim()) + '%')
-          .ilike('household_relationship', '%ဦးစီး%');
+        const data = await fetchAllRows(() => {
+          let query = supabase
+            .from('households')
+            .select('id, name, household_no, gender, occupation, date_of_birth')
+            .ilike('ward_village_group', '%' + escapeLike(path.village.trim()) + '%')
+            .ilike('household_relationship', '%ဦးစီး%')
+            .order('id', { ascending: true });
 
-        if (path.district) query = query.eq('district', path.district);
-        if (path.township) query = query.eq('township', path.township);
-        if (path.group) query = query.ilike('ward_village_group', '%' + escapeLike(path.group.trim()) + '%');
-          
-        let { data, error } = await query;
-        if (error) throw error;
-        
-        setDataList(data || []);
-        cacheSet(cacheKey, data || []);
+          if (path.district) query = query.eq('district', path.district);
+          if (path.township) query = query.eq('township', path.township);
+          if (path.group) query = query.ilike('ward_village_group', '%' + escapeLike(path.group.trim()) + '%');
+          return query;
+        });
+
+        setDataList(data);
+        cacheSet(cacheKey, data);
       }
       else if (level === 6) {
         // Family members
@@ -517,35 +520,37 @@ const Reports = ({ user }) => {
     }));
   };
 
+  const buildScopedExportQuery = () => {
+    let query = supabase
+      .from('households')
+      .select('*')
+      .order('household_no', { ascending: true })
+      .order('id', { ascending: true });
+
+    if (path.district) query = query.eq('district', path.district);
+    else if (districtFilter) query = query.in('district', districtFilter);
+    if (path.township) query = query.eq('township', path.township);
+    else if (townshipFilter) query = query.in('township', townshipFilter);
+    if (path.locationType === 'ward' && path.ward) {
+      query = query.ilike('ward_village_group', '%' + escapeLike(path.ward.trim()) + '%');
+    } else if (path.locationType === 'group') {
+      if (path.village) {
+        query = query.ilike('ward_village_group', '%' + escapeLike(path.village.trim()) + '%');
+      } else if (path.group) {
+        query = query.ilike('ward_village_group', '%' + escapeLike(path.group.trim()) + '%');
+      }
+    }
+    return query;
+  };
+
   const exportAllJson = async () => {
     setExportingJson(true);
     try {
-      let query = supabase
-        .from('households')
-        .select('*')
-        .order('household_no', { ascending: true })
-        .order('id', { ascending: true });
-
-      if (path.district) query = query.eq('district', path.district);
-      else if (districtFilter) query = query.in('district', districtFilter);
-      if (path.township) query = query.eq('township', path.township);
-      else if (townshipFilter) query = query.in('township', townshipFilter);
-      if (path.locationType === 'ward' && path.ward) {
-        query = query.ilike('ward_village_group', '%' + escapeLike(path.ward.trim()) + '%');
-      } else if (path.locationType === 'group') {
-        if (path.village) {
-          query = query.ilike('ward_village_group', '%' + escapeLike(path.village.trim()) + '%');
-        } else if (path.group) {
-          query = query.ilike('ward_village_group', '%' + escapeLike(path.group.trim()) + '%');
-        }
-      }
-
-      const { data, error } = await query;
-      if (error) throw error;
+      const data = await fetchAllRows(buildScopedExportQuery);
 
       const householdsMap = new Map();
       const order = [];
-      for (const row of (data || [])) {
+      for (const row of data) {
         const hn = row.household_no || 'UNKNOWN';
         if (!householdsMap.has(hn)) {
           householdsMap.set(hn, []);
@@ -574,26 +579,7 @@ const Reports = ({ user }) => {
   const exportAllExcelData = async () => {
     setExportingExcel(true);
     try {
-      let query = supabase
-        .from('households')
-        .select('*');
-
-      if (path.district) query = query.eq('district', path.district);
-      else if (districtFilter) query = query.in('district', districtFilter);
-      if (path.township) query = query.eq('township', path.township);
-      else if (townshipFilter) query = query.in('township', townshipFilter);
-      if (path.locationType === 'ward' && path.ward) {
-        query = query.ilike('ward_village_group', '%' + escapeLike(path.ward.trim()) + '%');
-      } else if (path.locationType === 'group') {
-        if (path.village) {
-          query = query.ilike('ward_village_group', '%' + escapeLike(path.village.trim()) + '%');
-        } else if (path.group) {
-          query = query.ilike('ward_village_group', '%' + escapeLike(path.group.trim()) + '%');
-        }
-      }
-
-      const { data, error } = await query;
-      if (error) throw error;
+      const data = await fetchAllRows(buildScopedExportQuery);
 
       await exportAllExcel(data, {
         district: path.district,

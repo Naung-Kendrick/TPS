@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase, fetchAllRows } from '../lib/supabase';
 import { Download, FileSpreadsheet, HardDrive, Clock, CheckCircle2, RefreshCw, Filter, ShieldCheck, ChevronDown } from 'lucide-react';
 import { exportAllExcel } from '../lib/householdPrint';
 import { getSecureItem, setSecureItem } from '../lib/secureStorage';
@@ -119,11 +119,11 @@ const DatabaseBackup = ({ user }) => {
     } catch (_) {}
   }, []);
 
-  // Fetch unique Districts on load
+  // Fetch unique Districts on load via aggregated RPC (no 1,000-row cap)
   useEffect(() => {
     async function loadDistricts() {
       try {
-        const { data, error } = await supabase.from('households').select('district');
+        const { data, error } = await supabase.rpc('report_districts');
         if (!error && data) {
           const unique = Array.from(new Set(data.map(d => d.district).filter(Boolean))).sort();
           setDistricts(unique);
@@ -135,7 +135,7 @@ const DatabaseBackup = ({ user }) => {
     loadDistricts();
   }, []);
 
-  // Fetch unique Townships when District changes
+  // Fetch unique Townships when District changes via aggregated RPC
   useEffect(() => {
     async function loadTownships() {
       if (!selectedDistrict) {
@@ -144,10 +144,7 @@ const DatabaseBackup = ({ user }) => {
         return;
       }
       try {
-        const { data, error } = await supabase
-          .from('households')
-          .select('township')
-          .eq('district', selectedDistrict);
+        const { data, error } = await supabase.rpc('report_townships', { p_district: selectedDistrict });
         if (!error && data) {
           const unique = Array.from(new Set(data.map(d => d.township).filter(Boolean))).sort();
           setTownships(unique);
@@ -159,21 +156,24 @@ const DatabaseBackup = ({ user }) => {
     loadTownships();
   }, [selectedDistrict]);
 
-  // Calculate live matching records count for District & Township
+  // Calculate live matching records count for District & Township across all pages
   useEffect(() => {
     async function calculateStats() {
       setLoadingStats(true);
       try {
-        let query = supabase.from('households').select('id, household_no', { count: 'exact' });
-        if (selectedDistrict) query = query.eq('district', selectedDistrict);
-        if (selectedTownship) query = query.eq('township', selectedTownship);
+        const data = await fetchAllRows(() => {
+          let query = supabase
+            .from('households')
+            .select('id, household_no')
+            .order('id', { ascending: true });
+          if (selectedDistrict) query = query.eq('district', selectedDistrict);
+          if (selectedTownship) query = query.eq('township', selectedTownship);
+          return query;
+        });
 
-        const { data, count, error } = await query;
-        if (!error) {
-          setMemberCount(count || 0);
-          const uniqueHh = new Set((data || []).map(d => d.household_no).filter(Boolean));
-          setRecordCount(uniqueHh.size);
-        }
+        setMemberCount(data.length);
+        const uniqueHh = new Set(data.map(d => d.household_no).filter(Boolean));
+        setRecordCount(uniqueHh.size);
       } catch (err) {
         console.error(err);
       } finally {
@@ -200,22 +200,21 @@ const DatabaseBackup = ({ user }) => {
     return `${parts.join('_')}.${ext}`;
   };
 
-  // Build structured nested JSON for backup
-  const fetchBackupDataset = async () => {
-    let query = supabase
-      .from('households')
-      .select('*')
-      .order('district', { ascending: true })
-      .order('township', { ascending: true })
-      .order('household_no', { ascending: true });
+  // Build structured nested JSON for backup (paginated past PostgREST 1,000-row cap)
+  const fetchBackupDataset = () =>
+    fetchAllRows(() => {
+      let query = supabase
+        .from('households')
+        .select('*')
+        .order('district', { ascending: true })
+        .order('township', { ascending: true })
+        .order('household_no', { ascending: true })
+        .order('id', { ascending: true });
 
-    if (selectedDistrict) query = query.eq('district', selectedDistrict);
-    if (selectedTownship) query = query.eq('township', selectedTownship);
-
-    const { data, error } = await query;
-    if (error) throw error;
-    return data || [];
-  };
+      if (selectedDistrict) query = query.eq('district', selectedDistrict);
+      if (selectedTownship) query = query.eq('township', selectedTownship);
+      return query;
+    });
 
   const handleExportJson = async () => {
     setExporting(true);

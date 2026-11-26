@@ -57,19 +57,9 @@ const UserManagement = ({ user }) => {
 
   const canToggleUsers = user?.role === 'system' || user?.role === 'master';
 
-  if (user?.role !== 'system' && user?.role !== 'master') {
-    return (
-      <div style={{ padding: '3rem', textAlign: 'center', color: '#737373', fontFamily: "Inter, sans-serif" }}>
-        <h2 style={{ color: '#DC2626', fontSize: '20px', fontWeight: '600', marginBottom: '12px' }}>ACCESS DENIED</h2>
-        <p style={{ fontSize: '13px' }}>Only System Administrators are authorized to view or manage user accounts.</p>
-      </div>
-    );
-  }
-
-
-
   // ── Load user list ────────────────────────────────────────────────────────
   const loadUsers = useCallback(async () => {
+    if (!canToggleUsers) return;
     setListLoading(true);
     setListError(null);
     try {
@@ -95,11 +85,11 @@ const UserManagement = ({ user }) => {
     } finally {
       setListLoading(false);
     }
-  }, []);
+  }, [canToggleUsers]);
 
-  useEffect(() => { loadUsers(); }, [loadUsers]);
-
-
+  useEffect(() => {
+    if (canToggleUsers) loadUsers();
+  }, [canToggleUsers, loadUsers]);
 
   // ── Toggle active/disabled ────────────────────────────────────────────────
   const toggleUserActive = async (targetUser) => {
@@ -125,7 +115,7 @@ const UserManagement = ({ user }) => {
 
   // ── Load all townships grouped by district ────────────────────────────────
   const loadAllTownships = useCallback(async () => {
-    if (townshipsLoadedRef.current) return;
+    if (!canToggleUsers || townshipsLoadedRef.current) return;
     setLoadingTownships(true);
     try {
       const results = await Promise.all(
@@ -142,7 +132,16 @@ const UserManagement = ({ user }) => {
     } finally {
       setLoadingTownships(false);
     }
-  }, []);
+  }, [canToggleUsers]);
+
+  if (!canToggleUsers) {
+    return (
+      <div style={{ padding: '3rem', textAlign: 'center', color: '#737373', fontFamily: "Inter, sans-serif" }}>
+        <h2 style={{ color: '#DC2626', fontSize: '20px', fontWeight: '600', marginBottom: '12px' }}>ACCESS DENIED</h2>
+        <p style={{ fontSize: '13px' }}>Only System Administrators are authorized to view or manage user accounts.</p>
+      </div>
+    );
+  }
 
   // ── Save district/township access for existing user ───────────────────────
   const saveDistrictAccess = async (userId) => {

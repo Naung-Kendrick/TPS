@@ -646,7 +646,15 @@ const Reports = ({ user }) => {
         fields.date_of_birth = normalizeDateOfBirth(fields.date_of_birth);
       }
 
-      // 1. Log audit trail in Supabase
+      // 1. Perform database update first so audit logs only record committed changes
+      const { error } = await supabase
+        .from('households')
+        .update(fields)
+        .eq('id', editingId);
+
+      if (error) throw error;
+
+      // 2. Log UI reason/field metadata after update succeeds (DB trigger also logs DB_UPDATE_MEMBER)
       try {
         await supabase.from('audit_logs').insert([{
           user_id: user?.id || null,
@@ -665,14 +673,6 @@ const Reports = ({ user }) => {
       } catch (auditErr) {
         console.warn('Audit logging error:', auditErr);
       }
-
-      // 2. Perform database update
-      const { error } = await supabase
-        .from('households')
-        .update(fields)
-        .eq('id', editingId);
-
-      if (error) throw error;
       setFamilyMembers(prev =>
         prev.map(m => m.id === editingId ? { ...m, ...fields } : m)
       );
@@ -723,7 +723,15 @@ const Reports = ({ user }) => {
       }
       const member = deleteConfirmMember;
 
-      // 1. Log audit trail in Supabase
+      // 1. Perform database deletion first so audit logs only record committed deletions
+      const { error } = await supabase
+        .from('households')
+        .delete()
+        .eq('id', member.id);
+
+      if (error) throw error;
+
+      // 2. Log UI deletion reason after delete succeeds (DB trigger also logs DB_DELETE_MEMBER)
       try {
         await supabase.from('audit_logs').insert([{
           user_id: user?.id || null,
@@ -741,14 +749,6 @@ const Reports = ({ user }) => {
       } catch (auditErr) {
         console.warn('Audit logging error:', auditErr);
       }
-
-      // 2. Perform database deletion
-      const { error } = await supabase
-        .from('households')
-        .delete()
-        .eq('id', member.id);
-
-      if (error) throw error;
       setFamilyMembers(prev => prev.filter(m => m.id !== member.id));
       setDeleteConfirmMember(null);
       setDeleteReason('');

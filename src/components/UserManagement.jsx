@@ -370,7 +370,7 @@ const UserManagement = ({ user }) => {
               <tbody>
                 {listLoading ? (
                   <tr>
-                    <td colSpan={5} className="px-4 py-10 text-center text-gray-400">
+                    <td colSpan={canToggleUsers ? 6 : 5} className="px-4 py-10 text-center text-gray-400">
                       <div className="flex flex-col items-center gap-2">
                         <Loader2 size={20} className="animate-spin" />
                         <span className="text-[10px] uppercase tracking-wider">Loading accounts…</span>
@@ -379,7 +379,7 @@ const UserManagement = ({ user }) => {
                   </tr>
                 ) : filteredList.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-4 py-10 text-center text-gray-400 text-[11px]">
+                    <td colSpan={canToggleUsers ? 6 : 5} className="px-4 py-10 text-center text-gray-400 text-[11px]">
                       No accounts match the current filter.
                     </td>
                   </tr>
@@ -453,7 +453,13 @@ const UserManagement = ({ user }) => {
                                       )}
                                     </>
                               ) : isViewerLevel ? (
-                                <span className="text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5">မြင်းသာ (Viewer)</span>
+                                (u.allowed_districts || []).length === 0
+                                  ? <span className="text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5">All Districts (Viewer)</span>
+                                  : <>
+                                      {(u.allowed_districts || []).map(d => (
+                                        <span key={d} className="text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5">{d.replace(' ခရိုင်', '')} (Viewer)</span>
+                                      ))}
+                                    </>
                               ) : isSubTownshipLevel ? (
                                 <>
                                   {(u.allowed_townships || []).length === 0

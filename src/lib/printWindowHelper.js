@@ -12,11 +12,11 @@ export function openPrintPreview(html, blockedMessage = 'Please allow popups to 
     return;
   }
 
-  w.document.open();
-  w.document.write(html);
-  w.document.close();
-
+  const parser = new DOMParser();
+  const parsed = parser.parseFromString(html, 'text/html');
   const doc = w.document;
+  doc.replaceChild(doc.importNode(parsed.documentElement, true), doc.documentElement);
+
   const printBtn = doc.getElementById('tps-print-btn');
   const closeBtn = doc.getElementById('tps-close-btn');
   if (printBtn) printBtn.addEventListener('click', () => w.print());

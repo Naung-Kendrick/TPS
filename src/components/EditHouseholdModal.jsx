@@ -140,7 +140,7 @@ const validateDateOfBirth = (text) => {
   return null;
 };
 
-const EditHouseholdModal = ({ household, isOpen, onClose, onUpdateSuccess }) => {
+const EditHouseholdModal = ({ household, user, isOpen, onClose, onUpdateSuccess }) => {
   const [formData, setFormData] = useState({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -210,6 +210,22 @@ const EditHouseholdModal = ({ household, isOpen, onClose, onUpdateSuccess }) => 
       setError(supabaseError.message);
       setLoading(false);
     } else {
+      try {
+        await supabase.from('audit_logs').insert([{
+          user_id: user?.id || null,
+          action: 'UPDATE_MEMBER',
+          table_name: 'households',
+          details: {
+            record_id: id,
+            member_name: updateData.name || '',
+            household_no: updateData.household_no || '',
+            source: 'registration_roster',
+            updated_fields: updateData,
+            performed_by: user?.username || user?.email || 'Officer',
+            timestamp: new Date().toISOString(),
+          },
+        }]);
+      } catch (_) {}
       setLoading(false);
       onUpdateSuccess();
       onClose();

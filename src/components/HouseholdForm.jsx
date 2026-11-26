@@ -910,6 +910,21 @@ const HouseholdForm = ({ user }) => {
     try {
       const { error } = await supabase.from('households').delete().eq('id', id);
       if (!error) {
+        try {
+          await supabase.from('audit_logs').insert([{
+            user_id: user?.id || null,
+            action: 'DELETE_MEMBER',
+            table_name: 'households',
+            details: {
+              record_id: id,
+              member_name: name || '',
+              household_no: formData.household_no || '',
+              source: 'registration_roster',
+              performed_by: user?.username || user?.email || 'Officer',
+              timestamp: new Date().toISOString(),
+            },
+          }]);
+        } catch (_) {}
         fetchFamilyRoster(formData.household_no);
       } else {
         alert('Failed to delete: ' + error.message);
@@ -1413,6 +1428,7 @@ const HouseholdForm = ({ user }) => {
       {isEditModalOpen && (
         <EditHouseholdModal
           household={editingMember}
+          user={user}
           isOpen={isEditModalOpen}
           onClose={() => setIsEditModalOpen(false)}
           onUpdateSuccess={() => fetchFamilyRoster(formData.household_no)}

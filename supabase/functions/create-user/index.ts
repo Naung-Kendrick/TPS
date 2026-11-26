@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
-import { checkOriginAndGetCors, enforcePostAndCors, extractSessionIdFromJwt } from "../_shared/security.ts"
+import { checkOriginAndGetCors, enforcePostAndCors, requireVerifiedSystemAdmin } from "../_shared/security.ts"
 
 const VALID_ROLES = new Set(['field', 'ops', 'regional', 'system'])
 const VALID_ACCESS_LEVELS = new Set(['central', 'district', 'township', 'viewer', 'sub_township'])
@@ -21,67 +21,14 @@ serve(async (req) => {
       auth: { persistSession: false },
     })
 
-    // 1. Verify caller JWT
-    const authHeader = req.headers.get('Authorization') ?? ''
-    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : ''
-    if (!token) {
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized: missing authorization token.' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 }
-      )
-    }
-
-    const { data: { user: caller }, error: callerErr } = await supabaseAdmin.auth.getUser(token)
-    if (callerErr || !caller) {
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized: invalid or expired session.' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 }
-      )
-    }
-
-    // 1b. Require caller session to have completed Email OTP 2FA
-    const sessionId = extractSessionIdFromJwt(token)
-    if (!sessionId) {
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized: invalid session token.' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 }
-      )
-    }
-
-    const twelveHoursAgoIso = new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString()
-    const { data: verifiedSession, error: verifiedErr } = await supabaseAdmin
-      .from('verified_2fa_sessions')
-      .select('session_id, verified_at')
-      .eq('session_id', sessionId)
-      .eq('user_id', caller.id)
-      .gt('verified_at', twelveHoursAgoIso)
-      .maybeSingle()
-
-    if (verifiedErr || !verifiedSession) {
-      return new Response(
-        JSON.stringify({ error: 'Forbidden: 2FA verification required.' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 403 }
-      )
-    }
-
-    // 2. Verify caller is an active System/Master Administrator
-    const { data: callerProfile, error: callerProfileErr } = await supabaseAdmin
-      .from('profiles')
-      .select('role, is_active')
-      .eq('id', caller.id)
-      .single()
-
-    if (
-      callerProfileErr ||
-      !callerProfile ||
-      callerProfile.is_active === false ||
-      !['system', 'master'].includes(callerProfile.role)
-    ) {
-      return new Response(
-        JSON.stringify({ error: 'Forbidden: only active System Administrators can create accounts.' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 403 }
-      )
-    }
+    // 1 & 2. Verify caller JWT, 12h Email OTP 2FA, and active System/Master Admin role
+    const auth = await requireVerifiedSystemAdmin(
+      req,
+      supabaseAdmin,
+      corsHeaders,
+      'Forbidden: only active System Administrators can create accounts.'
+    )
+    if (auth.errorResponse) return auth.errorResponse
 
     // 3. Parse and validate input payload
     const { username, password, role, displayName, email, access_level, allowed_districts, allowed_townships } = await req.json()

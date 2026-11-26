@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 import {
   UserPlus, Shield, User, Key, Loader2, CheckCircle2, AlertTriangle, X,
   Users, Circle, ToggleLeft, ToggleRight, UserCheck, UserX, Activity, ChevronDown, Mail,
-  RefreshCw, Pencil, Save
+  RefreshCw, Pencil, Save, Eye, EyeOff
 } from 'lucide-react';
 import { getProfileType, ROLE_LABELS } from '../lib/roleHelper';
 
@@ -54,6 +54,15 @@ const UserManagement = ({ user }) => {
   const [allTownships,     setAllTownships]     = useState({});
   const [loadingTownships, setLoadingTownships] = useState(false);
   const townshipsLoadedRef = useRef(false);
+
+  // ── Reset Password / PIN modal state ──────────────────────────────────────
+  const [resetTarget,   setResetTarget]   = useState(null);
+  const [resetPassword, setResetPassword] = useState('');
+  const [resetConfirm,  setResetConfirm]  = useState('');
+  const [showResetPw,   setShowResetPw]   = useState(false);
+  const [resetting,     setResetting]     = useState(false);
+  const [resetError,    setResetError]    = useState('');
+  const [resetBanner,   setResetBanner]   = useState(null);
 
   const canToggleUsers = user?.role === 'system' || user?.role === 'master';
 
@@ -222,6 +231,67 @@ const UserManagement = ({ user }) => {
     }
   };
 
+  const openResetModal = (targetUser) => {
+    setResetTarget(targetUser);
+    setResetPassword('');
+    setResetConfirm('');
+    setShowResetPw(false);
+    setResetError('');
+  };
+
+  const closeResetModal = () => {
+    if (resetting) return;
+    setResetTarget(null);
+    setResetPassword('');
+    setResetConfirm('');
+    setResetError('');
+  };
+
+  const handleResetPassword = async (e) => {
+    e.preventDefault();
+    if (!resetTarget || !canToggleUsers) return;
+    if (resetPassword.trim().length < 8 || resetPassword.length < 8) {
+      setResetError('New Password/PIN must be at least 8 non-whitespace characters.');
+      return;
+    }
+    if (resetPassword !== resetConfirm) {
+      setResetError('Passwords do not match.');
+      return;
+    }
+
+    setResetting(true);
+    setResetError('');
+    try {
+      const { data, error } = await supabase.functions.invoke('reset-user-password', {
+        body: { targetUserId: resetTarget.id, newPassword: resetPassword },
+      });
+      if (error) {
+        let msg = error.message || 'Failed to reset password.';
+        try {
+          if (typeof error?.context?.json === 'function') {
+            const body = await error.context.json();
+            if (body?.error) msg = body.error;
+          }
+        } catch (_) {}
+        throw new Error(msg);
+      }
+      if (data?.error) throw new Error(data.error);
+
+      const label = resetTarget.username || resetTarget.id.slice(0, 8);
+      setResetBanner({
+        type: 'success',
+        text: `PIN/Password reset for ${label}. Their existing 2FA sessions were revoked.`,
+      });
+      setResetTarget(null);
+      setResetPassword('');
+      setResetConfirm('');
+    } catch (err) {
+      setResetError(err.message || 'Failed to reset user password.');
+    } finally {
+      setResetting(false);
+    }
+  };
+
   // ── Derived stats ─────────────────────────────────────────────────────────
   const totalUsers    = userList.length;
   const activeUsers   = userList.filter(u => u.is_active !== false).length;
@@ -344,7 +414,13 @@ const UserManagement = ({ user }) => {
             </button>
           </div>
 
-          {/* Error */}
+          {/* Error & Reset Banner */}
+          {resetBanner && (
+            <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 text-green-800 text-xs">
+              <CheckCircle2 size={13} /> {resetBanner.text}
+              <button onClick={() => setResetBanner(null)} className="ml-auto"><X size={12} /></button>
+            </div>
+          )}
           {listError && (
             <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 text-red-700 text-xs">
               <AlertTriangle size={13} /> {listError}
@@ -528,6 +604,13 @@ const UserManagement = ({ user }) => {
                                     }`}
                                   >
                                     <Pencil size={11} /> Edit
+                                  </button>
+                                  <button
+                                    onClick={() => openResetModal(u)}
+                                    title="Reset account PIN / password"
+                                    className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1.5 border border-amber-200 text-amber-700 hover:bg-amber-50 bg-white transition-all"
+                                  >
+                                    <Key size={11} /> Reset PIN
                                   </button>
                                   <button
                                     onClick={() => toggleUserActive(u)}
@@ -986,6 +1069,105 @@ const UserManagement = ({ user }) => {
                 </form>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── RESET PIN / PASSWORD MODAL ────────────────────────────────────────── */}
+      {resetTarget && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-white border border-gray-900 w-full max-w-md shadow-xl">
+            <div className="px-5 py-4 border-b border-gray-200 flex items-center justify-between bg-gray-50">
+              <div className="flex items-center gap-2">
+                <Key size={14} className="text-amber-700" />
+                <h3 className="text-xs font-bold uppercase tracking-wider text-gray-900">
+                  Reset Account PIN / Password
+                </h3>
+              </div>
+              <button type="button" onClick={closeResetModal} className="text-gray-400 hover:text-gray-900">
+                <X size={15} />
+              </button>
+            </div>
+
+            <form onSubmit={handleResetPassword} className="p-5 space-y-4">
+              <div className="p-3 bg-gray-50 border border-gray-200 text-xs">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-0.5">Target Officer</div>
+                <div className="font-bold text-gray-900">
+                  {resetTarget.username || resetTarget.id.slice(0, 8)}
+                  <span className="ml-2 text-[10px] font-mono text-gray-500 uppercase">({resetTarget.role})</span>
+                </div>
+                <p className="text-[10px] text-amber-700 mt-1.5">
+                  Resetting the PIN immediately revokes this officer&apos;s active 2FA sessions and requires a fresh Email OTP login.
+                </p>
+              </div>
+
+              {resetError && (
+                <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs flex items-start gap-2">
+                  <AlertTriangle size={14} className="mt-0.5 flex-shrink-0" />
+                  <span>{resetError}</span>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase tracking-wider">
+                  New PIN / Password (min 8 chars)
+                </label>
+                <div className="flex">
+                  <input
+                    type={showResetPw ? 'text' : 'password'}
+                    required
+                    minLength={8}
+                    maxLength={128}
+                    value={resetPassword}
+                    onChange={(e) => setResetPassword(e.target.value)}
+                    className="w-full px-3 py-2 bg-white border border-gray-200 focus:outline-none focus:border-gray-900 text-sm"
+                    placeholder="Enter new PIN / password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowResetPw(v => !v)}
+                    className="px-3 border border-l-0 border-gray-200 bg-gray-50 text-gray-500 hover:text-gray-900"
+                    title={showResetPw ? 'Hide' : 'Show'}
+                  >
+                    {showResetPw ? <EyeOff size={14} /> : <Eye size={14} />}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase tracking-wider">
+                  Confirm New PIN / Password
+                </label>
+                <input
+                  type={showResetPw ? 'text' : 'password'}
+                  required
+                  minLength={8}
+                  maxLength={128}
+                  value={resetConfirm}
+                  onChange={(e) => setResetConfirm(e.target.value)}
+                  className="w-full px-3 py-2 bg-white border border-gray-200 focus:outline-none focus:border-gray-900 text-sm"
+                  placeholder="Re-enter new PIN / password"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={closeResetModal}
+                  disabled={resetting}
+                  className="px-4 py-2 border border-gray-200 text-gray-600 hover:text-gray-900 text-[11px] font-bold uppercase tracking-wider"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={resetting}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-gray-900 hover:bg-gray-800 text-white text-[11px] font-bold uppercase tracking-wider disabled:opacity-50"
+                >
+                  {resetting ? <><Loader2 size={12} className="animate-spin" /> Resetting...</> : 'Confirm Reset PIN'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

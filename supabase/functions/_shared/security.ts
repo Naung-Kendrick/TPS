@@ -84,3 +84,95 @@ export function extractSessionIdFromJwt(jwt: string): string | null {
     return null
   }
 }
+
+export interface VerifiedSystemAdminResult {
+  caller?: { id: string }
+  callerProfile?: { role: string; is_active: boolean; username?: string | null }
+  errorResponse?: Response
+}
+
+/**
+ * Verifies caller Bearer JWT, active 12h Email OTP 2FA session, and active
+ * `system` / `master` admin profile. Returns either `{ caller, callerProfile }`
+ * or an HTTP `errorResponse` (`401`/`403`).
+ */
+export async function requireVerifiedSystemAdmin(
+  req: Request,
+  // deno-lint-ignore no-explicit-any
+  supabaseAdmin: any,
+  corsHeaders: Record<string, string>,
+  forbiddenMessage = 'Forbidden: only active System Administrators can perform this action.'
+): Promise<VerifiedSystemAdminResult> {
+  const jsonHeaders = { ...corsHeaders, 'Content-Type': 'application/json' }
+
+  const authHeader = req.headers.get('Authorization') ?? ''
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : ''
+  if (!token) {
+    return {
+      errorResponse: new Response(
+        JSON.stringify({ error: 'Unauthorized: missing authorization token.' }),
+        { headers: jsonHeaders, status: 401 }
+      ),
+    }
+  }
+
+  const { data: { user: caller }, error: callerErr } = await supabaseAdmin.auth.getUser(token)
+  if (callerErr || !caller) {
+    return {
+      errorResponse: new Response(
+        JSON.stringify({ error: 'Unauthorized: invalid or expired session.' }),
+        { headers: jsonHeaders, status: 401 }
+      ),
+    }
+  }
+
+  const sessionId = extractSessionIdFromJwt(token)
+  if (!sessionId) {
+    return {
+      errorResponse: new Response(
+        JSON.stringify({ error: 'Unauthorized: invalid session token.' }),
+        { headers: jsonHeaders, status: 401 }
+      ),
+    }
+  }
+
+  const twelveHoursAgoIso = new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString()
+  const { data: verifiedSession, error: verifiedErr } = await supabaseAdmin
+    .from('verified_2fa_sessions')
+    .select('session_id, verified_at')
+    .eq('session_id', sessionId)
+    .eq('user_id', caller.id)
+    .gt('verified_at', twelveHoursAgoIso)
+    .maybeSingle()
+
+  if (verifiedErr || !verifiedSession) {
+    return {
+      errorResponse: new Response(
+        JSON.stringify({ error: 'Forbidden: 2FA verification required.' }),
+        { headers: jsonHeaders, status: 403 }
+      ),
+    }
+  }
+
+  const { data: callerProfile, error: callerProfileErr } = await supabaseAdmin
+    .from('profiles')
+    .select('role, is_active, username')
+    .eq('id', caller.id)
+    .single()
+
+  if (
+    callerProfileErr ||
+    !callerProfile ||
+    callerProfile.is_active === false ||
+    !['system', 'master'].includes(callerProfile.role)
+  ) {
+    return {
+      errorResponse: new Response(
+        JSON.stringify({ error: forbiddenMessage }),
+        { headers: jsonHeaders, status: 403 }
+      ),
+    }
+  }
+
+  return { caller, callerProfile }
+}

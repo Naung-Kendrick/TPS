@@ -89,6 +89,6 @@ supabase functions deploy create-user --no-verify-jwt --use-api
 
 ### Known Build / Runtime Troubleshooting
 1. **Build warning for `/assets/fonts/Pyidaungsu.ttf`:** `vite build` warns about an unresolved CSS reference to `/assets/fonts/Pyidaungsu.ttf` (font file not present in `public/assets/fonts/`). Browser falls back cleanly to system Myanmar fonts (`Noto Sans Myanmar` / OS fonts).
-2. **Vite ESM-in-CJS config notice:** Vite emits a CJS-vs-ESM config-loading notice when loading `vite.config.js` while still building cleanly.
+2. **Vite ESM config:** [`vite.config.mjs`](file:///c:/Users/User/Desktop/Our%202026%20Code%20PJ/TPS/vite.config.mjs) uses `.mjs` so Vite 8's native config loader runs with zero CommonJS-vs-ESM warnings alongside `postcss.config.js` / `tailwind.config.js`.
 3. **Windows Sandbox & CLIs:** `supabase` CLI and `vercel` CLI commands require network/auth access and will fail inside the default offline terminal sandbox unless elevated/approved.
 4. **2FA OTP Delivery Failures:** Verify `RESEND_API_KEY`, `OTP_FROM_EMAIL`, `OTP_HMAC_SECRET`, and `ALLOWED_ORIGIN` are set in Supabase Edge Function secrets and that the browser origin matches `ALLOWED_ORIGIN`.

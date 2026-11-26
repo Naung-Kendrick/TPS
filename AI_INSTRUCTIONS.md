@@ -53,7 +53,7 @@ Do not duplicate logic that already exists:
 
 - **NEVER** read, print, copy, commit, or log values from `.env.local` or secret stores.
 - **NEVER** bypass or relax RLS (`USING (true)`), `is_2fa_verified()`, `OTP_HMAC_SECRET`, CSP/headers in `vercel.json`, or `VITE_SKIP_OTP` guards.
-- **NEVER** configure Workbox / Service Worker in `vite.config.js` to cache Supabase API/Storage responses containing citizen PII, or store unencrypted citizen PII in `localStorage`.
+- **NEVER** configure Workbox / Service Worker in `vite.config.mjs` to cache Supabase API/Storage responses containing citizen PII, or store unencrypted citizen PII in `localStorage`.
 - **NEVER** run `supabase db reset`, drop production tables, or deploy Edge Functions/Vercel builds without explicit user approval.
 - **NEVER** re-introduce previously removed unused dependencies (`@zxing/browser`, `@zxing/library`, `html5-qrcode`, `jszip`, `knayi-myscript`, `qrcode`) without justification.
 

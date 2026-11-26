@@ -22,7 +22,7 @@ flowchart LR
 
 ## 2. Project Directory Organization (85 Tracked/Source Files)
 
-- **Root (`16` files)**: Build/hosting configs (`vite.config.js`, `vercel.json`, `tailwind.config.js`, `postcss.config.js`, `index.html`, `package.json`), security rule (`AGENTS.md`), documentation (`*.md`), local env (`.env.local` — ignored by Git).
+- **Root (`16` files)**: Build/hosting configs (`vite.config.mjs`, `vercel.json`, `tailwind.config.js`, `postcss.config.js`, `index.html`, `package.json`), security rule (`AGENTS.md`), documentation (`*.md`), local env (`.env.local` — ignored by Git).
 - **`public/icons/` (`2` files)**: PWA manifest icons (`icon-192.png`, `icon-512.png`).
 - **`src/` (`38` files)**:
   - `main.jsx`, `App.jsx`, `index.css` — Bootstrap, lazy routes, 2FA/session guard, global design tokens.
@@ -60,7 +60,7 @@ flowchart LR
 | **IndexedDB Read Cache** | `src/lib/offlineCache.js` | `tps_offline_cache` (`cache` store, used by `Reports.jsx`) | **15 minutes** | User-scoped key prefix (`reports_v6_${user.id}_...`), cleared on `handleLogin` and `handleLogout` |
 | **Stats Session Cache** | `PopulationStatistics.jsx`, `DemographicDashboard.jsx` | `sessionStorage` (`tps_stats_cache_v3_*`, `tps_demo_cache_v1_*`) | **5 minutes** | User-scoped key prefix, wiped via `sessionStorage.clear()` on logout |
 | **Notification Log** | `src/lib/notifications.js` | `localStorage` (`tps_notifications`, max 50) | Persistent until cleared | Filtered to `ERROR` and `WARNING` only (`OFFLINE` & non-urgent types suppressed) |
-| **Workbox Service Worker** | `vite.config.js` | Precache app shell + `google-fonts-cache` | Static build / 1yr fonts | Supabase API/REST/Storage traffic is **explicitly excluded** from SW caching |
+| **Workbox Service Worker** | `vite.config.mjs` | Precache app shell + `google-fonts-cache` | Static build / 1yr fonts | Supabase API/REST/Storage traffic is **explicitly excluded** from SW caching |
 
 ---
 
